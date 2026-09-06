@@ -105,12 +105,13 @@ describe('CFSM wire adapters', () => {
 
   it('keeps source ownership on list responses', () => {
     const result = normalizeServerCollection({
-      servers: [{ id: 'node-1' }],
+      servers: [{ id: 'node-1' }, null, {}, { id: '   ' }],
       stats: { online: 1 },
       sysConfig: { show_price: true, long_history_points: 180 },
     }, source)
 
     expect(result.servers[0]?.source.base).toBe('https://status.example')
+    expect(result.servers).toHaveLength(1)
     expect(result.stats).toEqual({ online: 1 })
     expect(result.systemConfig).toEqual({ showPrice: true, longHistoryPoints: 180 })
   })

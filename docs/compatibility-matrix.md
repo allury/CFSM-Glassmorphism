@@ -1,12 +1,12 @@
 # 功能兼容矩阵
 
-> 本文记录 2026-09-06 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不表示当前第 1 轮已经实现对应 UI。
+> 本文记录 2026-09-06 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不等同于当前实现进度。
 
 ## 审计基线
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 远端无提交 | 本地从空仓库建立工程 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | 0689e569765a52a40d55ff1fbc2475177af75af6 | 第 1 轮工程基础；第 2 轮在其上开发 |
 | huilang-me/CF-Server-Monitor | main | 90d0d217015ce294a0826146d83a80e558a5055e | theme-develop.md 与 src/frontend 第三方主题链路 |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -14,6 +14,12 @@
 权限边界采用：CFSM `theme-develop.md` 高于 CFSM 内部前端实现；LuminaPlus 只作为成熟适配参考；Komari 只提供视觉与交互基线。上游克隆位于忽略目录 `work/upstreams/`，保持只读。
 
 状态统计：**✅ 1:1 31 项、🟢 等价实现 20 项、🟡 降级实现 5 项、🔴 CFSM API 暂不支持 4 项，共 60 项。**
+
+## 第 2 轮实现进度
+
+真实 REST 首页已覆盖首页入口、卡片/列表、总览、分组、搜索、基础排序、核心资源与网络指标、进程与连接、当前延迟/丢包、GPU、IPv4/IPv6 可达性、站点标题，以及多 API Base 的来源保留和部分失败降级。页面对零节点、全离线、缺失字段、旧 Agent 数据和请求错误使用明确空态或不可用状态。
+
+WebSocket、节点详情、历史图、主题设置界面、Earth/Map 和高级工具仍未进入实现；下表中的兼容状态仍表示最终设计结论。
 
 ## 矩阵
 
@@ -87,4 +93,3 @@
 - `disk` 只有六个指标中至少一个非零时才有意义；缺失、格式错误或全零都视为不可用。
 - `/api/servers` 才包含 ping/loss 窗口；`/api/server` 不包含。窗口点稀疏且保留真实时间戳。
 - LuminaPlus 最新实现确实通过 `POST /api/theme_options` 保存完整配置。其仍存在“只读/本地保存”的旧注释和一个拒绝保存的兼容 stub；本项目以实际调用链与最新 CFSM 文档为准，不复制陈旧注释。
-

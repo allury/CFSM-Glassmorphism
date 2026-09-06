@@ -42,8 +42,12 @@ function objectValue(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {}
 }
 
-function enumValue<T extends string>(value: unknown, allowed: readonly T[], fallback: T): T {
-  return typeof value === 'string' && allowed.includes(value as T) ? (value as T) : fallback
+function preferredThemeValue(value: unknown): SiteConfig['preferredTheme'] {
+  return value === 'dark' || value === 'light' ? value : 'auto'
+}
+
+function defaultLanguageValue(value: unknown): SiteConfig['defaultLanguage'] {
+  return value === 'zh' || value === 'en' ? value : 'auto'
 }
 
 function reachabilityValue(value: unknown): '0' | '1' | null {
@@ -171,7 +175,12 @@ function systemConfig(value: unknown): ServerSystemConfig | undefined {
 }
 
 function isOnline(value: Record<string, unknown>, now: number): boolean {
-  if (typeof value.is_online === 'boolean') return value.is_online
+  if (value.is_online === true || value.is_online === false
+    || value.is_online === 1 || value.is_online === 0
+    || value.is_online === '1' || value.is_online === '0'
+    || value.is_online === 'true' || value.is_online === 'false') {
+    return booleanValue(value.is_online)
+  }
   const updated = numberValue(value.last_updated) ?? numberValue(value.timestamp)
   return updated !== null && updated <= now + FIVE_MINUTES_MS && now - updated <= FIVE_MINUTES_MS
 }
@@ -202,8 +211,8 @@ export function normalizeSiteConfig(value: unknown): SiteConfig {
       bd: stringValue(input.custom_bd_name) ?? 'BGP',
     },
     siteTitle: title ?? 'CF Server Monitor',
-    preferredTheme: enumValue(input.preferred_theme, ['auto', 'dark', 'light'] as const, 'auto'),
-    defaultLanguage: enumValue(input.default_language, ['auto', 'zh', 'en'] as const, 'auto'),
+    preferredTheme: preferredThemeValue(input.preferred_theme),
+    defaultLanguage: defaultLanguageValue(input.default_language),
     themeOptions: objectValue(input.theme_options),
     verified: booleanValue(input.verified),
     turnstileVerified: stringValue(input.turnstile_verified),
@@ -297,7 +306,10 @@ export function normalizeServerCollection(
 
   return {
     source,
-    servers: input.servers.map((server) => normalizeServer(server, source, now)),
+    servers: input.servers.flatMap((server) => {
+      if (!isRecord(server) || stringValue(server.id) === null) return []
+      return [normalizeServer(server, source, now)]
+    }),
     stats: objectValue(input.stats),
     systemConfig: systemConfig(input.sysConfig),
   }

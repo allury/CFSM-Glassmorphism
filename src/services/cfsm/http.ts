@@ -56,7 +56,8 @@ async function responseBody(response: Response): Promise<unknown> {
   const text = await response.text()
   if (text === '') return null
   try {
-    return JSON.parse(text) as unknown
+    const parsed: unknown = JSON.parse(text)
+    return parsed
   } catch {
     return text
   }
@@ -84,10 +85,10 @@ function errorDetails(payload: unknown): { message: string; code: string | null 
   return { message, code }
 }
 
-export async function cfsmRequest<T = unknown>(
+export async function cfsmRequest(
   path: string,
   options: CfsmRequestOptions,
-): Promise<T> {
+): Promise<unknown> {
   const controller = new AbortController()
   const timeoutMs = options.timeoutMs ?? 15_000
   const fetcher = options.fetcher ?? fetch
@@ -139,21 +140,20 @@ export async function cfsmRequest<T = unknown>(
     writeStorage(STORAGE_KEYS.turnstileToken, null, options.storage)
   }
 
-  return payload as T
+  return payload
 }
 
-export function cfsmGet<T = unknown>(
+export function cfsmGet(
   path: string,
   options: Omit<CfsmRequestOptions, 'method' | 'body'>,
-): Promise<T> {
-  return cfsmRequest<T>(path, { ...options, method: 'GET' })
+): Promise<unknown> {
+  return cfsmRequest(path, { ...options, method: 'GET' })
 }
 
-export function cfsmPost<T = unknown>(
+export function cfsmPost(
   path: string,
   body: unknown,
   options: Omit<CfsmRequestOptions, 'method' | 'body'>,
-): Promise<T> {
-  return cfsmRequest<T>(path, { ...options, method: 'POST', body })
+): Promise<unknown> {
+  return cfsmRequest(path, { ...options, method: 'POST', body })
 }
-

@@ -8,7 +8,10 @@ const forbiddenRuntimeMarkers = [
   '/api/public',
   '/api/nodes',
   '/api/clients',
+  '/api/rpc',
   '/rpc2',
+  '/manage/',
+  'Komari RPC',
   'common:',
   'public:',
   'admin:',
@@ -46,4 +49,3 @@ for (const file of textFiles) {
 console.log(
   'dist validation passed: index.html and ' + assetFiles.length + ' asset file(s)',
 )
-

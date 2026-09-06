@@ -1,5 +1,5 @@
 export * from './adapters'
 export * from './api'
 export * from './config'
+export * from './glassmorphism-adapter'
 export * from './http'
-

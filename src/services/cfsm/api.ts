@@ -1,6 +1,7 @@
 import type {
   HistorySeries,
   ServerCollection,
+  ServerSourcesResult,
   SiteConfig,
   ThemeOptionsSaveResult,
 } from '@/types/cfsm'
@@ -13,7 +14,7 @@ import {
   normalizeThemeOptionsSave,
 } from './adapters'
 import { apiSource, getApiBases } from './config'
-import { cfsmGet, cfsmPost, type CfsmRequestOptions } from './http'
+import { CfsmRequestError, cfsmGet, cfsmPost, type CfsmRequestOptions } from './http'
 
 export const HISTORY_HOURS = [0.167, 0.5, 1, 6, 12, 24, 48, 96, 168] as const
 export type HistoryHours = (typeof HISTORY_HOURS)[number]
@@ -50,8 +51,31 @@ export async function fetchServers(
 export async function fetchAllServerSources(
   bases = getApiBases(),
   options: SharedRequestOptions = {},
-): Promise<ServerCollection[]> {
-  return Promise.all(bases.map((base, index) => fetchServers(base, options, index)))
+): Promise<ServerSourcesResult> {
+  const settled = await Promise.allSettled(
+    bases.map((base, index) => fetchServers(base, options, index)),
+  )
+  const collections: ServerCollection[] = []
+  const failures: ServerSourcesResult['failures'] = []
+
+  settled.forEach((result, index) => {
+    const base = bases[index]
+    if (!base) return
+    if (result.status === 'fulfilled') {
+      collections.push(result.value)
+      return
+    }
+
+    const reason: unknown = result.reason
+    failures.push({
+      source: apiSource(base, index),
+      message: reason instanceof Error ? reason.message : 'Unknown CFSM server error',
+      status: reason instanceof CfsmRequestError ? reason.status : null,
+      code: reason instanceof CfsmRequestError ? reason.code : null,
+    })
+  })
+
+  return { collections, failures }
 }
 
 export async function fetchServer(
@@ -90,4 +114,3 @@ export async function saveThemeOptions(
   })
   return normalizeThemeOptionsSave(payload)
 }
-

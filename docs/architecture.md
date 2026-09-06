@@ -18,7 +18,7 @@ Transport (URL, JWT, Turnstile, timeout, errors)
 Service (endpoint intent and source ownership)
       |
       v
-Adapter (unknown wire data -> strict domain model)
+Adapter (unknown wire data -> strict CFSM and Glass UI models)
       |
       v
 Store (state, lifecycle, selection, derived values)
@@ -59,6 +59,7 @@ UI (render and user intent only)
 - 把 snake_case 映射到 `src/types/cfsm.ts` 的稳定领域模型。
 - 兼容 `gpu_info` 的数组/JSON 字符串和历史磁盘 IO 两种形状。
 - 不补历史点，不伪造 IP/ASN/城市/厂商，不把错误格式变成看似真实的数据。
+- `src/services/cfsm/glassmorphism-adapter.ts` 再把稳定 CFSM 模型映射为首页展示模型；可达性仍是状态，不成为地址字符串。
 
 ### Store
 
@@ -66,17 +67,18 @@ UI (render and user intent only)
 
 - `app.ts` 管理 apiBases、站点 config、加载状态与官方管理端地址。
 - `servers.ts` 管理按来源分开的集合，以 `base::id` 作为稳定键，避免不同站点 UUID 冲突。
-- store 对异步过程提供 idle/loading/ready/error，而不是让 UI 猜测。
+- store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
 - 后续 WebSocket、详情、历史和 theme settings 各自建立职责清晰的 store 或 composable，不堆入单一全局对象。
 
 ### UI
 
-位置：`src/App.vue` 与后续 `views/`、`components/`。
+位置：`src/App.vue`、`src/views/HomeView.vue` 与 `src/components/dashboard/`。
 
 - 只渲染领域模型和显式状态。
 - 缺数据时隐藏依赖组件或显示“不可用”，不展示 0 值占位来冒充采样。
 - 用户动作调用 store/service，鉴权失败保留当前页面和编辑内容。
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
+- 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
 
 ## Theme Options
 
@@ -98,7 +100,7 @@ schema defaults
 
 ## WebSocket
 
-后续实时层将位于 `src/services/cfsm/ws.ts`，但第 1 轮不创建假实现。约束如下：
+后续实时层将位于 `src/services/cfsm/ws.ts`，当前 REST 首页不创建假实现。约束如下：
 
 - 一条首页连接只对应一个 apiBase；它的订阅 IDs 只来自同一 base。
 - 详情连接使用 `subscribe=<id>`；不拉/订阅全量后过滤。
@@ -142,7 +144,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 1 轮完成边界
+## 第 2 轮完成边界
 
-本轮完成审计、文档、基础工程、领域模型、HTTP service、adapter、store 骨架、最小真实 config 页面、测试与 CI。以下仍是后续阶段：完整首页、WebSocket 运行时、详情页、历史图、完整主题设置、Earth/Map 和高级工具。
-
+本轮在既有审计与工程基础上完成真实 REST 首页：读取 `/api/config` 与 `/api/servers`，经过严格 adapter 形成 Glass 展示模型，并提供总览、卡片/列表、分组、搜索、基础排序、多来源部分失败和真实空/离线/缺字段状态。以下仍是后续阶段：WebSocket 运行时、详情页、历史图、完整主题设置、Earth/Map 和高级工具。

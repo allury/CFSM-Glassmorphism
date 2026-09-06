@@ -138,6 +138,18 @@ export interface ServerCollection {
   systemConfig?: ServerSystemConfig
 }
 
+export interface ServerSourceFailure {
+  source: ApiSource
+  message: string
+  status: number | null
+  code: string | null
+}
+
+export interface ServerSourcesResult {
+  collections: ServerCollection[]
+  failures: ServerSourceFailure[]
+}
+
 export interface HistoryPoint {
   timestamp: number
   cpu: NullableNumber

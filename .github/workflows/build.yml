@@ -42,15 +42,19 @@ jobs:
       - name: Validate dist
         run: bun run validate:dist
 
+      - name: Resolve artifact name
+        id: artifact
+        shell: bash
+        run: echo "file=CFSM-Glassmorphism-build-${GITHUB_SHA::7}.zip" >> "$GITHUB_OUTPUT"
+
       - name: Package theme
         working-directory: dist
-        run: zip -r ../cfsm-glassmorphism.zip index.html assets
+        run: zip -r "../${{ steps.artifact.outputs.file }}" index.html assets
 
       - name: Upload theme archive
         uses: actions/upload-artifact@v4
         with:
-          name: cfsm-glassmorphism
-          path: cfsm-glassmorphism.zip
+          name: ${{ steps.artifact.outputs.file }}
+          path: ${{ steps.artifact.outputs.file }}
           if-no-files-found: error
           retention-days: 14
-

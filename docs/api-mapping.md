@@ -8,13 +8,13 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 
 ## 端点与代码责任
 
-| 能力 | theme-develop.md | CFSM 官方 frontend 参考 | 本主题实现 | 第 1 轮状态 |
+| 能力 | theme-develop.md | CFSM 官方 frontend 参考 | 本主题实现 | 当前状态 |
 |---|---|---|---|---|
-| Config | `GET /api/config` | `src/frontend/main.js`、`utils/api.js`、`utils/turnstile.js` | `fetchSiteConfig` → `normalizeSiteConfig` | 已实现并测试 |
-| Servers | `GET /api/servers` | `src/frontend/utils/server.js`、`views/dashboard` | `fetchServers` / `fetchAllServerSources` → `normalizeServerCollection` | 已实现并测试 |
+| Config | `GET /api/config` | `src/frontend/main.js`、`utils/api.js`、`utils/turnstile.js` | `fetchSiteConfig` → `normalizeSiteConfig` | 已用于真实首页并测试 |
+| Servers | `GET /api/servers` | `src/frontend/utils/server.js`、`views/dashboard` | `fetchServers` / `fetchAllServerSources` → `normalizeServerCollection` → `toGlassServer` | 已用于真实首页并测试，支持多来源部分失败 |
 | Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` → `normalizeServer` | 已实现 service，UI 后续实现 |
 | History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` | 已实现 service，图表后续实现 |
-| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 ServerDetail 的订阅逻辑 | 预留类型；后续建立独立 ws service | 本轮明确未实现运行时 |
+| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 ServerDetail 的订阅逻辑 | 预留类型；后续建立独立 ws service | 第 2 轮明确未实现运行时 |
 | Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `saveThemeOptions` → `normalizeThemeOptionsSave` | 已实现并测试 |
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
@@ -55,7 +55,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 ### GET /api/ws
 
-本轮没有实现 WebSocket 客户端。后续实现必须遵守：
+第 2 轮没有实现 WebSocket 客户端。后续实现必须遵守：
 
 1. 首页先按 base 读取列表，再为每个 base 建立独立 `subscribe=all` 连接。
 2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 只属于当前 base；不发送订阅消息不会收到更新。
@@ -95,4 +95,3 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 ## 数据真实性边界
 
 公开 API 不提供实际服务器 IP、ASN、城市、精确坐标或管理端 note。本主题不会从可达性标志推断地址，不会在生产代码中填假数据，也不会为填满组件而生成历史点、价格、厂商或地理位置。
-

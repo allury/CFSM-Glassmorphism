@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import type { CfsmServer, ServerCollection } from '@/types/cfsm'
+import type { CfsmServer, ServerCollection, ServerSourceFailure } from '@/types/cfsm'
 import { fetchAllServerSources, getApiBases } from '@/services/cfsm'
 import type { LoadState } from './app'
 
@@ -12,6 +12,8 @@ export const useServersStore = defineStore('servers', () => {
   const collections = ref<ServerCollection[]>([])
   const state = ref<LoadState>('idle')
   const error = ref<string | null>(null)
+  const sourceFailures = ref<ServerSourceFailure[]>([])
+  const loadedAt = ref<number | null>(null)
 
   const servers = computed<CfsmServer[]>(() => collections.value.flatMap((item) => item.servers))
   const bySourceAndId = computed(() => new Map(
@@ -25,9 +27,21 @@ export const useServersStore = defineStore('servers', () => {
   async function load(bases = getApiBases()): Promise<void> {
     state.value = 'loading'
     error.value = null
+    sourceFailures.value = []
     try {
-      collections.value = await fetchAllServerSources(bases)
-      state.value = 'ready'
+      const result = await fetchAllServerSources(bases)
+      collections.value = result.collections
+      sourceFailures.value = result.failures
+      loadedAt.value = Date.now()
+
+      if (result.failures.length === 0) {
+        state.value = 'ready'
+      } else if (result.collections.length > 0) {
+        state.value = 'partial'
+      } else {
+        state.value = 'error'
+        error.value = result.failures.map((failure) => failure.message).join('; ')
+      }
     } catch (reason) {
       collections.value = []
       state.value = 'error'
@@ -39,6 +53,8 @@ export const useServersStore = defineStore('servers', () => {
     collections.value = []
     state.value = 'idle'
     error.value = null
+    sourceFailures.value = []
+    loadedAt.value = null
   }
 
   return {
@@ -46,9 +62,10 @@ export const useServersStore = defineStore('servers', () => {
     servers,
     state,
     error,
+    sourceFailures,
+    loadedAt,
     findServer,
     load,
     clear,
   }
 })
-

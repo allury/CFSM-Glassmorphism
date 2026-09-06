@@ -3,7 +3,7 @@ import { defineStore } from 'pinia'
 import type { SiteConfig } from '@/types/cfsm'
 import { adminUrl, fetchSiteConfig, getApiBases } from '@/services/cfsm'
 
-export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+export type LoadState = 'idle' | 'loading' | 'ready' | 'partial' | 'error'
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Unknown CFSM configuration error'
@@ -47,4 +47,3 @@ export const useAppStore = defineStore('app', () => {
     initialize,
   }
 })
-
