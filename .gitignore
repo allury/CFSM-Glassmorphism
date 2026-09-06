@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.eslintcache
+*.zip
+.env
+.env.*
+!.env.example
+
+# Codex projectless workspace helpers and read-only upstream checkouts.
+work/
+outputs/
+

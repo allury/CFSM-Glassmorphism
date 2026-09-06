@@ -1,0 +1,4 @@
+* text=auto
+
+# Preserve the owner-supplied specification byte-for-byte.
+docs/CODEX_SPEC.md -text
