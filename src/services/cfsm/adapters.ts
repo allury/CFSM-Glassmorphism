@@ -439,7 +439,7 @@ export function mergeRealtimeSample(
   if ('swap_used' in input) next.swapUsed = normalized.swapUsed
   if ('disk_total' in input) next.diskTotal = normalized.diskTotal
   if ('disk_used' in input) next.diskUsed = normalized.diskUsed
-  if ('disk' in input && normalized.diskIo !== undefined) next.diskIo = normalized.diskIo
+  if ('disk' in input) next.diskIo = normalized.diskIo
   if ('cpu_cores' in input) next.cpuCores = normalized.cpuCores
   if ('cpu_info' in input) next.cpuInfo = normalized.cpuInfo
   if ('gpu_info' in input) next.gpus = normalized.gpus
@@ -478,6 +478,7 @@ export function normalizeHistory(value: unknown): HistoryPoint[] {
     return [{
       timestamp,
       cpu: numberValue(entry.cpu),
+      gpus: gpuValues(entry.gpu_info),
       memoryUsed: numberValue(entry.ram_used),
       memoryTotal: numberValue(entry.ram_total),
       swapUsed: numberValue(entry.swap_used),

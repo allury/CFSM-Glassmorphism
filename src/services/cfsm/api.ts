@@ -1,4 +1,5 @@
 import type {
+  CfsmServer,
   HistorySeries,
   ServerCollection,
   ServerSourcesResult,
@@ -87,6 +88,37 @@ export async function fetchServer(
   const query = new URLSearchParams({ id }).toString()
   const payload = await cfsmGet('/api/server?' + query, { ...options, base })
   return normalizeServer(payload, source)
+}
+
+export async function fetchServerFromSources(
+  id: string,
+  bases: readonly string[],
+  options: SharedRequestOptions = {},
+  preferredBase?: string,
+): Promise<CfsmServer> {
+  const uniqueBases = [...new Set(bases)]
+  if (uniqueBases.length === 0) throw new Error('No CFSM API base is configured')
+
+  if (preferredBase && uniqueBases.includes(preferredBase)) {
+    return fetchServer(id, preferredBase, options)
+  }
+
+  const settled = await Promise.allSettled(
+    uniqueBases.map((base) => fetchServer(id, base, options)),
+  )
+  for (const result of settled) {
+    if (result.status === 'fulfilled') return result.value
+  }
+
+  const reasons = settled.flatMap((result) => {
+    if (result.status === 'fulfilled') return []
+    const reason: unknown = result.reason
+    return [reason]
+  })
+  const meaningful = reasons.find((reason) => (
+    !(reason instanceof CfsmRequestError) || reason.status !== 404
+  ))
+  throw meaningful ?? reasons[0] ?? new Error('CFSM server could not be resolved')
 }
 
 export async function fetchHistory(

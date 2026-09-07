@@ -24,6 +24,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   toggleFavorite: []
+  viewDetails: []
 }>()
 
 const resourceItems = computed(() => {
@@ -166,6 +167,11 @@ onUnmounted(() => {
                 <div><dt>IPv4 / IPv6</dt><dd>{{ server.connectivity.ipv4 === null ? '未知' : server.connectivity.ipv4 === '1' ? '可达' : '不可达' }} / {{ server.connectivity.ipv6 === null ? '未知' : server.connectivity.ipv6 === '1' ? '可达' : '不可达' }}</dd></div>
               </dl>
             </section>
+
+            <button class="quick-view__detail-link" type="button" @click="emit('viewDetails')">
+              打开完整详情与历史
+              <span aria-hidden="true">→</span>
+            </button>
           </div>
         </section>
       </div>

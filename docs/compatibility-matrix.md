@@ -6,7 +6,7 @@
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 4574ed2d5bdcde435b098972c75b768e91d48c11 | 第 4 轮 WebSocket 与多 API Base；第 4.5 轮在其上开发 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | 136c51a79fc49c871334ec54bcd43d4ac542c5ec | 第 4.5 轮 Ping/Node 契约；第 5 轮在其上开发 |
 | huilang-me/CF-Server-Monitor | main | 924e71d32e5a0b5493cb52fdb2c184a9d6bd71e3 | 最新 theme-develop.md Ping/Node 契约与公开 config handler |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -15,11 +15,11 @@
 
 状态统计：**✅ 1:1 31 项、🟢 等价实现 20 项、🟡 降级实现 5 项、🔴 CFSM API 暂不支持 4 项，共 60 项。**
 
-## 第 4.5 轮实现进度
+## 第 5 轮实现进度
 
-第 4 轮实时架构保持不变。第 4.5 轮将 CFSM 新增的 `node_1_name..node_4_name`、`ping_node_1..4` 与 `loss_node_1..4` 纳入严格领域模型，同时把旧四线路改为相同的 `number | null | false` 三态。Server、History、列表窗口和 WebSocket partial sample 都区分：缺失/未配置 `false`、明确超时 `null`、有效结果 `number`（包括 0）。旧 CFSM 缺字段时使用集中 fallback，不生成探测结果。
+第 5 轮直接消费第 4.5 轮的 `CfsmServer`、`HistoryPoint`、`ProbeValues` 与集中 probe label，不在详情 UI 读取 snake_case。`/#/server/:id` 使用单节点 `/api/server`，确定来源后让 History、source config 与 `/api/ws?subscribe=<id>` 全部回到 owning base。直接刷新多来源链接时仅用各 base 的单节点接口解析归属，不请求全量列表。
 
-第 4.5 轮测试覆盖八个 probe 的 number/0/null/false/missing、配置名称正常/空白/缺失、History 完整映射、三种 WebSocket sample 容器与多 API Base 隔离。正式节点详情、详情实时订阅与历史图仍未进入实现；第 5 轮可直接消费已经归一化的名称、Server probe 和 History probe，无需解析 wire payload。
+详情展示 CPU/load、RAM/Swap/Disk、网络与累计流量、进程/TCP/UDP、uptime、系统元数据和可用财务字段。Disk IO 只在真实数据存在时显示，GPU 与 GPU History 兼容 `gpu_info` 数组/JSON string。历史图按真实稀疏时间戳绘制，不插值、不补点；Ping/Loss 覆盖旧四线路与 Node 1–4，图例区分有效、超时和缺失。401/404/409/503、网络失败与空数组都有独立非伪造状态。
 
 ## 矩阵
 
@@ -56,14 +56,14 @@
 | 流量配额 | 配额数值与使用率 | traffic_limit 为格式化字符串 | 能可靠解析时计算，否则只展示原值 | 🟡 降级实现 |
 | GPU 利用率 | GPU 指标卡 | gpu_info id/name/info | 兼容数组和 JSON 字符串 | ✅ 1:1 |
 | 磁盘 IO | 吞吐、IOPS、await、util | disk 对象 | 缺失或全零时隐藏 | ✅ 1:1 |
-| 八目标即时延迟/丢包 | Ping 指标 | ping/loss 的 CT/CU/CM/BD 与 Node 1–4 字段 | 三态映射；旧四线路沿用自定义名，Node 名称进入领域配置；首页本轮仍只显示旧四线路 | ✅ 1:1 |
+| 八目标即时延迟/丢包 | Ping 指标 | ping/loss 的 CT/CU/CM/BD 与 Node 1–4 字段 | 三态映射；首页保留旧四线路，详情完整显示旧四线路和 Node 1–4 | ✅ 1:1 |
 | 延迟窗口小图 | 历史延迟序列 | `/api/servers` ping/loss 窗口 | 使用真实稀疏时间戳，不补点 | ✅ 1:1 |
 | 在线状态 | Komari online 字段 | is_online 或 last_updated/timestamp | 遵循五分钟在线阈值 | 🟢 等价实现 |
 | 多 API Base | 原主题单后端 | apiBase meta 可配置多个 origin | 每个节点保存 source ownership | 🟢 等价实现 |
 | 定时刷新间隔 | dataUpdateInterval/RPC | REST + 服务端五秒 WS 批次 | 设置只控制 REST 补偿/前端刷新，不改变服务端节奏 | 🟡 降级实现 |
 | 实时订阅 | `/api/clients` | `/api/ws` | 每个 base 独立连接、订阅其自身 IDs、增量合并 | 🟢 等价实现 |
-| 单节点详情初始数据 | Komari node RPC | `/api/server?id=` | 详情只拉一台，不拉全量后过滤 | 🟢 等价实现 |
-| 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 映射支持周期与稀疏点 | 🟢 等价实现 |
+| 单节点详情初始数据 | Komari node RPC | `/api/server?id=` | 已实现详情只拉单节点；owning base 已知时不探测其他来源 | 🟢 等价实现 |
+| 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 已实现官方九种周期、稀疏点 SVG 图表与真实空/错误状态 | 🟢 等价实现 |
 | 超过 24 小时历史 | Komari 鉴权历史 | hours 48/96/168 需 JWT | 保留登录门槛并显示 401 | ✅ 1:1 |
 | 磁盘耗尽预测 | 历史回归 | history disk_used/disk_total | 只在足够真实样本时计算 | 🟢 等价实现 |
 | 详情指标面板 | 预设与自定义 keys | 详情/历史公开字段 | 建立指标注册表并按可用性隐藏 | 🟢 等价实现 |

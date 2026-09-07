@@ -12,9 +12,9 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 |---|---|---|---|---|
 | Config | `GET /api/config` | `src/frontend/main.js`、`utils/api.js`、`utils/turnstile.js` | `fetchSiteConfig` → `normalizeSiteConfig` | 已用于真实首页并测试 |
 | Servers | `GET /api/servers` | `src/frontend/utils/server.js`、`views/dashboard` | `fetchServers` / `fetchAllServerSources` → `normalizeServerCollection` → `toGlassServer` | 已用于真实首页并测试，支持多来源部分失败 |
-| Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` → `normalizeServer` | 已实现 service，UI 后续实现 |
-| History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` | 已实现 service，图表后续实现 |
-| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 `utils/api.js` 的订阅逻辑 | `createCfsmSocket` → `normalizeSocketBatch` → `mergeRealtimeSample` | 首页已实现；详情订阅留待详情阶段 |
+| Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` / `fetchServerFromSources` → `normalizeServer` → `server-detail` store | 已用于 `/#/server/:id` 并测试 |
+| History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` → 详情 SVG 图表模型 | 已用于真实详情图表并测试 |
+| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 `utils/api.js` 的订阅逻辑 | `createCfsmSocket` → `normalizeSocketBatch` → `mergeRealtimeSample` | 首页与单节点详情均已实现 |
 | Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `saveThemeOptions` → `normalizeThemeOptionsSave` | 已实现并测试 |
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
@@ -43,6 +43,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 - 仅拉取指定节点；详情页不得先拉 `/api/servers` 再前端过滤。
 - 请求必须发往该节点的 `source.base`。
+- 首页进入详情时通过 URL query 携带已经归一化的 owning base；直接打开详情链接且未携带来源时，只对配置的 apiBases 调用单节点接口来解析归属，不会调用 `/api/servers`。解析成功后 Config、History 与 WebSocket 全部固定回到同一 base。
 - 404 原样表现为节点不存在；不创建演示节点。
 - 详情响应不提供列表页的 ping/loss 窗口数组。
 - 当前探测字段包含旧线路 `ping/loss_{ct,cu,cm,bd}` 和新增 `ping/loss_node_1..4`，全部在 adapter 后进入同一八目标领域映射。
@@ -56,6 +57,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 - 历史 `disk` 优先读取对象；兼容旧的六个 `disk_*` 平铺字段，但缺失时不绘制。
 - 503 是后端额度/暂不可用状态，只能显示真实降级提示，不能用 mock 历史替代。
 - 每个真实历史点归一化旧四线路和 Node 1–4 的全部 Ping/Loss 字段，并保持与详情一致的 `false / null / number` 三态；缺字段是 `false`，不插值、不补点、不把超时或缺失改写为 0。
+- `gpu_info` 在 History 中同样兼容数组与 JSON string；图表只为实际出现过有效数字的 CPU/load、RAM/Swap、Disk、Network、Disk IO、GPU、Ping/Loss 序列创建组件。只有 `false`/`null` 而没有数值的趋势隐藏。
 
 ### GET /api/ws
 
@@ -69,7 +71,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 5. `frontend_ws_timeout_minutes` 只接受 0–1440 的整数。正数时限到达后停止连接，由用户明确选择继续新连接或保持暂停。
 6. 网络或策略失败采用 1–30 秒有界指数退避，并确保每条连接只有一个待执行重试；不可用期间启用单个 60 秒 REST 补偿循环。REST 503 保留已有来源快照并显示来源错误，不生成替代数据。
 7. 同源非公开站点依赖 CFSM cookie；跨源才把 JWT 放入 `token` 查询参数。Turnstile 不参与 WebSocket 验证。
-8. 详情仍应使用 `subscribe=<id>`，不订阅全量；该能力不属于本轮。
+8. 详情使用 owning base 的 `subscribe=<id>`，不发送 all-scope 订阅帧、不订阅其他节点；隐藏时关闭，可见时先补单节点 REST 再恢复。失败时只有一个低频 `/api/server` 补偿循环。
 
 CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 Node 1–4 probe 字段和三态语义。其 `/api/config` 示例与 `SiteConfig` 示例目前漏列 `node_1_name..node_4_name`，但同一文档明确指定这些名称，且官方公开 `/api/config` handler 与官方前端都已返回/读取它们；本主题据此按公开接口兼容，并保留旧版本 fallback。
 

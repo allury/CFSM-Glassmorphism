@@ -200,6 +200,7 @@ describe('CFSM wire adapters', () => {
       {
         timestamp: 123,
         cpu: 4,
+        gpu_info: '[{"id":"0","name":"History GPU","info":44}]',
         disk_read_bps: 100,
         disk_write_bps: 20,
       },
@@ -210,6 +211,23 @@ describe('CFSM wire adapters', () => {
     expect(history).toHaveLength(1)
     expect(history[0]?.timestamp).toBe(123)
     expect(history[0]?.diskIo?.readBps).toBe(100)
+    expect(history[0]?.gpus).toEqual([{ id: '0', name: 'History GPU', utilization: 44 }])
+  })
+
+  it('normalizes GPU arrays and rejects malformed history GPU payloads', () => {
+    const history = normalizeHistory([
+      {
+        timestamp: 1,
+        gpu_info: [{ id: '0', name: 'Array GPU', info: 0 }],
+      },
+      {
+        timestamp: 2,
+        gpu_info: 'not-json',
+      },
+    ])
+
+    expect(history[0]?.gpus).toEqual([{ id: '0', name: 'Array GPU', utilization: 0 }])
+    expect(history[1]?.gpus).toEqual([])
   })
 
   it('keeps all legacy and Node probe states in history without filling missing data', () => {
@@ -360,6 +378,27 @@ describe('CFSM wire adapters', () => {
       lastUpdated: 2_100,
     })
     expect(merged.gpus).toEqual([{ id: '0', name: 'GPU', utilization: 25 }])
+  })
+
+  it('removes Disk IO only when a realtime payload explicitly clears disk', () => {
+    const server = normalizeServer({
+      id: 'node-1',
+      disk: { read_bps: 128 },
+    }, source)
+
+    const unchanged = mergeRealtimeSample(server, {
+      serverId: 'node-1',
+      timestamp: 1,
+      data: { cpu: 0 },
+    })
+    const cleared = mergeRealtimeSample(unchanged, {
+      serverId: 'node-1',
+      timestamp: 2,
+      data: { disk: null },
+    })
+
+    expect(unchanged.diskIo?.readBps).toBe(128)
+    expect(cleared.diskIo).toBeUndefined()
   })
 
   it('rejects malformed required response shapes', () => {

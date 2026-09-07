@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
@@ -26,6 +27,7 @@ const app = useAppStore()
 const serverStore = useServersStore()
 const preferences = useDashboardPreferencesStore()
 const realtime = useRealtimeStore()
+const router = useRouter()
 
 const query = ref('')
 const selectedGroup = ref(ALL_GROUPS)
@@ -122,6 +124,15 @@ function openServer(server: GlassServer): void {
 
 function closeServer(): void {
   selectedServerKey.value = null
+}
+
+function viewServerDetails(server: GlassServer): void {
+  closeServer()
+  void router.push({
+    name: 'server-detail',
+    params: { id: server.id },
+    query: { source: server.sourceBase },
+  })
 }
 
 function cardStyle(index: number): Record<string, string> {
@@ -377,6 +388,7 @@ onUnmounted(() => realtime.stop())
       :show-source="showSource"
       @close="closeServer"
       @toggle-favorite="selectedServer && preferences.toggleFavorite(selectedServer.key)"
+      @view-details="selectedServer && viewServerDetails(selectedServer)"
     />
   </div>
 </template>

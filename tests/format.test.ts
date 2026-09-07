@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatCfsmDate,
   formatLatency,
+  formatPrice,
   formatProbePercent,
   formatTimestamp,
   formatUptime,
+  parseCfsmDate,
 } from '@/utils/format'
 
 describe('time formatting', () => {
@@ -26,5 +29,24 @@ describe('time formatting', () => {
     expect(formatProbePercent(null)).toBe('超时')
     expect(formatProbePercent(false)).toBe('—')
     expect(formatProbePercent(0)).toBe('0.0%')
+  })
+
+  it('strictly parses CFSM expiry dates without leaking Invalid Date', () => {
+    expect(formatCfsmDate('2028-02-29')).toBe('2028/02/29')
+    expect(parseCfsmDate('2027-02-29')).toBeNull()
+    expect(parseCfsmDate('2026-13-01')).toBeNull()
+    expect(parseCfsmDate('12/31/2026')).toBeNull()
+    expect(parseCfsmDate('2026-02-30T00:00:00Z')).toBeNull()
+    expect(parseCfsmDate('2026-12-31T23:59:00+08:00')?.getTime()).toBe(1_798_732_740_000)
+    expect(formatCfsmDate('not-a-date')).toBe('—')
+    expect(formatCfsmDate(null)).toBe('—')
+  })
+
+  it('handles free, missing and invalid prices without NaN', () => {
+    expect(formatPrice('0', '¥', 'month')).toBe('免费')
+    expect(formatPrice('-1', '$', 'year')).toBe('免费')
+    expect(formatPrice('30.00', '¥', 'month')).toBe('¥30 / month')
+    expect(formatPrice('invalid', '$', 'month')).toBe('—')
+    expect(formatPrice(null, null, null)).toBe('—')
   })
 })

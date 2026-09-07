@@ -43,13 +43,15 @@ UI (render and user intent only)
 
 ### Service
 
-位置：`src/services/cfsm/api.ts`、`src/services/cfsm/websocket.ts` 与 `src/services/cfsm/dashboard-realtime.ts`。
+位置：`src/services/cfsm/api.ts`、`src/services/cfsm/websocket.ts`、`src/services/cfsm/dashboard-realtime.ts` 与 `src/services/cfsm/detail-realtime.ts`。
 
 - 用语义方法封装 `/api/config`、`/api/servers`、`/api/server`、`/api/history/all` 和 `/api/theme_options`。
 - 在发出请求前确定 base、id 和受支持的 history hours。
 - 多源请求保留数组边界；详情和历史明确接收 owning base。
 - `websocket.ts` 只负责单一 base 的 URL、订阅帧、消息适配、连接时限、keepalive 和有界退避。
 - `dashboard-realtime.ts` 负责首页多 base 协调、visibility 生命周期、REST 补偿与用户超时决策；不会跨来源拼接订阅 ID。
+- `detail-realtime.ts` 只建立 owning base 的 `subscribe=<serverId>` 连接；页面恢复可见时先刷新单节点 REST，失败时以单个低频 REST 循环补偿。
+- `errors.ts` 把 400/401/404/409/503、网络错误与未知错误转换为稳定 issue；UI 只选择对应文案，不解析响应体。
 
 ### Adapter
 
@@ -61,6 +63,7 @@ UI (render and user intent only)
 - Ping/Loss 在边界统一映射为 `ProbeValue = number | null | false`。`CfsmServer` 与 `HistoryPoint` 都持有旧四线路加 Node 1–4 的八目标完整映射：缺字段为 `false`，显式 `null` 和有效 `0` 均原样保留。
 - `/api/config` 的八个 probe 显示名进入 `SiteConfig.probeLabels`；`src/constants/probes.ts` 是旧版本与 config 不可用场景的唯一默认名来源，避免 adapter 和 UI 各自定义 fallback。
 - 兼容 `gpu_info` 的数组/JSON 字符串和历史磁盘 IO 两种形状。
+- Server 与 History 都在 adapter 边界解析 `gpu_info`；History 图表模型只读取归一化后的 `HistoryPoint.gpus`。
 - 不补历史点，不伪造 IP/ASN/城市/厂商，不把错误格式变成看似真实的数据。
 - `src/services/cfsm/glassmorphism-adapter.ts` 再把稳定 CFSM 模型映射为首页展示模型；可达性仍是状态，不成为地址字符串。
 
@@ -73,12 +76,13 @@ UI (render and user intent only)
 - `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。
 - `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
 - `dashboard-preferences.ts` 只保存首页本地偏好：system/light/dark、card/compact/mini/list、离线置底与以 source+id 标识的收藏；读取时严格校验版本化快照，浏览器存储不可用时仍保持当前会话可用。
+- `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
-- 详情、历史和 theme settings 后续仍各自建立职责清晰的 store 或 composable，不堆入单一全局对象。
+- theme settings 后续仍建立独立 store，不堆入首页或详情状态。
 
 ### UI
 
-位置：`src/App.vue`、`src/views/HomeView.vue` 与 `src/components/dashboard/`。
+位置：`src/App.vue`、`src/views/`、`src/components/dashboard/` 与 `src/components/detail/`。
 
 - 只渲染领域模型和显式状态。
 - 缺数据时隐藏依赖组件或显示“不可用”，不展示 0 值占位来冒充采样。
@@ -86,6 +90,7 @@ UI (render and user intent only)
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
 - 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
 - 节点快速查看只展开当前 REST 快照，不触发详情、历史或 WebSocket 请求；桌面为模态框，移动端为底部抽屉。
+- `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。轻量 SVG 图表按真实时间戳绘制，缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
 ## Theme Options
 
@@ -118,7 +123,7 @@ schema defaults
 - 配置的连接时限到达后由用户选择继续或暂停；网络恢复采用单计时器指数退避，不会并发重连。
 - 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
-- 详情连接仍须使用 `subscribe=<id>`；不拉/订阅全量后过滤，该能力属于后续详情阶段。
+- 详情连接使用 `/api/ws?subscribe=<id>` 且不发送 all-scope frame；只合并同 ID sample。隐藏时关闭、可见时先请求 `/api/server` 再建立新连接，连接时限仍要求用户明确选择。
 
 ## Multi API Base
 
@@ -142,7 +147,7 @@ server click -> its source -> detail/history/ws
 - 详情 `/#/server/:id`
 - 管理 `/admin#admin`，由 CFSM 官方前端负责
 
-本轮只有最小入口，没有抢先建立详情占位页。主题不实现管理员私有接口、不复制登录管理逻辑、不调用 `save_settings`。
+`vue-router` 使用 Hash History，详情刷新可恢复。主题不实现管理员私有接口、不复制登录管理逻辑、不调用 `save_settings`。
 
 ## 质量与发布
 
@@ -153,6 +158,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 4.5 轮完成边界
+## 第 5 轮完成边界
 
-第 4 轮已完成真实 WebSocket 更新与多 API Base 协调；第 4.5 轮只追加最新 CFSM Ping/Node 契约：集中管理旧四线路与 Node 1–4 名称及旧版本 fallback，让 Server、History、列表窗口与 WebSocket partial merge 全链路保留 `false / null / number` 三态。现有首页继续只消费旧四线路，不新增 Node 1–4 UI。以下仍是后续阶段：正式详情路由、详情 WebSocket、历史图、完整主题设置及后端保存、Earth/Map 和高级工具。
+第 5 轮在第 4.5 轮稳定领域模型上新增正式详情路由、owning-base 单节点 REST/WS、官方九种时间范围 History、真实资源/GPU/Disk IO/Ping/Loss 展示与 SVG 图表。详情 probe 同时覆盖旧四线路与 Node 1–4，并沿用 `false / null / number`，没有在 UI 重新解释 wire 字段。以下仍是后续阶段：完整主题设置及后端保存、Earth/Map、高级工具与最终专项性能/视觉回归；本轮不进入这些范围。

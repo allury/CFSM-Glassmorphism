@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import {
   fetchAllServerSources,
+  fetchHistory,
+  fetchServer,
+  fetchServerFromSources,
   fetchServers,
   fetchSiteConfig,
+  isHistoryHours,
 } from '@/services/cfsm/api'
 
 describe('CFSM REST services', () => {
@@ -74,5 +78,77 @@ describe('CFSM REST services', () => {
 
     expect(result.servers).toEqual([])
     expect(result.stats).toEqual({ total: 0 })
+  })
+
+  it('loads detail and history from the owning API base without a list request', async () => {
+    const requests: string[] = []
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.includes('/api/server?')) {
+        return new Response('{"id":"node-a","ping_node_1":0}', { status: 200 })
+      }
+      return new Response('[{"timestamp":1700000000000,"loss_node_1":null}]', { status: 200 })
+    }
+
+    const server = await fetchServer('node-a', 'https://b.example', { fetcher })
+    const history = await fetchHistory('node-a', 0.167, 'https://b.example', { fetcher })
+
+    expect(requests).toEqual([
+      'https://b.example/api/server?id=node-a',
+      'https://b.example/api/history/all?id=node-a&hours=0.167',
+    ])
+    expect(server.source.base).toBe('https://b.example')
+    expect(server.latency.node_1).toBe(0)
+    expect(history.source.base).toBe('https://b.example')
+    expect(history.points[0]?.packetLoss.node_1).toBeNull()
+  })
+
+  it('resolves a direct detail link across configured bases and prefers an explicit owner', async () => {
+    const requests: string[] = []
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input)
+      requests.push(url)
+      if (url.startsWith('https://a.example')) {
+        return new Response('{"error":"Server not found"}', { status: 404 })
+      }
+      return new Response('{"id":"shared-id","name":"B"}', { status: 200 })
+    }
+
+    const resolved = await fetchServerFromSources(
+      'shared-id',
+      ['https://a.example', 'https://b.example'],
+      { fetcher },
+    )
+    expect(resolved.source.base).toBe('https://b.example')
+    expect(requests).toHaveLength(2)
+
+    requests.length = 0
+    const preferred = await fetchServerFromSources(
+      'shared-id',
+      ['https://a.example', 'https://b.example'],
+      { fetcher },
+      'https://b.example',
+    )
+    expect(preferred.source.base).toBe('https://b.example')
+    expect(requests).toEqual(['https://b.example/api/server?id=shared-id'])
+  })
+
+  it('only accepts the official CFSM history ranges', () => {
+    expect([0.167, 0.5, 1, 6, 12, 24, 48, 96, 168].every(isHistoryHours)).toBe(true)
+    expect(isHistoryHours(2)).toBe(false)
+    expect(isHistoryHours(720)).toBe(false)
+  })
+
+  it('preserves an empty history response as a real empty series', async () => {
+    const fetcher: typeof fetch = async () => new Response('[]', { status: 200 })
+
+    const history = await fetchHistory('node-a', 24, 'https://status.example', { fetcher })
+
+    expect(history).toEqual({
+      serverId: 'node-a',
+      source: { base: 'https://status.example', label: 'status.example' },
+      points: [],
+    })
   })
 })

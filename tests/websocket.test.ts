@@ -67,6 +67,42 @@ describe('CFSM WebSocket transport', () => {
       storage,
       locationHost: 'a.example',
     })).toBe('wss://b.example/api/ws?subscribe=all&token=secret-token')
+    expect(createCfsmSocketUrl('https://b.example', {
+      storage,
+      locationHost: 'a.example',
+      subscribe: 'node-1',
+    })).toBe('wss://b.example/api/ws?subscribe=node-1&token=secret-token')
+    expect(() => createCfsmSocketUrl('https://b.example', {
+      subscribe: 'invalid id',
+    })).toThrow('valid CFSM WebSocket subscription target')
+  })
+
+  it('uses the single-server URL without sending an all-scope subscription', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    const urls: string[] = []
+    createCfsmSocket({
+      base: 'https://a.example',
+      ids: ['node-a'],
+      subscribe: 'node-a',
+      timeoutMinutes: 0,
+      locationHost: 'a.example',
+      socketFactory: (url) => {
+        urls.push(url)
+        const socket = new FakeSocket()
+        sockets.push(socket)
+        return socket
+      },
+      onSamples: vi.fn(),
+      onState: vi.fn(),
+      onTimeout: vi.fn(),
+    })
+
+    expect(urls).toEqual(['wss://a.example/api/ws?subscribe=node-a'])
+    sockets[0]?.open()
+    expect(sockets[0]?.sent).toEqual([])
+    vi.advanceTimersByTime(30_000)
+    expect(sockets[0]?.sent).toEqual([JSON.stringify({ type: 'ping' })])
   })
 
   it('sanitizes IDs and sends the exact all-scope subscription and heartbeat', () => {

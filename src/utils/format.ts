@@ -56,14 +56,14 @@ export function formatProbePercent(value: ProbeValue): string {
   return formatPercent(value)
 }
 
-function timestampMilliseconds(value: number | null): number | null {
+export function normalizeTimestampMilliseconds(value: number | null): number | null {
   const timestamp = normalizedNumber(value)
   if (timestamp === null || timestamp === 0) return null
   return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp
 }
 
 export function formatTimestamp(value: number | null): string {
-  const timestamp = timestampMilliseconds(value)
+  const timestamp = normalizeTimestampMilliseconds(value)
   if (timestamp === null) return '—'
   const date = new Date(timestamp)
   if (Number.isNaN(date.getTime())) return '—'
@@ -77,7 +77,7 @@ export function formatTimestamp(value: number | null): string {
 }
 
 export function formatUptime(bootTime: number | null, now = Date.now()): string {
-  const startedAt = timestampMilliseconds(bootTime)
+  const startedAt = normalizeTimestampMilliseconds(bootTime)
   if (startedAt === null || startedAt > now) return '—'
   const totalMinutes = Math.floor((now - startedAt) / 60_000)
   const days = Math.floor(totalMinutes / 1440)
@@ -86,4 +86,75 @@ export function formatUptime(bootTime: number | null, now = Date.now()): string 
   if (days > 0) return `${days} 天 ${hours} 小时`
   if (hours > 0) return `${hours} 小时 ${minutes} 分`
   return `${minutes} 分钟`
+}
+
+const DATE_ONLY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/
+const ISO_DATE_TIME_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})$/
+const NUMERIC_TIMESTAMP_PATTERN = /^\d{10,13}$/
+
+function calendarDate(value: string): { year: number; month: number; day: number } | null {
+  const match = DATE_ONLY_PATTERN.exec(value)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const validation = new Date(Date.UTC(year, month - 1, day))
+  if (
+    validation.getUTCFullYear() !== year
+    || validation.getUTCMonth() !== month - 1
+    || validation.getUTCDate() !== day
+  ) return null
+  return { year, month, day }
+}
+
+export function parseCfsmDate(value: string | null): Date | null {
+  const candidate = value?.trim()
+  if (!candidate) return null
+
+  if (NUMERIC_TIMESTAMP_PATTERN.test(candidate)) {
+    const timestamp = normalizeTimestampMilliseconds(Number(candidate))
+    if (timestamp === null) return null
+    const date = new Date(timestamp)
+    return Number.isNaN(date.getTime()) ? null : date
+  }
+
+  const dateOnly = calendarDate(candidate)
+  if (dateOnly) {
+    return new Date(Date.UTC(dateOnly.year, dateOnly.month - 1, dateOnly.day, 12))
+  }
+
+  if (!ISO_DATE_TIME_PATTERN.test(candidate)) return null
+  if (calendarDate(candidate.slice(0, 10)) === null) return null
+  const timestamp = Date.parse(candidate)
+  return Number.isNaN(timestamp) ? null : new Date(timestamp)
+}
+
+export function formatCfsmDate(value: string | null): string {
+  const dateOnly = value ? calendarDate(value.trim()) : null
+  if (dateOnly) {
+    return `${dateOnly.year}/${String(dateOnly.month).padStart(2, '0')}/${String(dateOnly.day).padStart(2, '0')}`
+  }
+  const date = parseCfsmDate(value)
+  if (date === null) return '—'
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(date)
+}
+
+export function formatPrice(
+  price: string | null,
+  currency: string | null,
+  billingCycle: string | null,
+): string {
+  if (price === null) return '—'
+  const amount = Number(price)
+  if (!Number.isFinite(amount)) return '—'
+  if (amount === 0 || amount === -1) return '免费'
+  if (amount < 0) return '—'
+  const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(amount)
+  const prefix = currency?.trim() ?? ''
+  const cycle = billingCycle?.trim()
+  return `${prefix}${formatted}${cycle ? ` / ${cycle}` : ''}`
 }

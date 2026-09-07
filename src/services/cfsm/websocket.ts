@@ -43,6 +43,7 @@ export interface CfsmSocketConnection {
 export interface CfsmSocketOptions {
   base: string
   ids: readonly string[]
+  subscribe?: string
   timeoutMinutes: number
   onSamples(samples: CfsmRealtimeSample[]): void
   onState(state: CfsmSocketState): void
@@ -101,14 +102,23 @@ export function sanitizeSubscriptionIds(ids: readonly string[]): string[] {
 
 export function createCfsmSocketUrl(
   base: string,
-  options: { storage?: Storage; locationHost?: string } = {},
+  options: { storage?: Storage; locationHost?: string; subscribe?: string } = {},
 ): string {
   const url = new URL('/api/ws', webSocketBase(base))
-  url.searchParams.set('subscribe', 'all')
+  url.searchParams.set('subscribe', normalizeSubscribe(options.subscribe))
   const token = readStorage(STORAGE_KEYS.jwt, options.storage)
   const locationHost = options.locationHost ?? currentLocationHost()
   if (token && url.host !== locationHost) url.searchParams.set('token', token)
   return url.toString()
+}
+
+function normalizeSubscribe(value: string | undefined): string {
+  if (value === undefined || value === 'all') return 'all'
+  const [serverId] = sanitizeSubscriptionIds([value])
+  if (!serverId || serverId !== value.trim()) {
+    throw new Error('A valid CFSM WebSocket subscription target is required')
+  }
+  return serverId
 }
 
 function sameIds(left: readonly string[], right: readonly string[]): boolean {
@@ -119,6 +129,7 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   const scheduler = options.scheduler ?? defaultScheduler
   const socketFactory = options.socketFactory ?? defaultSocketFactory
   const timeoutMs = normalizedTimeoutMinutes(options.timeoutMinutes) * 60_000
+  const subscribe = normalizeSubscribe(options.subscribe)
   let ids = sanitizeSubscriptionIds(options.ids)
   let socket: CfsmSocketLike | null = null
   let state: CfsmSocketState = 'idle'
@@ -148,7 +159,7 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   }
 
   function scheduleReconnect(): void {
-    if (closed || reconnectTimer !== null || ids.length === 0) return
+    if (closed || reconnectTimer !== null || (subscribe === 'all' && ids.length === 0)) return
     const delay = Math.min(
       RECONNECT_MAX_DELAY_MS,
       RECONNECT_BASE_DELAY_MS * 2 ** Math.min(reconnectAttempt, 5),
@@ -169,6 +180,7 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   }
 
   function sendSubscription(current: CfsmSocketLike): boolean {
+    if (subscribe !== 'all') return true
     const subscription: CfsmSocketSubscription = { type: 'subscribe', scope: 'all', ids }
     try {
       current.send(JSON.stringify(subscription))
@@ -189,7 +201,7 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
     setState('connecting')
     let current: CfsmSocketLike
     try {
-      current = socketFactory(createCfsmSocketUrl(options.base, options))
+      current = socketFactory(createCfsmSocketUrl(options.base, { ...options, subscribe }))
     } catch {
       setState('unavailable')
       scheduleReconnect()
@@ -261,11 +273,12 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
     }
   }
 
-  if (ids.length > 0) connect()
+  if (subscribe !== 'all' || ids.length > 0) connect()
   else setState('unavailable')
 
   return {
     updateIds(nextIds) {
+      if (subscribe !== 'all') return
       const next = sanitizeSubscriptionIds(nextIds)
       if (sameIds(ids, next)) return
       ids = next

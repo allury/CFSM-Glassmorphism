@@ -158,6 +158,7 @@ export interface ServerSourcesResult {
 export interface HistoryPoint {
   timestamp: number
   cpu: NullableNumber
+  gpus: GpuMetrics[]
   memoryUsed: NullableNumber
   memoryTotal: NullableNumber
   swapUsed: NullableNumber
@@ -208,4 +209,20 @@ export interface CfsmRealtimeSample {
   serverId: string
   timestamp: NullableNumber
   data: Record<string, unknown>
+}
+
+export type CfsmRequestIssueKind =
+  | 'unauthorized'
+  | 'not-found'
+  | 'upgrade-required'
+  | 'unavailable'
+  | 'network'
+  | 'invalid-request'
+  | 'unknown'
+
+export interface CfsmRequestIssue {
+  kind: CfsmRequestIssueKind
+  status: number | null
+  code: string | null
+  message: string
 }
