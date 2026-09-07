@@ -8,6 +8,8 @@
 
 首页已落地与 `themeMode`、`defaultViewMode`、`nodeCardSize` 和 `offlineNodesLast` 对应的轻量本地交互，并以 source+id 保存收藏。当前 system/light/dark、card/compact/mini/list 和离线置底存放在版本化浏览器快照中；CSS 动态背景是本轮固定视觉层，不冒充 `background*` 设置已经完成。完整 48 项 schema、设置界面、backend/local 分层编辑、迁移和 `POST /api/theme_options` 保存仍留在后续轮次。
 
+第 4 轮没有提前实现完整设置中心。首页现在读取 CFSM 系统配置 `frontend_ws_timeout_minutes`（它不是 theme option）控制单次实时连接寿命，并在网络不可用期间采用固定低频 REST 补偿；`dataUpdateInterval` 尚未作为可编辑主题设置落地，也不会改变 CFSM 约五秒的服务端批次节奏。
+
 ## 状态定义
 
 - ✅ 1:1：配置含义和用户体验可以原样保留。

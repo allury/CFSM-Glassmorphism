@@ -14,7 +14,7 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 | Servers | `GET /api/servers` | `src/frontend/utils/server.js`、`views/dashboard` | `fetchServers` / `fetchAllServerSources` → `normalizeServerCollection` → `toGlassServer` | 已用于真实首页并测试，支持多来源部分失败 |
 | Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` → `normalizeServer` | 已实现 service，UI 后续实现 |
 | History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` | 已实现 service，图表后续实现 |
-| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 ServerDetail 的订阅逻辑 | 预留类型；后续建立独立 ws service | 第 2 轮明确未实现运行时 |
+| WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 `utils/api.js` 的订阅逻辑 | `createCfsmSocket` → `normalizeSocketBatch` → `mergeRealtimeSample` | 首页已实现；详情订阅留待详情阶段 |
 | Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `saveThemeOptions` → `normalizeThemeOptionsSave` | 已实现并测试 |
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
@@ -55,15 +55,16 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 ### GET /api/ws
 
-截至第 3 轮仍没有实现 WebSocket 客户端。后续实现必须遵守：
+首页实时链路已经实现并遵守以下契约：
 
-1. 首页先按 base 读取列表，再为每个 base 建立独立 `subscribe=all` 连接。
-2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 只属于当前 base；不发送订阅消息不会收到更新。
-3. 详情使用 `subscribe=<id>`，不订阅全量。
-4. `batchUpdate.updates[].samples[]` 从 `data || payload || metrics` 取增量对象，并合并到现有完整状态，不能用缺字段的样本覆盖整台服务器。
-5. 页面隐藏时关闭；重新可见时先补 REST，再恢复订阅。
-6. 读取 `frontend_ws_timeout_minutes`。达到正数超时后等待用户明确继续，不做静默无限重连。
+1. 首页先按 base 读取列表，再为每个有节点的 base 建立独立 `subscribe=all` 连接。
+2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 去重、校验且只属于当前 base；不发送订阅消息不会收到更新。
+3. `batchUpdate.updates[].samples[]` 从第一个有效的 `data || payload || metrics` 增量对象读取，按 sample、update、message 的真实时间戳顺序回退，再按字段合并到现有 REST 实体。缺失字段不会被覆盖为 null、0 或空值。
+4. 页面隐藏时主动关闭全部连接；重新可见时先执行 REST revalidate，再按最新节点集合恢复订阅。
+5. `frontend_ws_timeout_minutes` 只接受 0–1440 的整数。正数时限到达后停止连接，由用户明确选择继续新连接或保持暂停。
+6. 网络或策略失败采用 1–30 秒有界指数退避，并确保每条连接只有一个待执行重试；不可用期间启用单个 60 秒 REST 补偿循环。REST 503 保留已有来源快照并显示来源错误，不生成替代数据。
 7. 同源非公开站点依赖 CFSM cookie；跨源才把 JWT 放入 `token` 查询参数。Turnstile 不参与 WebSocket 验证。
+8. 详情仍应使用 `subscribe=<id>`，不订阅全量；该能力不属于本轮。
 
 ### POST /api/theme_options
 

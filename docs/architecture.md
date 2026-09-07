@@ -43,12 +43,13 @@ UI (render and user intent only)
 
 ### Service
 
-位置：`src/services/cfsm/api.ts`。
+位置：`src/services/cfsm/api.ts`、`src/services/cfsm/websocket.ts` 与 `src/services/cfsm/dashboard-realtime.ts`。
 
 - 用语义方法封装 `/api/config`、`/api/servers`、`/api/server`、`/api/history/all` 和 `/api/theme_options`。
 - 在发出请求前确定 base、id 和受支持的 history hours。
 - 多源请求保留数组边界；详情和历史明确接收 owning base。
-- 本轮没有实现 WebSocket service，避免把占位连接误认为完成能力。
+- `websocket.ts` 只负责单一 base 的 URL、订阅帧、消息适配、连接时限、keepalive 和有界退避。
+- `dashboard-realtime.ts` 负责首页多 base 协调、visibility 生命周期、REST 补偿与用户超时决策；不会跨来源拼接订阅 ID。
 
 ### Adapter
 
@@ -67,9 +68,11 @@ UI (render and user intent only)
 
 - `app.ts` 管理 apiBases、站点 config、加载状态与官方管理端地址。
 - `servers.ts` 管理按来源分开的集合，以 `base::id` 作为稳定键，避免不同站点 UUID 冲突。
+- `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。
+- `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
 - `dashboard-preferences.ts` 只保存首页本地偏好：system/light/dark、card/compact/mini/list、离线置底与以 source+id 标识的收藏；读取时严格校验版本化快照，浏览器存储不可用时仍保持当前会话可用。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
-- 后续 WebSocket、详情、历史和 theme settings 各自建立职责清晰的 store 或 composable，不堆入单一全局对象。
+- 详情、历史和 theme settings 后续仍各自建立职责清晰的 store 或 composable，不堆入单一全局对象。
 
 ### UI
 
@@ -102,16 +105,18 @@ schema defaults
 
 ## WebSocket
 
-后续实时层将位于 `src/services/cfsm/ws.ts`，当前 REST 首页不创建假实现。约束如下：
+首页实时层位于 `src/services/cfsm/websocket.ts`、`dashboard-realtime.ts` 与 `src/stores/realtime.ts`，当前实现如下：
 
 - 一条首页连接只对应一个 apiBase；它的订阅 IDs 只来自同一 base。
-- 详情连接使用 `subscribe=<id>`；不拉/订阅全量后过滤。
+- 首页连接 URL 固定为 `/api/ws?subscribe=all`，open 后发送包含本 base 真实节点 IDs 的 all-scope subscription。
 - 收到 `batchUpdate` 后提取 sample 的 `data`、`payload` 或 `metrics`，按字段合并进已有实体。
 - 高频增量缺失字段是正常情况，不得覆盖为 null/0。
 - 列表 ping/loss 窗口由 REST 补齐，详情实时字段与历史序列分别管理。
-- document 隐藏时主动关闭，可见时先 REST revalidate 再连接。
-- 配置的连接时限到达后由用户选择继续；自动重连需要退避，并尊重用户明确关闭。
+- document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。
+- 配置的连接时限到达后由用户选择继续或暂停；网络恢复采用单计时器指数退避，不会并发重连。
+- 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
+- 详情连接仍须使用 `subscribe=<id>`；不拉/订阅全量后过滤，该能力属于后续详情阶段。
 
 ## Multi API Base
 
@@ -146,6 +151,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 3 轮完成边界
+## 第 4 轮完成边界
 
-本轮在第 2 轮真实 REST 数据链路上完成首页视觉与交互还原：Glassmorphism 页头、总览、动态 CSS 背景、卡片/紧凑/迷你/列表四种布局、tooltip、收藏、离线置底、多词搜索、响应式快速查看，以及 system/light/dark 本地偏好。0/1/10/30 节点、长名称、多标签和 375–1920px 断点已验证。以下仍是后续阶段：WebSocket 运行时、正式详情路由、历史图、完整主题设置及后端保存、Earth/Map 和高级工具。
+本轮在第 3 轮首页上完成真实 WebSocket 更新与多 API Base 协调：每个 backend 独立连接和订阅、`batchUpdate` 多 envelope 适配、partial merge、visibility REST-first 恢复、`frontend_ws_timeout_minutes` 用户决策、有界退避、60 秒 REST fallback 与五分钟离线过期。测试覆盖跨来源同 ID 隔离、订阅 IDs、批次适配、增量保留、重连防风暴、503/网络降级、页面可见性和连接时限。以下仍是后续阶段：正式详情路由、详情 WebSocket、历史图、完整主题设置及后端保存、Earth/Map 和高级工具。

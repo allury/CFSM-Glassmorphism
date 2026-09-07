@@ -1,5 +1,7 @@
 export * from './adapters'
 export * from './api'
 export * from './config'
+export * from './dashboard-realtime'
 export * from './glassmorphism-adapter'
 export * from './http'
+export * from './websocket'

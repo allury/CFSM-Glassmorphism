@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
@@ -18,12 +18,14 @@ import {
 import { toGlassServer } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
+import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import type { DashboardSort, GlassServer } from '@/types/glassmorphism'
 
 const app = useAppStore()
 const serverStore = useServersStore()
 const preferences = useDashboardPreferencesStore()
+const realtime = useRealtimeStore()
 
 const query = ref('')
 const selectedGroup = ref(ALL_GROUPS)
@@ -77,6 +79,14 @@ const hasNoMatches = computed(() => (
   glassServers.value.length > 0 && visibleServers.value.length === 0
 ))
 const allOffline = computed(() => summary.value.total > 0 && summary.value.online === 0)
+const realtimeLabel = computed(() => {
+  if (realtime.status === 'live') return 'Live updates'
+  if (realtime.status === 'fallback') return 'REST fallback'
+  if (realtime.status === 'timed-out') return 'Live updates timed out'
+  if (realtime.status === 'paused') return 'Live updates paused'
+  if (realtime.status === 'connecting') return 'Live updates connecting'
+  return 'REST snapshot'
+})
 
 watch(groups, (nextGroups) => {
   if (selectedGroup.value !== ALL_GROUPS && !nextGroups.includes(selectedGroup.value)) {
@@ -88,7 +98,7 @@ watch(siteTitle, (title) => {
   document.title = title
 }, { immediate: true })
 
-async function refresh(): Promise<void> {
+async function refreshRest(): Promise<void> {
   if (refreshing.value) return
   refreshing.value = true
   try {
@@ -99,6 +109,11 @@ async function refresh(): Promise<void> {
   } finally {
     refreshing.value = false
   }
+}
+
+async function refresh(): Promise<void> {
+  await refreshRest()
+  realtime.sync()
 }
 
 function openServer(server: GlassServer): void {
@@ -115,9 +130,12 @@ function cardStyle(index: number): Record<string, string> {
 
 onMounted(async () => {
   preferences.initialize()
-  await refresh()
+  await refreshRest()
   preferences.adoptPreferredTheme(app.config?.preferredTheme ?? 'auto')
+  realtime.start(refreshRest)
 })
+
+onUnmounted(() => realtime.stop())
 </script>
 
 <template>
@@ -160,6 +178,50 @@ onMounted(async () => {
             {{ failure.source.label }}：{{ failure.message }}
             <template v-if="failure.status">（HTTP {{ failure.status }}）</template>
           </span>
+        </div>
+
+        <div
+          v-if="realtime.timedOut"
+          class="notice notice--warning notice--choice"
+          role="status"
+        >
+          <div>
+            <strong>实时连接已达到站点设置的连接时限</strong>
+            <span>请选择继续建立新的实时连接，或暂时停用实时更新。</span>
+          </div>
+          <div class="notice__actions">
+            <button type="button" @click="realtime.continueAfterTimeout">
+              继续实时连接
+            </button>
+            <button type="button" @click="realtime.pauseAfterTimeout">
+              保持暂停
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-else-if="realtime.paused"
+          class="notice notice--warning notice--choice"
+          role="status"
+        >
+          <div>
+            <strong>实时更新已暂停</strong>
+            <span>当前页面保留最后一次真实数据快照；恢复后会重新连接各数据源。</span>
+          </div>
+          <div class="notice__actions">
+            <button type="button" @click="realtime.resume">
+              恢复实时连接
+            </button>
+          </div>
+        </div>
+
+        <div
+          v-if="realtime.fallbackActive"
+          class="notice notice--warning"
+          role="status"
+        >
+          <strong>实时连接暂不可用</strong>
+          <span>已启用低频 REST 补偿刷新，WebSocket 会按退避策略继续恢复。</span>
         </div>
 
         <div
@@ -304,7 +366,7 @@ onMounted(async () => {
             CF-Server-Monitor<template v-if="app.config?.version"> v{{ app.config.version }}</template>
           </a>
         </span>
-        <span>Glassmorphism Theme · REST snapshot</span>
+        <span>Glassmorphism Theme · {{ realtimeLabel }}</span>
       </footer>
     </div>
 

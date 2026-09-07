@@ -182,16 +182,23 @@ export interface ThemeOptionsSaveResult {
   message: string | null
 }
 
-export type CfsmSocketState = 'idle' | 'connecting' | 'open' | 'closed' | 'error'
+export type CfsmSocketState =
+  | 'idle'
+  | 'connecting'
+  | 'open'
+  | 'backoff'
+  | 'unavailable'
+  | 'timed-out'
+  | 'closed'
 
 export interface CfsmSocketSubscription {
   type: 'subscribe'
-  server_ids: string[]
+  scope: 'all'
+  ids: string[]
 }
 
-export interface CfsmBatchUpdate {
-  type: 'batchUpdate'
-  data?: unknown
-  payload?: unknown
-  metrics?: unknown
+export interface CfsmRealtimeSample {
+  serverId: string
+  timestamp: NullableNumber
+  data: Record<string, unknown>
 }

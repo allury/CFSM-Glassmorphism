@@ -1,5 +1,6 @@
 import type {
   ApiSource,
+  CfsmRealtimeSample,
   CfsmServer,
   DiskIoMetrics,
   GpuMetrics,
@@ -44,6 +45,13 @@ function objectValue(value: unknown): Record<string, unknown> {
 
 function preferredThemeValue(value: unknown): SiteConfig['preferredTheme'] {
   return value === 'dark' || value === 'light' ? value : 'auto'
+}
+
+function liveSocketTimeoutMinutes(value: unknown): number {
+  const minutes = numberValue(value)
+  return minutes !== null && Number.isInteger(minutes) && minutes >= 0 && minutes <= 1440
+    ? minutes
+    : 0
 }
 
 function defaultLanguageValue(value: unknown): SiteConfig['defaultLanguage'] {
@@ -216,7 +224,7 @@ export function normalizeSiteConfig(value: unknown): SiteConfig {
     themeOptions: objectValue(input.theme_options),
     verified: booleanValue(input.verified),
     turnstileVerified: stringValue(input.turnstile_verified),
-    frontendWebsocketTimeoutMinutes: numberValue(input.frontend_ws_timeout_minutes) ?? 0,
+    frontendWebsocketTimeoutMinutes: liveSocketTimeoutMinutes(input.frontend_ws_timeout_minutes),
     longHistoryPoints: numberValue(input.long_history_points) ?? 120,
     latencyWindow: {
       points: numberValue(latencyConfig.points) ?? 20,
@@ -313,6 +321,130 @@ export function normalizeServerCollection(
     stats: objectValue(input.stats),
     systemConfig: systemConfig(input.sysConfig),
   }
+}
+
+function realtimeSampleData(value: Record<string, unknown>): Record<string, unknown> | null {
+  const candidates = [value.data, value.payload, value.metrics]
+  return candidates.find(isRecord) ?? null
+}
+
+export function normalizeSocketBatch(value: unknown): CfsmRealtimeSample[] {
+  if (!isRecord(value) || value.type !== 'batchUpdate' || !Array.isArray(value.updates)) return []
+  const messageTimestamp = numberValue(value.ts) ?? numberValue(value.timestamp)
+
+  return value.updates.flatMap((rawUpdate) => {
+    if (!isRecord(rawUpdate) || !Array.isArray(rawUpdate.samples)) return []
+    const serverId = stringValue(rawUpdate.serverId)
+    if (serverId === null) return []
+    const updateTimestamp = numberValue(rawUpdate.ts)
+      ?? numberValue(rawUpdate.timestamp)
+      ?? messageTimestamp
+
+    return rawUpdate.samples
+      .flatMap((rawSample, index) => {
+        if (!isRecord(rawSample)) return []
+        const data = realtimeSampleData(rawSample)
+        if (data === null) return []
+        const timestamp = numberValue(rawSample.ts)
+          ?? numberValue(rawSample.timestamp)
+          ?? numberValue(data.sample_timestamp)
+          ?? numberValue(data.last_updated)
+          ?? numberValue(data.timestamp)
+          ?? updateTimestamp
+        return [{ serverId, timestamp, data: { ...data }, index }]
+      })
+      .sort((left, right) => {
+        if (left.timestamp === null && right.timestamp === null) return left.index - right.index
+        if (left.timestamp === null) return 1
+        if (right.timestamp === null) return -1
+        return left.timestamp - right.timestamp || left.index - right.index
+      })
+      .map((sample) => ({
+        serverId: sample.serverId,
+        timestamp: sample.timestamp,
+        data: sample.data,
+      }))
+  })
+}
+
+export function mergeRealtimeSample(
+  server: CfsmServer,
+  sample: CfsmRealtimeSample,
+  receivedAt = Date.now(),
+): CfsmServer {
+  if (server.id !== sample.serverId) return server
+  const input = sample.data
+  const normalized = normalizeServer({ ...input, id: server.id }, server.source, receivedAt)
+  const next: CfsmServer = {
+    ...server,
+    online: true,
+    lastUpdated: receivedAt,
+    timestamp: sample.timestamp ?? receivedAt,
+  }
+
+  const name = stringValue(input.name)
+  if (name !== null) next.name = name
+  if ('server_group' in input) next.group = normalized.group
+  if ('tags' in input) next.tags = normalized.tags
+  if ('price' in input) next.price = normalized.price
+  if ('billing_cycle' in input) next.billingCycle = normalized.billingCycle
+  if ('auto_renewal' in input) next.autoRenewal = normalized.autoRenewal
+  if ('currency' in input) next.currency = normalized.currency
+  if ('expire_date' in input) next.expireDate = normalized.expireDate
+  if ('traffic_limit' in input) next.trafficLimit = normalized.trafficLimit
+  if ('traffic_calc_type' in input) next.trafficCalculationType = normalized.trafficCalculationType
+  if ('reset_day' in input) next.resetDay = normalized.resetDay
+  if ('report_interval' in input) next.reportInterval = normalized.reportInterval
+  if ('wss_report_interval' in input) next.websocketReportInterval = normalized.websocketReportInterval
+  if ('is_hidden' in input) next.hidden = normalized.hidden
+  if ('sort_order' in input) next.sortOrder = normalized.sortOrder
+  if ('is_online' in input) next.online = normalized.online
+  if ('cpu' in input) next.cpu = normalized.cpu
+  if ('load_avg' in input) {
+    next.load1 = normalized.load1
+    next.load5 = normalized.load5
+    next.load15 = normalized.load15
+  }
+  if ('net_in_speed' in input) next.networkInSpeed = normalized.networkInSpeed
+  if ('net_out_speed' in input) next.networkOutSpeed = normalized.networkOutSpeed
+  if ('net_rx' in input) next.networkReceived = normalized.networkReceived
+  if ('net_tx' in input) next.networkTransmitted = normalized.networkTransmitted
+  if ('net_rx_monthly' in input) next.monthlyNetworkReceived = normalized.monthlyNetworkReceived
+  if ('net_tx_monthly' in input) next.monthlyNetworkTransmitted = normalized.monthlyNetworkTransmitted
+  if ('processes' in input) next.processes = normalized.processes
+  if ('tcp_conn' in input) next.tcpConnections = normalized.tcpConnections
+  if ('udp_conn' in input) next.udpConnections = normalized.udpConnections
+  if ('ram_total' in input) next.memoryTotal = normalized.memoryTotal
+  if ('ram_used' in input) next.memoryUsed = normalized.memoryUsed
+  if ('swap_total' in input) next.swapTotal = normalized.swapTotal
+  if ('swap_used' in input) next.swapUsed = normalized.swapUsed
+  if ('disk_total' in input) next.diskTotal = normalized.diskTotal
+  if ('disk_used' in input) next.diskUsed = normalized.diskUsed
+  if ('disk' in input && normalized.diskIo !== undefined) next.diskIo = normalized.diskIo
+  if ('cpu_cores' in input) next.cpuCores = normalized.cpuCores
+  if ('cpu_info' in input) next.cpuInfo = normalized.cpuInfo
+  if ('gpu_info' in input) next.gpus = normalized.gpus
+  if ('arch' in input) next.architecture = normalized.architecture
+  if ('os' in input) next.operatingSystem = normalized.operatingSystem
+  if ('kernel_version' in input) next.kernelVersion = normalized.kernelVersion
+  if ('region' in input) next.region = normalized.region
+  if ('ip_v4' in input) next.ipV4Reachable = normalized.ipV4Reachable
+  if ('ip_v6' in input) next.ipV6Reachable = normalized.ipV6Reachable
+  if ('boot_time' in input) next.bootTime = normalized.bootTime
+  if ('agent_version' in input) next.agentVersion = normalized.agentVersion
+
+  const latency = { ...server.latency }
+  const packetLoss = { ...server.packetLoss }
+  for (const carrier of LATENCY_CARRIERS) {
+    const pingKey = `ping_${carrier}`
+    const lossKey = `loss_${carrier}`
+    if (pingKey in input) latency[carrier] = normalized.latency[carrier]
+    if (lossKey in input) packetLoss[carrier] = normalized.packetLoss[carrier]
+  }
+  next.latency = latency
+  next.packetLoss = packetLoss
+
+  return next
 }
 
 export function normalizeHistory(value: unknown): HistoryPoint[] {

@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  mergeRealtimeSample,
   normalizeHistory,
   normalizeServer,
   normalizeServerCollection,
   normalizeSiteConfig,
+  normalizeSocketBatch,
 } from '@/services/cfsm/adapters'
 import { apiSource } from '@/services/cfsm/config'
 
@@ -38,6 +40,17 @@ describe('CFSM wire adapters', () => {
     })
     expect(config.latencyLabels.ct).toBe('Telecom')
     expect(config.themeOptions).toEqual({ glass: true })
+  })
+
+  it('accepts only valid whole-minute WebSocket lifetime settings', () => {
+    expect(normalizeSiteConfig({ frontend_ws_timeout_minutes: 0 })
+      .frontendWebsocketTimeoutMinutes).toBe(0)
+    expect(normalizeSiteConfig({ frontend_ws_timeout_minutes: 1440 })
+      .frontendWebsocketTimeoutMinutes).toBe(1440)
+    expect(normalizeSiteConfig({ frontend_ws_timeout_minutes: 1.5 })
+      .frontendWebsocketTimeoutMinutes).toBe(0)
+    expect(normalizeSiteConfig({ frontend_ws_timeout_minutes: 1441 })
+      .frontendWebsocketTimeoutMinutes).toBe(0)
   })
 
   it('maps official server fields, reachability flags and optional metrics', () => {
@@ -131,6 +144,73 @@ describe('CFSM wire adapters', () => {
     expect(history).toHaveLength(1)
     expect(history[0]?.timestamp).toBe(123)
     expect(history[0]?.diskIo?.readBps).toBe(100)
+  })
+
+  it('normalizes ordered batch updates across data, payload and metrics envelopes', () => {
+    const updates = normalizeSocketBatch({
+      type: 'batchUpdate',
+      ts: 50,
+      updates: [
+        {
+          serverId: 'node-1',
+          samples: [
+            { ts: 30, metrics: { cpu: 30 } },
+            { ts: 10, data: { cpu: 10 } },
+            { timestamp: 20, payload: { cpu: 20 } },
+            { ts: 40, data: null },
+            { data: { cpu: 50 } },
+          ],
+        },
+        { serverId: '', samples: [{ data: { cpu: 99 } }] },
+      ],
+    })
+
+    expect(updates.map((sample) => [sample.timestamp, sample.data.cpu])).toEqual([
+      [10, 10],
+      [20, 20],
+      [30, 30],
+      [50, 50],
+    ])
+  })
+
+  it('merges partial realtime samples without erasing the REST snapshot', () => {
+    const server = normalizeServer({
+      id: 'node-1',
+      name: 'Tokyo edge',
+      server_group: 'production',
+      tags: ['edge'],
+      cpu: 10,
+      ram_total: 8192,
+      ram_used: 2048,
+      disk_total: 100_000,
+      disk_used: 50_000,
+      net_rx: 1234,
+      gpu_info: [{ id: '0', name: 'GPU', info: 25 }],
+      last_updated: 1_000,
+    }, source, 1_000)
+
+    const merged = mergeRealtimeSample(server, {
+      serverId: 'node-1',
+      timestamp: 2_000,
+      data: { cpu: 22, ram_used: 4096, net_in_speed: 512 },
+    }, 2_100)
+
+    expect(merged).toMatchObject({
+      name: 'Tokyo edge',
+      group: 'production',
+      tags: ['edge'],
+      online: true,
+      cpu: 22,
+      memoryTotal: 8192,
+      memoryUsed: 4096,
+      diskTotal: 100_000,
+      diskUsed: 50_000,
+      networkReceived: 1234,
+      networkInSpeed: 512,
+      timestamp: 2_000,
+      lastUpdated: 2_100,
+    })
+    expect(merged.gpus).toEqual([{ id: '0', name: 'GPU', utilization: 25 }])
   })
 
   it('rejects malformed required response shapes', () => {
