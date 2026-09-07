@@ -10,7 +10,7 @@ export const ALL_GROUPS = '__all__'
 export const UNGROUPED_LABEL = '未分组'
 
 function normalizedText(value: string): string {
-  return value.trim().toLocaleLowerCase('zh-CN')
+  return value.normalize('NFKC').trim().toLocaleLowerCase('zh-CN')
 }
 
 export function displayGroup(server: GlassServer): string {
@@ -30,28 +30,33 @@ export function filterServers(
   servers: GlassServer[],
   query: string,
   group = ALL_GROUPS,
+  favoriteKeys?: ReadonlySet<string>,
 ): GlassServer[] {
-  const needle = normalizedText(query)
+  const terms = normalizedText(query).split(/\s+/).filter(Boolean)
 
   return servers.filter((server) => {
     if (group !== ALL_GROUPS && displayGroup(server) !== group) return false
-    if (!needle) return true
+    if (favoriteKeys && !favoriteKeys.has(server.key)) return false
+    if (terms.length === 0) return true
 
     const searchable = [
+      server.id,
       server.name,
       server.group,
       server.region,
       server.cpuInfo,
       server.operatingSystem,
       server.architecture,
+      server.kernelVersion,
+      server.agentVersion,
       server.sourceLabel,
       ...server.tags,
     ]
       .filter((value): value is string => typeof value === 'string' && value.length > 0)
-      .join(' ')
-      .toLocaleLowerCase('zh-CN')
+      .map(normalizedText)
+      .join('\n')
 
-    return searchable.includes(needle)
+    return terms.every((term) => searchable.includes(term))
   })
 }
 
@@ -70,8 +75,14 @@ function serverNameOrder(left: GlassServer, right: GlassServer): number {
   return left.name.localeCompare(right.name, 'zh-CN', { numeric: true })
 }
 
-export function sortServers(servers: GlassServer[], sort: DashboardSort): GlassServer[] {
+export function sortServers(
+  servers: GlassServer[],
+  sort: DashboardSort,
+  offlineLast = false,
+): GlassServer[] {
   return [...servers].sort((left, right) => {
+    if (offlineLast && left.online !== right.online) return left.online ? -1 : 1
+
     let result = 0
     switch (sort) {
       case 'name':

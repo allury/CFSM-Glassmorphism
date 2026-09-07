@@ -1,8 +1,12 @@
 # 主题设置审计
 
-> 基线：Komari Glassmorphism v3.3.7 的 `komari-theme.json`，提交 bf8376587c720de915ac48789a8a180357c762d6。状态描述在 CFSM 上的最终适配可行性，不代表第 1 轮已经完成设置界面。
+> 基线：Komari Glassmorphism v3.3.7 的 `komari-theme.json`，提交 bf8376587c720de915ac48789a8a180357c762d6。状态描述在 CFSM 上的最终适配可行性，不等同于当前实现进度。
 
 共审计 **48** 个设置：**✅ 1:1 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
+
+## 第 3 轮落地范围
+
+首页已落地与 `themeMode`、`defaultViewMode`、`nodeCardSize` 和 `offlineNodesLast` 对应的轻量本地交互，并以 source+id 保存收藏。当前 system/light/dark、card/compact/mini/list 和离线置底存放在版本化浏览器快照中；CSS 动态背景是本轮固定视觉层，不冒充 `background*` 设置已经完成。完整 48 项 schema、设置界面、backend/local 分层编辑、迁移和 `POST /api/theme_options` 保存仍留在后续轮次。
 
 ## 状态定义
 
@@ -83,4 +87,3 @@
 - 原多行 keys 支持逗号、空格或换行分隔，保存时规范化并去重但保持顺序。
 - `glassCustomColors` 和旧的 `chartDashboardTemplate` JSON 必须先安全解析，失败时显示错误，不执行字符串。
 - 红色设置保留迁移说明，但不向用户展示一个看似可用、实际依赖 mock 的开关。
-

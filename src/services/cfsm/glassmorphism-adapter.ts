@@ -90,6 +90,10 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     operatingSystem: server.operatingSystem,
     architecture: server.architecture,
     cpuInfo: server.cpuInfo,
+    cpuCores: finiteNonNegative(server.cpuCores),
+    kernelVersion: server.kernelVersion,
+    agentVersion: server.agentVersion,
+    bootTime: finiteNonNegative(server.bootTime),
     lastUpdated: server.lastUpdated ?? server.timestamp,
   }
 }

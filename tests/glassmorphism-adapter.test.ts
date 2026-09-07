@@ -47,6 +47,10 @@ describe('Server to Glassmorphism adapter', () => {
       gpu_info: [{ id: '0', name: 'GPU 0', info: 45 }],
       ip_v4: '1',
       ip_v6: '0',
+      cpu_cores: 4,
+      kernel_version: '6.8.0',
+      agent_version: '1.3.3',
+      boot_time: 1_700_000_000_000,
       is_online: '1',
     }, source)
 
@@ -71,6 +75,10 @@ describe('Server to Glassmorphism adapter', () => {
         monthlyTransmitted: 40_000,
       },
       connectivity: { ipv4: '1', ipv6: '0' },
+      cpuCores: 4,
+      kernelVersion: '6.8.0',
+      agentVersion: '1.3.3',
+      bootTime: 1_700_000_000_000,
     })
     expect(view.latency).toEqual([{
       carrier: 'ct',

@@ -45,3 +45,35 @@ export function formatLatency(value: number | null): string {
   const latency = normalizedNumber(value)
   return latency === null ? '—' : latency.toFixed(latency >= 100 ? 0 : 1) + ' ms'
 }
+
+function timestampMilliseconds(value: number | null): number | null {
+  const timestamp = normalizedNumber(value)
+  if (timestamp === null || timestamp === 0) return null
+  return timestamp < 1_000_000_000_000 ? timestamp * 1000 : timestamp
+}
+
+export function formatTimestamp(value: number | null): string {
+  const timestamp = timestampMilliseconds(value)
+  if (timestamp === null) return '—'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
+export function formatUptime(bootTime: number | null, now = Date.now()): string {
+  const startedAt = timestampMilliseconds(bootTime)
+  if (startedAt === null || startedAt > now) return '—'
+  const totalMinutes = Math.floor((now - startedAt) / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  if (days > 0) return `${days} 天 ${hours} 小时`
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`
+  return `${minutes} 分钟`
+}

@@ -6,7 +6,7 @@
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 0689e569765a52a40d55ff1fbc2475177af75af6 | 第 1 轮工程基础；第 2 轮在其上开发 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | 2e26bc1c0825745f37726bf7ceafb54ac6414b9b | 第 2 轮真实 REST 首页；第 3 轮在其上开发 |
 | huilang-me/CF-Server-Monitor | main | 90d0d217015ce294a0826146d83a80e558a5055e | theme-develop.md 与 src/frontend 第三方主题链路 |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -15,11 +15,11 @@
 
 状态统计：**✅ 1:1 31 项、🟢 等价实现 20 项、🟡 降级实现 5 项、🔴 CFSM API 暂不支持 4 项，共 60 项。**
 
-## 第 2 轮实现进度
+## 第 3 轮实现进度
 
-真实 REST 首页已覆盖首页入口、卡片/列表、总览、分组、搜索、基础排序、核心资源与网络指标、进程与连接、当前延迟/丢包、GPU、IPv4/IPv6 可达性、站点标题，以及多 API Base 的来源保留和部分失败降级。页面对零节点、全离线、缺失字段、旧 Agent 数据和请求错误使用明确空态或不可用状态。
+真实 REST 首页已在第 2 轮能力上完成 Glassmorphism 视觉与交互还原：粘性页头、总览玻璃卡、CSS 动态背景、card/compact/mini/list 四种响应式布局、tooltip、当前快照模态框/底部抽屉、source+id 收藏、离线置底、多词搜索与 system/light/dark 本地偏好。核心资源、网络、运行信息、当前延迟/丢包、GPU、IPv4/IPv6 可达性和系统元数据仍只使用 adapter 提供的真实字段。页面对零节点、全离线、缺失字段、旧 Agent 数据和请求错误使用明确空态或不可用状态。
 
-WebSocket、节点详情、历史图、主题设置界面、Earth/Map 和高级工具仍未进入实现；下表中的兼容状态仍表示最终设计结论。
+0/1/10/30 节点、长名称、14 标签，以及 375/430/768/1024/1440/1920px 视口已经过本地构建验证。WebSocket、正式节点详情、历史图、完整主题设置界面与后端保存、Earth/Map 和高级工具仍未进入实现；下表中的兼容状态仍表示最终设计结论。
 
 ## 矩阵
 

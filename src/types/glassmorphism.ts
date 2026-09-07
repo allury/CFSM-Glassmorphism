@@ -58,10 +58,15 @@ export interface GlassServer {
   operatingSystem: string | null
   architecture: string | null
   cpuInfo: string | null
+  cpuCores: number | null
+  kernelVersion: string | null
+  agentVersion: string | null
+  bootTime: number | null
   lastUpdated: number | null
 }
 
-export type DashboardViewMode = 'card' | 'list'
+export type DashboardViewMode = 'card' | 'compact' | 'mini' | 'list'
+export type DashboardThemeMode = 'system' | 'light' | 'dark'
 export type DashboardSort = 'order' | 'name' | 'status' | 'cpu' | 'memory' | 'network'
 
 export interface DashboardSummary {

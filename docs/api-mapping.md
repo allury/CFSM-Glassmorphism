@@ -55,7 +55,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 ### GET /api/ws
 
-第 2 轮没有实现 WebSocket 客户端。后续实现必须遵守：
+截至第 3 轮仍没有实现 WebSocket 客户端。后续实现必须遵守：
 
 1. 首页先按 base 读取列表，再为每个 base 建立独立 `subscribe=all` 连接。
 2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 只属于当前 base；不发送订阅消息不会收到更新。

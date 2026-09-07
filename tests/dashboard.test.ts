@@ -44,6 +44,10 @@ function makeServer(id: string, overrides: Partial<GlassServer> = {}): GlassServ
     operatingSystem: null,
     architecture: null,
     cpuInfo: null,
+    cpuCores: null,
+    kernelVersion: null,
+    agentVersion: null,
+    bootTime: null,
     lastUpdated: null,
     ...overrides,
   }
@@ -126,7 +130,15 @@ describe('dashboard selectors', () => {
 
     expect(filterServers(servers, 'epyc', ALL_GROUPS).map((server) => server.id)).toEqual(['a'])
     expect(filterServers(servers, 'premium', ALL_GROUPS).map((server) => server.id)).toEqual(['a'])
+    expect(filterServers(servers, 'hong ubuntu', ALL_GROUPS).map((server) => server.id)).toEqual(['a'])
     expect(filterServers(servers, 'tokyo', 'Production')).toEqual([])
+  })
+
+  it('filters favorites by stable source-owned key', () => {
+    const servers = [makeServer('a'), makeServer('b')]
+    const favorites = new Set([servers[1]?.key ?? ''])
+
+    expect(filterServers(servers, '', ALL_GROUPS, favorites).map((server) => server.id)).toEqual(['b'])
   })
 
   it('groups blank values explicitly and sorts unavailable metrics last', () => {
@@ -139,5 +151,31 @@ describe('dashboard selectors', () => {
     expect(availableGroups(servers)).toEqual(['Edge', UNGROUPED_LABEL])
     expect(groupServers(servers).map((group) => group.name)).toEqual(['Edge', UNGROUPED_LABEL])
     expect(sortServers(servers, 'cpu').map((server) => server.id)).toEqual(['c', 'b', 'a'])
+  })
+
+  it('places offline nodes last without changing the selected metric order', () => {
+    const servers = [
+      makeServer('offline-fast', { online: false, cpu: 99 }),
+      makeServer('online-fast', { cpu: 60 }),
+      makeServer('online-slow', { cpu: 10 }),
+    ]
+
+    expect(sortServers(servers, 'cpu', true).map((server) => server.id)).toEqual([
+      'online-fast',
+      'online-slow',
+      'offline-fast',
+    ])
+  })
+
+  it.each([0, 1, 10, 30])('preserves truthful collection cardinality for %i nodes', (count) => {
+    const servers = Array.from({ length: count }, (_, index) => makeServer(String(index), {
+      name: index === 0 ? 'A very long production server name that must remain searchable' : `Node ${index}`,
+      tags: index === 0 ? Array.from({ length: 14 }, (__, tagIndex) => `tag-${tagIndex}`) : [],
+    }))
+
+    expect(sortServers(filterServers(servers, '', ALL_GROUPS), 'order')).toHaveLength(count)
+    if (count > 0) {
+      expect(filterServers(servers, 'very long production', ALL_GROUPS)[0]?.tags).toHaveLength(14)
+    }
   })
 })

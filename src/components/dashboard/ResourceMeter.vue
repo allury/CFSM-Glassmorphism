@@ -11,6 +11,13 @@ const props = defineProps<{
 const fillStyle = computed(() => ({
   width: (props.metric.percentage ?? 0) + '%',
 }))
+const tone = computed(() => {
+  const percentage = props.metric.percentage
+  if (percentage === null) return 'neutral'
+  if (percentage >= 90) return 'danger'
+  if (percentage >= 75) return 'warning'
+  return 'normal'
+})
 const detail = computed(() => {
   if (props.metric.used === null && props.metric.total === null) return '—'
   if (props.metric.total === null) return formatMebibytes(props.metric.used)
@@ -34,6 +41,7 @@ const detail = computed(() => {
     >
       <span
         class="resource-meter__fill"
+        :class="`resource-meter__fill--${tone}`"
         :style="fillStyle"
       />
     </div>
