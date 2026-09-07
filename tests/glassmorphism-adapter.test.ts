@@ -80,12 +80,20 @@ describe('Server to Glassmorphism adapter', () => {
       agentVersion: '1.3.3',
       bootTime: 1_700_000_000_000,
     })
-    expect(view.latency).toEqual([{
-      carrier: 'ct',
-      label: '电信',
-      latency: 21,
-      packetLoss: 0,
-    }])
+    expect(view.latency).toEqual([
+      {
+        carrier: 'ct',
+        label: '电信',
+        latency: 21,
+        packetLoss: 0,
+      },
+      {
+        carrier: 'cu',
+        label: '联通',
+        latency: false,
+        packetLoss: null,
+      },
+    ])
     expect(view.gpus).toEqual([{ id: '0', name: 'GPU 0', utilization: 45 }])
   })
 
@@ -121,5 +129,20 @@ describe('Server to Glassmorphism adapter', () => {
     expect(view.network.inSpeed).toBeNull()
     expect(view.gpus).toEqual([])
     expect(view.latency).toEqual([])
+  })
+
+  it('uses the same centralized legacy labels when config is unavailable', () => {
+    const view = toGlassServer(normalizeServer({
+      id: 'fallback-label-node',
+      ping_ct: 0,
+      loss_ct: 0,
+    }, source), null)
+
+    expect(view.latency).toEqual([{
+      carrier: 'ct',
+      label: '电信',
+      latency: 0,
+      packetLoss: 0,
+    }])
   })
 })

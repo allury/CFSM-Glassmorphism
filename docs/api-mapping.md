@@ -26,6 +26,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 - 可带 `Authorization: Bearer <jwt>`。
 - 该端点在不带 Turnstile header 时可直接读取验证配置；带 `X-Turnstile-Token` 或 `X-Turnstile-Verified` 时会执行验证。
 - 读取 `theme_options`、站点标题、外观/语言偏好、Turnstile 状态、WebSocket 超时、长历史点数及 latency window。
+- 旧四线路名称读取 `custom_ct_name`、`custom_cu_name`、`custom_cm_name`、`custom_bd_name`；字段缺失或空白时统一回退为“电信 / 联通 / 移动 / BGP”。新增探测点名称读取 `node_1_name` 至 `node_4_name`，缺失或空白时回退为 `Node 1` 至 `Node 4`。八个默认名集中在 `src/constants/probes.ts`，config 暂不可用时同样使用这一来源。
 - 响应体中的 `turnstile_verified` 写入同名本地键，并清除已经消费的一次性 token。
 - 此端点不使用外部静态配置文件作为替代。
 
@@ -44,6 +45,8 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 - 请求必须发往该节点的 `source.base`。
 - 404 原样表现为节点不存在；不创建演示节点。
 - 详情响应不提供列表页的 ping/loss 窗口数组。
+- 当前探测字段包含旧线路 `ping/loss_{ct,cu,cm,bd}` 和新增 `ping/loss_node_1..4`，全部在 adapter 后进入同一八目标领域映射。
+- 每项保留 `number | null | false`：`false` 表示未配置、未上报或字段缺失，`null` 表示本轮探测超时，数值（包括 `0`）表示有效结果。旧版本缺少的新字段统一归一化为 `false`。
 
 ### GET /api/history/all?id=<id>&hours=<hours>
 
@@ -52,6 +55,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 - 长历史点数由后端配置决定，不在前端填点。
 - 历史 `disk` 优先读取对象；兼容旧的六个 `disk_*` 平铺字段，但缺失时不绘制。
 - 503 是后端额度/暂不可用状态，只能显示真实降级提示，不能用 mock 历史替代。
+- 每个真实历史点归一化旧四线路和 Node 1–4 的全部 Ping/Loss 字段，并保持与详情一致的 `false / null / number` 三态；缺字段是 `false`，不插值、不补点、不把超时或缺失改写为 0。
 
 ### GET /api/ws
 
@@ -60,11 +64,14 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 1. 首页先按 base 读取列表，再为每个有节点的 base 建立独立 `subscribe=all` 连接。
 2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 去重、校验且只属于当前 base；不发送订阅消息不会收到更新。
 3. `batchUpdate.updates[].samples[]` 从第一个有效的 `data || payload || metrics` 增量对象读取，按 sample、update、message 的真实时间戳顺序回退，再按字段合并到现有 REST 实体。缺失字段不会被覆盖为 null、0 或空值。
+   旧四线路和 Node 1–4 的 Ping/Loss 都走同一 presence-based merge；payload 中明确出现的 `false`、`null`、`0` 和普通数字都会覆盖对应旧值，未出现的 probe 字段保持不变。
 4. 页面隐藏时主动关闭全部连接；重新可见时先执行 REST revalidate，再按最新节点集合恢复订阅。
 5. `frontend_ws_timeout_minutes` 只接受 0–1440 的整数。正数时限到达后停止连接，由用户明确选择继续新连接或保持暂停。
 6. 网络或策略失败采用 1–30 秒有界指数退避，并确保每条连接只有一个待执行重试；不可用期间启用单个 60 秒 REST 补偿循环。REST 503 保留已有来源快照并显示来源错误，不生成替代数据。
 7. 同源非公开站点依赖 CFSM cookie；跨源才把 JWT 放入 `token` 查询参数。Turnstile 不参与 WebSocket 验证。
 8. 详情仍应使用 `subscribe=<id>`，不订阅全量；该能力不属于本轮。
+
+CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 Node 1–4 probe 字段和三态语义。其 `/api/config` 示例与 `SiteConfig` 示例目前漏列 `node_1_name..node_4_name`，但同一文档明确指定这些名称，且官方公开 `/api/config` handler 与官方前端都已返回/读取它们；本主题据此按公开接口兼容，并保留旧版本 fallback。
 
 ### POST /api/theme_options
 

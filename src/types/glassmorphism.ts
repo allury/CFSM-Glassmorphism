@@ -1,4 +1,4 @@
-import type { LatencyCarrier, Reachability } from './cfsm'
+import type { LatencyCarrier, ProbeValue, Reachability } from './cfsm'
 
 export interface GlassResourceMetric {
   used: number | null
@@ -8,8 +8,8 @@ export interface GlassResourceMetric {
 export interface GlassLatencyMetric {
   carrier: LatencyCarrier
   label: string
-  latency: number | null
-  packetLoss: number | null
+  latency: ProbeValue
+  packetLoss: ProbeValue
 }
 
 export interface GlassGpuMetric {

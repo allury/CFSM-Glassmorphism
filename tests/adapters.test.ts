@@ -8,6 +8,8 @@ import {
   normalizeSocketBatch,
 } from '@/services/cfsm/adapters'
 import { apiSource } from '@/services/cfsm/config'
+import { PROBE_TARGETS } from '@/constants/probes'
+import type { CfsmServer, ProbeValue } from '@/types/cfsm'
 
 const source = apiSource('https://status.example')
 
@@ -19,6 +21,13 @@ describe('CFSM wire adapters', () => {
       authorization: true,
       turnstile_enabled: '1',
       custom_ct_name: 'Telecom',
+      custom_cu_name: 'Unicom',
+      custom_cm_name: 'Mobile',
+      custom_bd_name: 'Backbone',
+      node_1_name: 'Tokyo',
+      node_2_name: 'Singapore',
+      node_3_name: 'Frankfurt',
+      node_4_name: 'Virginia',
       site_title: 'Status',
       preferred_theme: 'dark',
       default_language: 'zh',
@@ -38,8 +47,42 @@ describe('CFSM wire adapters', () => {
       frontendWebsocketTimeoutMinutes: 20,
       longHistoryPoints: 180,
     })
-    expect(config.latencyLabels.ct).toBe('Telecom')
+    expect(config.probeLabels).toEqual({
+      ct: 'Telecom',
+      cu: 'Unicom',
+      cm: 'Mobile',
+      bd: 'Backbone',
+      node_1: 'Tokyo',
+      node_2: 'Singapore',
+      node_3: 'Frankfurt',
+      node_4: 'Virginia',
+    })
     expect(config.themeOptions).toEqual({ glass: true })
+  })
+
+  it('uses centralized legacy and Node label defaults for missing or blank config fields', () => {
+    const expected = {
+      ct: '电信',
+      cu: '联通',
+      cm: '移动',
+      bd: 'BGP',
+      node_1: 'Node 1',
+      node_2: 'Node 2',
+      node_3: 'Node 3',
+      node_4: 'Node 4',
+    }
+
+    expect(normalizeSiteConfig({}).probeLabels).toEqual(expected)
+    expect(normalizeSiteConfig({
+      custom_ct_name: ' ',
+      custom_cu_name: '',
+      custom_cm_name: '\t',
+      custom_bd_name: '\n',
+      node_1_name: '',
+      node_2_name: ' ',
+      node_3_name: '\t',
+      node_4_name: '\n',
+    }).probeLabels).toEqual(expected)
   })
 
   it('accepts only valid whole-minute WebSocket lifetime settings', () => {
@@ -90,10 +133,33 @@ describe('CFSM wire adapters', () => {
     expect(server.latencyWindow[0]).toEqual({
       timestamp: 999_000,
       ct: 20,
-      cu: null,
+      cu: false,
       cm: null,
       bd: 30,
     })
+  })
+
+  it('preserves every legacy and Node probe state on server responses', () => {
+    const cases: Array<{ input?: ProbeValue; expected: ProbeValue }> = [
+      { input: 17.5, expected: 17.5 },
+      { input: 0, expected: 0 },
+      { input: null, expected: null },
+      { input: false, expected: false },
+      { expected: false },
+    ]
+
+    for (const target of PROBE_TARGETS) {
+      for (const probeCase of cases) {
+        const fields: Record<string, unknown> = { id: 'probe-node' }
+        if ('input' in probeCase) {
+          fields[`ping_${target}`] = probeCase.input
+          fields[`loss_${target}`] = probeCase.input
+        }
+        const server = normalizeServer(fields, source)
+        expect(server.latency[target]).toBe(probeCase.expected)
+        expect(server.packetLoss[target]).toBe(probeCase.expected)
+      }
+    }
   })
 
   it('does not expose absent all-zero disk IO or stale online state', () => {
@@ -144,6 +210,89 @@ describe('CFSM wire adapters', () => {
     expect(history).toHaveLength(1)
     expect(history[0]?.timestamp).toBe(123)
     expect(history[0]?.diskIo?.readBps).toBe(100)
+  })
+
+  it('keeps all legacy and Node probe states in history without filling missing data', () => {
+    const [point] = normalizeHistory([{
+      timestamp: 123,
+      ping_ct: 12,
+      ping_cu: 0,
+      ping_cm: null,
+      ping_bd: false,
+      ping_node_2: 22,
+      ping_node_3: 0,
+      ping_node_4: null,
+      loss_ct: false,
+      loss_cm: 0,
+      loss_bd: null,
+      loss_node_1: 1,
+      loss_node_2: false,
+      loss_node_4: 0,
+    }])
+
+    expect(point?.latency).toEqual({
+      ct: 12,
+      cu: 0,
+      cm: null,
+      bd: false,
+      node_1: false,
+      node_2: 22,
+      node_3: 0,
+      node_4: null,
+    })
+    expect(point?.packetLoss).toEqual({
+      ct: false,
+      cu: false,
+      cm: 0,
+      bd: null,
+      node_1: 1,
+      node_2: false,
+      node_3: false,
+      node_4: 0,
+    })
+  })
+
+  it('merges tri-state probe fields from every WebSocket sample envelope', () => {
+    const initial = normalizeServer({
+      id: 'node-1',
+      name: 'Preserved server',
+      ram_total: 8192,
+      ping_ct: 18,
+      loss_ct: 2,
+      ping_node_1: 20,
+      ping_node_2: 21,
+      ping_node_3: 22,
+    }, source)
+    const samples = normalizeSocketBatch({
+      type: 'batchUpdate',
+      updates: [{
+        serverId: 'node-1',
+        samples: [
+          { ts: 1, data: { ping_node_1: null, loss_node_1: 0 } },
+          { ts: 2, payload: { ping_node_2: false, loss_node_2: 4 } },
+          { ts: 3, metrics: { ping_ct: 0, loss_ct: null, ping_node_3: 42 } },
+        ],
+      }],
+    })
+    const merged = samples.reduce<CfsmServer>(
+      (server, sample) => mergeRealtimeSample(server, sample, 10),
+      initial,
+    )
+
+    expect(merged.latency).toMatchObject({
+      ct: 0,
+      node_1: null,
+      node_2: false,
+      node_3: 42,
+      node_4: false,
+    })
+    expect(merged.packetLoss).toMatchObject({
+      ct: null,
+      node_1: 0,
+      node_2: 4,
+      node_3: false,
+    })
+    expect(merged).toMatchObject({ name: 'Preserved server', memoryTotal: 8192 })
   })
 
   it('normalizes ordered batch updates across data, payload and metrics envelopes', () => {

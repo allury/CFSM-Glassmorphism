@@ -1,19 +1,18 @@
-import type { CfsmServer, SiteConfig } from '@/types/cfsm'
+import type { CfsmServer, ProbeValue, SiteConfig } from '@/types/cfsm'
+import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import type {
   GlassResourceMetric,
   GlassServer,
 } from '@/types/glassmorphism'
 import { latencyCarrierKeys } from './adapters'
 
-const DEFAULT_LATENCY_LABELS = {
-  ct: 'CT',
-  cu: 'CU',
-  cm: 'CM',
-  bd: 'BGP',
-} as const
-
 function finiteNonNegative(value: number | null): number | null {
   return value !== null && Number.isFinite(value) && value >= 0 ? value : null
+}
+
+function probeMetric(value: ProbeValue): ProbeValue {
+  if (value === false || value === null) return value
+  return finiteNonNegative(value) ?? false
 }
 function boundedPercentage(value: number | null): number | null {
   const metric = finiteNonNegative(value)
@@ -34,7 +33,7 @@ function serverKey(server: CfsmServer): string {
 }
 
 export function toGlassServer(server: CfsmServer, config: SiteConfig | null): GlassServer {
-  const labels = config?.latencyLabels ?? DEFAULT_LATENCY_LABELS
+  const labels = config?.probeLabels ?? DEFAULT_PROBE_LABELS
 
   return {
     key: serverKey(server),
@@ -68,9 +67,12 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     tcpConnections: finiteNonNegative(server.tcpConnections),
     udpConnections: finiteNonNegative(server.udpConnections),
     latency: latencyCarrierKeys().flatMap((carrier) => {
-      const latency = finiteNonNegative(server.latency[carrier])
-      const packetLoss = boundedPercentage(server.packetLoss[carrier])
-      if (latency === null && packetLoss === null) return []
+      const latency = probeMetric(server.latency[carrier])
+      const packetLossValue = probeMetric(server.packetLoss[carrier])
+      const packetLoss = typeof packetLossValue === 'number'
+        ? Math.min(packetLossValue, 100)
+        : packetLossValue
+      if (latency === false && packetLoss === false) return []
       return [{
         carrier,
         label: labels[carrier],

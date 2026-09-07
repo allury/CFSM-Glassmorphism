@@ -8,6 +8,7 @@ import {
   formatLatency,
   formatLoad,
   formatPercent,
+  formatProbePercent,
   formatSpeed,
   formatTimestamp,
   formatUptime,
@@ -214,7 +215,7 @@ function handleKeydown(event: KeyboardEvent): void {
       >
         <strong>{{ metric.label }}</strong>
         <span>{{ formatLatency(metric.latency) }}</span>
-        <small>Loss {{ formatPercent(metric.packetLoss) }}</small>
+        <small>Loss {{ formatProbePercent(metric.packetLoss) }}</small>
       </div>
     </section>
 

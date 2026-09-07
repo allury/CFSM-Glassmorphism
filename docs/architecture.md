@@ -58,6 +58,8 @@ UI (render and user intent only)
 - 唯一允许理解 CFSM wire 字段名的层。
 - 输入总是 `unknown`；先验证对象/数组和关键 id，再做有限的字符串、数值、布尔归一化。
 - 把 snake_case 映射到 `src/types/cfsm.ts` 的稳定领域模型。
+- Ping/Loss 在边界统一映射为 `ProbeValue = number | null | false`。`CfsmServer` 与 `HistoryPoint` 都持有旧四线路加 Node 1–4 的八目标完整映射：缺字段为 `false`，显式 `null` 和有效 `0` 均原样保留。
+- `/api/config` 的八个 probe 显示名进入 `SiteConfig.probeLabels`；`src/constants/probes.ts` 是旧版本与 config 不可用场景的唯一默认名来源，避免 adapter 和 UI 各自定义 fallback。
 - 兼容 `gpu_info` 的数组/JSON 字符串和历史磁盘 IO 两种形状。
 - 不补历史点，不伪造 IP/ASN/城市/厂商，不把错误格式变成看似真实的数据。
 - `src/services/cfsm/glassmorphism-adapter.ts` 再把稳定 CFSM 模型映射为首页展示模型；可达性仍是状态，不成为地址字符串。
@@ -110,7 +112,7 @@ schema defaults
 - 一条首页连接只对应一个 apiBase；它的订阅 IDs 只来自同一 base。
 - 首页连接 URL 固定为 `/api/ws?subscribe=all`，open 后发送包含本 base 真实节点 IDs 的 all-scope subscription。
 - 收到 `batchUpdate` 后提取 sample 的 `data`、`payload` 或 `metrics`，按字段合并进已有实体。
-- 高频增量缺失字段是正常情况，不得覆盖为 null/0。
+- 高频增量缺失字段是正常情况，不得覆盖已有值；显式存在的 probe `false`、`null`、`0` 与普通数字则必须更新对应单一字段。
 - 列表 ping/loss 窗口由 REST 补齐，详情实时字段与历史序列分别管理。
 - document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。
 - 配置的连接时限到达后由用户选择继续或暂停；网络恢复采用单计时器指数退避，不会并发重连。
@@ -151,6 +153,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 4 轮完成边界
+## 第 4.5 轮完成边界
 
-本轮在第 3 轮首页上完成真实 WebSocket 更新与多 API Base 协调：每个 backend 独立连接和订阅、`batchUpdate` 多 envelope 适配、partial merge、visibility REST-first 恢复、`frontend_ws_timeout_minutes` 用户决策、有界退避、60 秒 REST fallback 与五分钟离线过期。测试覆盖跨来源同 ID 隔离、订阅 IDs、批次适配、增量保留、重连防风暴、503/网络降级、页面可见性和连接时限。以下仍是后续阶段：正式详情路由、详情 WebSocket、历史图、完整主题设置及后端保存、Earth/Map 和高级工具。
+第 4 轮已完成真实 WebSocket 更新与多 API Base 协调；第 4.5 轮只追加最新 CFSM Ping/Node 契约：集中管理旧四线路与 Node 1–4 名称及旧版本 fallback，让 Server、History、列表窗口与 WebSocket partial merge 全链路保留 `false / null / number` 三态。现有首页继续只消费旧四线路，不新增 Node 1–4 UI。以下仍是后续阶段：正式详情路由、详情 WebSocket、历史图、完整主题设置及后端保存、Earth/Map 和高级工具。

@@ -1,13 +1,13 @@
 # 功能兼容矩阵
 
-> 本文记录 2026-09-06 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不等同于当前实现进度。
+> 本文记录截至 2026-09-07 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不等同于当前实现进度。
 
 ## 审计基线
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 2bc6e7c7ddf08a9b1da6d5f29898b26e896a5b13 | 第 3 轮 Glassmorphism 首页；第 4 轮在其上开发 |
-| huilang-me/CF-Server-Monitor | main | 90d0d217015ce294a0826146d83a80e558a5055e | theme-develop.md 与 src/frontend 第三方主题链路 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | 4574ed2d5bdcde435b098972c75b768e91d48c11 | 第 4 轮 WebSocket 与多 API Base；第 4.5 轮在其上开发 |
+| huilang-me/CF-Server-Monitor | main | 924e71d32e5a0b5493cb52fdb2c184a9d6bd71e3 | 最新 theme-develop.md Ping/Node 契约与公开 config handler |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
 
@@ -15,11 +15,11 @@
 
 状态统计：**✅ 1:1 31 项、🟢 等价实现 20 项、🟡 降级实现 5 项、🔴 CFSM API 暂不支持 4 项，共 60 项。**
 
-## 第 4 轮实现进度
+## 第 4.5 轮实现进度
 
-真实 REST 首页已增加 CFSM WebSocket 运行时：每个 API base 单独连接 `/api/ws?subscribe=all`，open 后只发送该来源的真实 IDs；`batchUpdate` 的 `data`、`payload`、`metrics` 增量按字段合并，因此不会抹掉 REST 提供的名称、容量、GPU 或累计流量。页面隐藏时关闭连接，恢复可见时先 REST revalidate；网络或策略失败采用有界指数退避和单个低频 REST fallback，503 时保留上一份真实来源快照。站点配置的连接时限到达后，必须由用户明确选择继续或暂停。
+第 4 轮实时架构保持不变。第 4.5 轮将 CFSM 新增的 `node_1_name..node_4_name`、`ping_node_1..4` 与 `loss_node_1..4` 纳入严格领域模型，同时把旧四线路改为相同的 `number | null | false` 三态。Server、History、列表窗口和 WebSocket partial sample 都区分：缺失/未配置 `false`、明确超时 `null`、有效结果 `number`（包括 0）。旧 CFSM 缺字段时使用集中 fallback，不生成探测结果。
 
-第 3 轮的 0/1/10/30 节点、长名称、14 标签与 375–1920px 视口验证继续有效；第 4 轮单测新增覆盖 partial merge、batchUpdate、多 base 同 ID 隔离、订阅 IDs、visibility、超时、重连防风暴和 REST fallback。正式节点详情、详情实时订阅、历史图、完整主题设置界面与后端保存、Earth/Map 和高级工具仍未进入实现；下表中的兼容状态仍表示最终设计结论。
+第 4.5 轮测试覆盖八个 probe 的 number/0/null/false/missing、配置名称正常/空白/缺失、History 完整映射、三种 WebSocket sample 容器与多 API Base 隔离。正式节点详情、详情实时订阅与历史图仍未进入实现；第 5 轮可直接消费已经归一化的名称、Server probe 和 History probe，无需解析 wire payload。
 
 ## 矩阵
 
@@ -56,7 +56,7 @@
 | 流量配额 | 配额数值与使用率 | traffic_limit 为格式化字符串 | 能可靠解析时计算，否则只展示原值 | 🟡 降级实现 |
 | GPU 利用率 | GPU 指标卡 | gpu_info id/name/info | 兼容数组和 JSON 字符串 | ✅ 1:1 |
 | 磁盘 IO | 吞吐、IOPS、await、util | disk 对象 | 缺失或全零时隐藏 | ✅ 1:1 |
-| 四线路即时延迟/丢包 | Ping 指标 | ping/loss 的 CT/CU/CM/BD 字段 | 直接映射自定义线路名 | ✅ 1:1 |
+| 八目标即时延迟/丢包 | Ping 指标 | ping/loss 的 CT/CU/CM/BD 与 Node 1–4 字段 | 三态映射；旧四线路沿用自定义名，Node 名称进入领域配置；首页本轮仍只显示旧四线路 | ✅ 1:1 |
 | 延迟窗口小图 | 历史延迟序列 | `/api/servers` ping/loss 窗口 | 使用真实稀疏时间戳，不补点 | ✅ 1:1 |
 | 在线状态 | Komari online 字段 | is_online 或 last_updated/timestamp | 遵循五分钟在线阈值 | 🟢 等价实现 |
 | 多 API Base | 原主题单后端 | apiBase meta 可配置多个 origin | 每个节点保存 source ownership | 🟢 等价实现 |
@@ -92,4 +92,5 @@
 - `gpu` 已废弃，适配只读取 `gpu_info`。REST 可能返回 JSON 字符串，WebSocket 新数据返回数组。
 - `disk` 只有六个指标中至少一个非零时才有意义；缺失、格式错误或全零都视为不可用。
 - `/api/servers` 才包含 ping/loss 窗口；`/api/server` 不包含。窗口点稀疏且保留真实时间戳。
+- Ping/Loss 的 `false`、`null`、`0` 不可互换：分别表示未配置/缺失、明确超时、有效零值。Node 1–4 的名称与 probe 字段已由公开 config、详情、历史及 WebSocket 契约提供；旧版本缺失时只回退名称和 `false` 状态。
 - LuminaPlus 最新实现确实通过 `POST /api/theme_options` 保存完整配置。其仍存在“只读/本地保存”的旧注释和一个拒绝保存的兼容 stub；本项目以实际调用链与最新 CFSM 文档为准，不复制陈旧注释。

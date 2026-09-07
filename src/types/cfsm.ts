@@ -1,13 +1,18 @@
 export type NullableNumber = number | null
 export type Reachability = '0' | '1' | null
 export type LatencyCarrier = 'ct' | 'cu' | 'cm' | 'bd'
+export type ProbeNode = 'node_1' | 'node_2' | 'node_3' | 'node_4'
+export type ProbeTarget = LatencyCarrier | ProbeNode
+export type ProbeValue = number | null | false
 
 export interface ApiSource {
   base: string
   label: string
 }
 
-export type LatencyValues = Record<LatencyCarrier, NullableNumber>
+export type LatencyValues = Record<LatencyCarrier, ProbeValue>
+export type ProbeValues = Record<ProbeTarget, ProbeValue>
+export type ProbeLabels = Record<ProbeTarget, string>
 
 export interface LatencyWindowSample extends LatencyValues {
   timestamp: number
@@ -79,8 +84,8 @@ export interface CfsmServer {
   processes: NullableNumber
   tcpConnections: NullableNumber
   udpConnections: NullableNumber
-  latency: LatencyValues
-  packetLoss: LatencyValues
+  latency: ProbeValues
+  packetLoss: ProbeValues
   latencyWindow: LatencyWindowSample[]
   packetLossWindow: LatencyWindowSample[]
   memoryTotal: NullableNumber
@@ -116,7 +121,7 @@ export interface SiteConfig {
   turnstileEnabled: boolean
   turnstileLoginEnabled: boolean
   turnstileSiteKey: string | null
-  latencyLabels: Record<LatencyCarrier, string>
+  probeLabels: ProbeLabels
   siteTitle: string
   preferredTheme: 'auto' | 'dark' | 'light'
   defaultLanguage: 'auto' | 'zh' | 'en'
@@ -167,6 +172,8 @@ export interface HistoryPoint {
   load5: NullableNumber
   load15: NullableNumber
   temperature: NullableNumber
+  latency: ProbeValues
+  packetLoss: ProbeValues
   diskIo?: DiskIoMetrics
 }
 

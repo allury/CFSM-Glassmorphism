@@ -1,3 +1,5 @@
+import type { ProbeValue } from '@/types/cfsm'
+
 const BYTE_UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] as const
 
 function normalizedNumber(value: number | null): number | null {
@@ -41,9 +43,17 @@ export function formatCount(value: number | null): string {
   return count === null ? '—' : Math.round(count).toLocaleString('zh-CN')
 }
 
-export function formatLatency(value: number | null): string {
+export function formatLatency(value: ProbeValue): string {
+  if (value === null) return '超时'
+  if (value === false) return '—'
   const latency = normalizedNumber(value)
   return latency === null ? '—' : latency.toFixed(latency >= 100 ? 0 : 1) + ' ms'
+}
+
+export function formatProbePercent(value: ProbeValue): string {
+  if (value === null) return '超时'
+  if (value === false) return '—'
+  return formatPercent(value)
 }
 
 function timestampMilliseconds(value: number | null): number | null {

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { formatTimestamp, formatUptime } from '@/utils/format'
+import {
+  formatLatency,
+  formatProbePercent,
+  formatTimestamp,
+  formatUptime,
+} from '@/utils/format'
 
 describe('time formatting', () => {
   it('supports CFSM boot timestamps in seconds and milliseconds', () => {
@@ -12,5 +17,14 @@ describe('time formatting', () => {
     expect(formatUptime(0)).toBe('—')
     expect(formatUptime(Date.now() + 60_000)).toBe('—')
     expect(formatTimestamp(null)).toBe('—')
+  })
+
+  it('renders probe timeout, absence and zero as distinct states', () => {
+    expect(formatLatency(null)).toBe('超时')
+    expect(formatLatency(false)).toBe('—')
+    expect(formatLatency(0)).toBe('0.0 ms')
+    expect(formatProbePercent(null)).toBe('超时')
+    expect(formatProbePercent(false)).toBe('—')
+    expect(formatProbePercent(0)).toBe('0.0%')
   })
 })

@@ -6,16 +6,21 @@ import type {
   GpuMetrics,
   HistoryPoint,
   LatencyCarrier,
-  LatencyValues,
   LatencyWindowSample,
   LatestReportUpdate,
+  ProbeValue,
+  ProbeValues,
   ServerCollection,
   ServerSystemConfig,
   SiteConfig,
   ThemeOptionsSaveResult,
 } from '@/types/cfsm'
+import {
+  DEFAULT_PROBE_LABELS,
+  LEGACY_PROBE_TARGETS,
+  PROBE_TARGETS,
+} from '@/constants/probes'
 
-const LATENCY_CARRIERS = ['ct', 'cu', 'cm', 'bd'] as const
 const FIVE_MINUTES_MS = 5 * 60 * 1000
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -78,12 +83,22 @@ function loadValues(value: unknown): [number | null, number | null, number | nul
   return [numberValue(values[0]), numberValue(values[1]), numberValue(values[2])]
 }
 
-function latencyValues(value: Record<string, unknown>, prefix: 'ping' | 'loss'): LatencyValues {
+function probeValue(value: unknown): ProbeValue {
+  if (value === null) return null
+  if (value === false || value === undefined) return false
+  return numberValue(value) ?? false
+}
+
+function probeValues(value: Record<string, unknown>, prefix: 'ping' | 'loss'): ProbeValues {
   return {
-    ct: numberValue(value[prefix + '_ct']),
-    cu: numberValue(value[prefix + '_cu']),
-    cm: numberValue(value[prefix + '_cm']),
-    bd: numberValue(value[prefix + '_bd']),
+    ct: probeValue(value[`${prefix}_ct`]),
+    cu: probeValue(value[`${prefix}_cu`]),
+    cm: probeValue(value[`${prefix}_cm`]),
+    bd: probeValue(value[`${prefix}_bd`]),
+    node_1: probeValue(value[`${prefix}_node_1`]),
+    node_2: probeValue(value[`${prefix}_node_2`]),
+    node_3: probeValue(value[`${prefix}_node_3`]),
+    node_4: probeValue(value[`${prefix}_node_4`]),
   }
 }
 
@@ -96,10 +111,10 @@ function latencyWindow(value: unknown): LatencyWindowSample[] {
     if (timestamp === null) return []
     return [{
       timestamp,
-      ct: numberValue(entry.ct),
-      cu: numberValue(entry.cu),
-      cm: numberValue(entry.cm),
-      bd: numberValue(entry.bd),
+      ct: probeValue(entry.ct),
+      cu: probeValue(entry.cu),
+      cm: probeValue(entry.cm),
+      bd: probeValue(entry.bd),
     }]
   })
 }
@@ -212,11 +227,15 @@ export function normalizeSiteConfig(value: unknown): SiteConfig {
     turnstileEnabled: booleanValue(input.turnstile_enabled),
     turnstileLoginEnabled: booleanValue(input.turnstile_login_enabled),
     turnstileSiteKey: stringValue(input.turnstile_site_key),
-    latencyLabels: {
-      ct: stringValue(input.custom_ct_name) ?? 'CT',
-      cu: stringValue(input.custom_cu_name) ?? 'CU',
-      cm: stringValue(input.custom_cm_name) ?? 'CM',
-      bd: stringValue(input.custom_bd_name) ?? 'BGP',
+    probeLabels: {
+      ct: stringValue(input.custom_ct_name) ?? DEFAULT_PROBE_LABELS.ct,
+      cu: stringValue(input.custom_cu_name) ?? DEFAULT_PROBE_LABELS.cu,
+      cm: stringValue(input.custom_cm_name) ?? DEFAULT_PROBE_LABELS.cm,
+      bd: stringValue(input.custom_bd_name) ?? DEFAULT_PROBE_LABELS.bd,
+      node_1: stringValue(input.node_1_name) ?? DEFAULT_PROBE_LABELS.node_1,
+      node_2: stringValue(input.node_2_name) ?? DEFAULT_PROBE_LABELS.node_2,
+      node_3: stringValue(input.node_3_name) ?? DEFAULT_PROBE_LABELS.node_3,
+      node_4: stringValue(input.node_4_name) ?? DEFAULT_PROBE_LABELS.node_4,
     },
     siteTitle: title ?? 'CF Server Monitor',
     preferredTheme: preferredThemeValue(input.preferred_theme),
@@ -275,8 +294,8 @@ export function normalizeServer(
     processes: numberValue(input.processes),
     tcpConnections: numberValue(input.tcp_conn),
     udpConnections: numberValue(input.udp_conn),
-    latency: latencyValues(input, 'ping'),
-    packetLoss: latencyValues(input, 'loss'),
+    latency: probeValues(input, 'ping'),
+    packetLoss: probeValues(input, 'loss'),
     latencyWindow: latencyWindow(input.ping),
     packetLossWindow: latencyWindow(input.loss),
     memoryTotal: numberValue(input.ram_total),
@@ -435,11 +454,11 @@ export function mergeRealtimeSample(
 
   const latency = { ...server.latency }
   const packetLoss = { ...server.packetLoss }
-  for (const carrier of LATENCY_CARRIERS) {
-    const pingKey = `ping_${carrier}`
-    const lossKey = `loss_${carrier}`
-    if (pingKey in input) latency[carrier] = normalized.latency[carrier]
-    if (lossKey in input) packetLoss[carrier] = normalized.packetLoss[carrier]
+  for (const target of PROBE_TARGETS) {
+    const pingKey = `ping_${target}`
+    const lossKey = `loss_${target}`
+    if (pingKey in input) latency[target] = normalized.latency[target]
+    if (lossKey in input) packetLoss[target] = normalized.packetLoss[target]
   }
   next.latency = latency
   next.packetLoss = packetLoss
@@ -473,6 +492,8 @@ export function normalizeHistory(value: unknown): HistoryPoint[] {
       load5,
       load15,
       temperature: numberValue(entry.temperature),
+      latency: probeValues(entry, 'ping'),
+      packetLoss: probeValues(entry, 'loss'),
       diskIo: diskIoValue(entry.disk) ?? legacyHistoryDiskIoValue(entry),
     }]
   })
@@ -488,5 +509,5 @@ export function normalizeThemeOptionsSave(value: unknown): ThemeOptionsSaveResul
 }
 
 export function latencyCarrierKeys(): readonly LatencyCarrier[] {
-  return LATENCY_CARRIERS
+  return LEGACY_PROBE_TARGETS
 }

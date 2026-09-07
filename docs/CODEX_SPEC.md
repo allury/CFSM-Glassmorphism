@@ -958,6 +958,10 @@ custom_ct_name
 custom_cu_name
 custom_cm_name
 custom_bd_name
+node_1_name
+node_2_name
+node_3_name
+node_4_name
 site_title
 preferred_theme
 default_language
@@ -1251,6 +1255,16 @@ loss_ct
 loss_cu
 loss_cm
 loss_bd
+
+ping_node_1
+ping_node_2
+ping_node_3
+ping_node_4
+
+loss_node_1
+loss_node_2
+loss_node_3
+loss_node_4
 ```
 
 名称来自：
@@ -1262,7 +1276,7 @@ custom_cm_name
 custom_bd_name
 ```
 
-禁止写死：
+旧四线路配置缺失或空白时统一 fallback：
 
 ```text
 电信
@@ -1270,6 +1284,10 @@ custom_bd_name
 移动
 BGP
 ```
+
+Node 名称来自 `node_1_name` 至 `node_4_name`，缺失或空白时使用 `Node 1` 至 `Node 4`。
+
+所有 Ping/Loss 字段必须保留 `number | null | false` 三态：字段缺失或未配置为 `false`，明确探测超时为 `null`，数值（包括 `0`）为有效结果。REST、History 与 WebSocket partial merge 不得把三者混淆。
 
 同时研究：
 

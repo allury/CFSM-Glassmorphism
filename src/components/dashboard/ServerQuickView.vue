@@ -8,6 +8,7 @@ import {
   formatLoad,
   formatMebibytes,
   formatPercent,
+  formatProbePercent,
   formatSpeed,
   formatTimestamp,
   formatUptime,
@@ -145,7 +146,7 @@ onUnmounted(() => {
               <div class="quick-view__latency">
                 <span v-for="metric in server.latency" :key="metric.carrier">
                   <strong>{{ metric.label }}</strong>
-                  {{ formatLatency(metric.latency) }} · {{ formatPercent(metric.packetLoss) }} Loss
+                  {{ formatLatency(metric.latency) }} · {{ formatProbePercent(metric.packetLoss) }} Loss
                 </span>
               </div>
             </section>

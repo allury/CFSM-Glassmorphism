@@ -36,7 +36,7 @@ describe('realtime server store', () => {
     store.applyRealtimeSamples('https://a.example', [{
       serverId: 'same-id',
       timestamp: 1_700_000_010,
-      data: { cpu: 33, ram_used: 2048 },
+      data: { cpu: 33, ram_used: 2048, ping_node_1: null, loss_node_1: 0 },
     }], 1_700_000_010_000)
 
     expect(store.findServer('https://a.example', 'same-id')).toMatchObject({
@@ -44,10 +44,14 @@ describe('realtime server store', () => {
       memoryUsed: 2048,
       memoryTotal: 8192,
       diskTotal: 100_000,
+      latency: { node_1: null },
+      packetLoss: { node_1: 0 },
     })
     expect(store.findServer('https://b.example', 'same-id')).toMatchObject({
       cpu: 20,
       memoryUsed: 1024,
+      latency: { node_1: false },
+      packetLoss: { node_1: false },
     })
     expect(store.lastRealtimeAt).toBe(1_700_000_010_000)
   })
