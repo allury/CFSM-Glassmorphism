@@ -6,6 +6,7 @@ import { formatMebibytes, formatPercent } from '@/utils/format'
 const props = defineProps<{
   label: string
   metric: GlassResourceMetric
+  highLoadThreshold: number
 }>()
 
 const fillStyle = computed(() => ({
@@ -14,8 +15,8 @@ const fillStyle = computed(() => ({
 const tone = computed(() => {
   const percentage = props.metric.percentage
   if (percentage === null) return 'neutral'
-  if (percentage >= 90) return 'danger'
-  if (percentage >= 75) return 'warning'
+  if (percentage >= props.highLoadThreshold) return 'danger'
+  if (percentage >= props.highLoadThreshold * 0.8) return 'warning'
   return 'normal'
 })
 const detail = computed(() => {

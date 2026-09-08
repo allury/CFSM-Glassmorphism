@@ -12,8 +12,8 @@ import {
 } from '@/domain/server-detail'
 import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
-import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServerDetailStore } from '@/stores/server-detail'
+import { useThemeSettingsStore } from '@/stores/theme-settings'
 import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
   formatBytes,
@@ -33,8 +33,8 @@ import {
 const route = useRoute()
 const router = useRouter()
 const app = useAppStore()
-const preferences = useDashboardPreferencesStore()
 const detail = useServerDetailStore()
+const theme = useThemeSettingsStore()
 const {
   server,
   sourceConfig,
@@ -59,7 +59,9 @@ const requestedSource = computed(() => (
   typeof route.query.source === 'string' ? route.query.source : undefined
 ))
 const labels = computed(() => sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS)
-const metricCharts = computed(() => buildMetricHistoryCharts(historyPoints.value))
+const metricCharts = computed(() => buildMetricHistoryCharts(historyPoints.value).filter((chart) => (
+  chart.key !== 'gpu' || theme.runtime.gpuChartEnabled
+)))
 const probeCharts = computed(() => buildProbeHistoryCharts(historyPoints.value, labels.value))
 const probeTargets = computed(() => (
   server.value ? activeProbeTargets(server.value, historyPoints.value) : []
@@ -87,6 +89,8 @@ const resourceItems = computed(() => {
 const showPrice = computed(() => {
   const current = server.value
   if (!current) return false
+  const authorized = sourceConfig.value?.authorization ?? app.config?.authorization ?? false
+  if (theme.runtime.hidePriceWhenLoggedOut && !authorized) return false
   return current.systemConfig?.showPrice !== false
     && (current.price !== null || current.billingCycle !== null || current.currency !== null)
 })
@@ -189,9 +193,7 @@ function selectHistory(hours: HistoryHours): void {
 }
 
 onMounted(async () => {
-  preferences.initialize()
   if (app.state === 'idle') await app.initialize()
-  preferences.adoptPreferredTheme(app.config?.preferredTheme ?? 'auto')
   mounted.value = true
   await loadCurrent()
 })
@@ -222,8 +224,11 @@ onUnmounted(() => detail.close())
             <span>{{ websocketLabel }}</span>
           </div>
           <div class="detail-header__actions">
-            <button class="icon-button" type="button" aria-label="切换主题" @click="preferences.cycleTheme">
+            <button class="icon-button" type="button" aria-label="切换主题" @click="theme.cycleTheme">
               <span aria-hidden="true">◐</span>
+            </button>
+            <button class="icon-button" type="button" aria-label="主题设置" @click="router.push({ name: 'theme-settings' })">
+              <span aria-hidden="true">☷</span>
             </button>
             <button
               class="icon-button"

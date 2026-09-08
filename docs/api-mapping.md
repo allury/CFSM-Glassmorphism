@@ -15,7 +15,7 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 | Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` / `fetchServerFromSources` → `normalizeServer` → `server-detail` store | 已用于 `/#/server/:id` 并测试 |
 | History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` → 详情 SVG 图表模型 | 已用于真实详情图表并测试 |
 | WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 `utils/api.js` 的订阅逻辑 | `createCfsmSocket` → `normalizeSocketBatch` → `mergeRealtimeSample` | 首页与单节点详情均已实现 |
-| Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `saveThemeOptions` → `normalizeThemeOptionsSave` | 已实现并测试 |
+| Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `theme-settings` store → `saveThemeOptions` → `normalizeThemeOptionsSave` → `/api/config` 回读 | 已用于设置页完整快照保存并测试 |
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
 
@@ -82,6 +82,9 @@ CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 No
 - 保存只修改后端 `appearance_options.theme_options`，不写 `site_options`，也不覆盖标题、背景、CSP 或自定义脚本等其他外观设置。
 - 401 清除无效 JWT；403 清除 Turnstile token/verified 并要求重新验证。任何失败都留在当前主题界面，不自动跳转。
 - LuminaPlus 的真实调用链已经使用此接口；其“read-only/local-only”旧注释不是协议依据。
+- `src/theme/settings.ts` 先把 draft 归一化为全部 48 个已知字段，并保留 backend 中未知的前向兼容字段；`jwt_token`、Turnstile、收藏和临时 UI 状态在序列化边界排除。
+- `src/stores/theme-settings.ts` 在 200 后立即采用响应快照、清空浏览器覆盖、更新 runtime 并重置表单，随后真实请求 `GET /api/config` 回读；回读失败不会把已经成功的保存误报为失败。
+- 400 `invalidThemeOptionsFormat`、401、403 和网络失败均不重置 draft。401 / 403 的凭证清理由公共 HTTP transport 统一负责，设置 UI 不直接操作 token。
 
 ## 鉴权与错误策略
 

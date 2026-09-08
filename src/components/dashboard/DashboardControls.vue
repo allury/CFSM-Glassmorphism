@@ -19,6 +19,7 @@ defineProps<{
   favoritesOnly: boolean
   favoriteCount: number
   offlineLast: boolean
+  quickControlsEnabled: boolean
 }>()
 
 defineEmits<{
@@ -72,7 +73,7 @@ function sortValue(event: Event): DashboardSort {
     </div>
 
     <div class="dashboard-controls__row">
-      <div class="quick-controls" aria-label="快捷筛选">
+      <div v-if="quickControlsEnabled" class="quick-controls" aria-label="快捷筛选">
         <button
           type="button"
           :class="{ 'is-active': favoritesOnly }"

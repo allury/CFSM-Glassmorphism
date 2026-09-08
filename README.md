@@ -2,7 +2,7 @@
 
 CFSM-Glassmorphism is a Vue 3, TypeScript and Vite port of Komari Glassmorphism for the public third-party-theme APIs of CF-Server-Monitor.
 
-The project currently includes the engineering foundation, a visually restored home dashboard, and a real `/#/server/:id` detail experience backed by CFSM REST, History and WebSocket data. The home page loads `/api/config` and `/api/servers`, while detail uses the owning source's `/api/server`, `/api/history/all` and single-node `/api/ws?subscribe=<id>` connection. Partial `batchUpdate` samples merge without erasing REST state; reconnects use bounded backoff and low-frequency REST fallback. Responsive Glassmorphism views now cover live resources, system and billing metadata, conditional GPU/Disk IO, and sparse real-history charts including all legacy and Node 1–4 Ping/Loss probes. The complete theme settings UI, Earth/Map and advanced tools intentionally remain for later rounds.
+The project currently includes the engineering foundation, a visually restored home dashboard, a real `/#/server/:id` detail experience, and a centralized `/#/settings` theme editor. The home page loads `/api/config` and `/api/servers`, while detail uses the owning source's `/api/server`, `/api/history/all` and single-node `/api/ws?subscribe=<id>` connection. Partial `batchUpdate` samples merge without erasing REST state; reconnects use bounded backoff and low-frequency REST fallback. Theme settings resolve defaults, backend `theme_options` and browser overrides in one strict store; authenticated saves use only `POST /api/theme_options`, send a complete snapshot, and re-fetch config without a reload. Earth/Map and advanced tools intentionally remain for later rounds.
 
 ## Authority and attribution
 

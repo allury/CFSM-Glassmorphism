@@ -12,10 +12,13 @@ import {
   formatUptime,
 } from '@/utils/format'
 
-defineProps<{
+const props = defineProps<{
   servers: GlassServer[]
   showSource: boolean
   favoriteKeys: ReadonlySet<string>
+  metadataEnabled: boolean
+  metadataFields: string[]
+  customTagsVisible: boolean
 }>()
 
 const emit = defineEmits<{
@@ -27,6 +30,14 @@ function firstLatency(server: GlassServer): string {
   const metric = server.latency[0]
   if (!metric) return '—'
   return metric.label + ' ' + formatLatency(metric.latency)
+}
+
+function metadataText(server: GlassServer): string {
+  const fields = new Set(props.metadataFields)
+  return [
+    fields.has('group') ? server.group : null,
+    fields.has('region') ? server.region : null,
+  ].filter(Boolean).join(' · ')
 }
 
 function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
@@ -73,8 +84,8 @@ function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
             <AppTooltip :content="server.name" placement="bottom">
               <strong class="table-node-name">{{ server.name }}</strong>
             </AppTooltip>
-            <span class="table-secondary">
-              {{ [server.group, server.region, server.operatingSystem].filter(Boolean).join(' · ') || '无附加信息' }}
+            <span v-if="metadataEnabled && metadataText(server)" class="table-secondary">
+              {{ metadataText(server) }}
             </span>
             <span
               v-if="showSource"
@@ -84,7 +95,7 @@ function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
             </span>
             <span class="table-secondary">运行 {{ formatUptime(server.bootTime) }} · 更新 {{ formatTimestamp(server.lastUpdated) }}</span>
             <span
-              v-if="server.tags.length > 0"
+              v-if="metadataEnabled && customTagsVisible && metadataFields.includes('tags') && server.tags.length > 0"
               class="table-tags"
             >
               {{ server.tags.join(' · ') }}

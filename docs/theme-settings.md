@@ -4,11 +4,15 @@
 
 共审计 **48** 个设置：**✅ 1:1 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
 
-## 第 3 轮落地范围
+## 第 6 轮落地范围
 
-首页已落地与 `themeMode`、`defaultViewMode`、`nodeCardSize` 和 `offlineNodesLast` 对应的轻量本地交互，并以 source+id 保存收藏。当前 system/light/dark、card/compact/mini/list 和离线置底存放在版本化浏览器快照中；CSS 动态背景是本轮固定视觉层，不冒充 `background*` 设置已经完成。完整 48 项 schema、设置界面、backend/local 分层编辑、迁移和 `POST /api/theme_options` 保存仍留在后续轮次。
+第 6 轮已在 `src/theme/settings.ts` 建立全部 48 项的版本化默认值、逐字段归一化、旧格式迁移、完整快照序列化和安全背景 / 自定义颜色校验。`src/stores/theme-settings.ts` 是 backend、local、draft 与 runtime 的唯一所有者；首页、详情、动态背景和 `/#/settings` 不再各自读取 `theme_options` 或浏览器外观键。
 
-第 4 轮没有提前实现完整设置中心。首页现在读取 CFSM 系统配置 `frontend_ws_timeout_minutes`（它不是 theme option）控制单次实时连接寿命，并在网络不可用期间采用固定低频 REST 补偿；`dataUpdateInterval` 尚未作为可编辑主题设置落地，也不会改变 CFSM 约五秒的服务端批次节奏。
+设置页提供即时预览、保存到当前浏览器、清除本地覆盖并使用后端、保存到 CFSM、完整 JSON 复制/查看。后端保存只调用 `POST /api/theme_options`，发送 48 个已知项加保留的未知后端项；JWT、Turnstile 和收藏等本地专属键会被剔除。成功时先采用响应中的 `theme_options`，清除 local，重建 runtime/draft，再回读 `/api/config`；400、401、403 与网络错误都保留草稿。
+
+本轮可编辑项仅覆盖现有 UI 能真实兑现的外观、布局、公告、首页控制、隐私显示、GPU 图表和自定义背景。Earth/Map、磁盘预测、可配置指标面板与高级工具的值仍按 schema 迁移和往返保存，但在对应开发轮次前不显示伪开关。`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。
+
+原 `cfsm-glassmorphism.dashboard.v1` 中的主题、视图和离线排序会一次性迁移到 `cfsm-glassmorphism.theme-options.v1`；旧 key 此后只保留 source+id 收藏。本地覆盖使用带 `version: 1` 的独立快照，即使清空也保留空层标记，避免再次迁移旧外观值。
 
 ## 状态定义
 
@@ -89,3 +93,4 @@
 - 原多行 keys 支持逗号、空格或换行分隔，保存时规范化并去重但保持顺序。
 - `glassCustomColors` 和旧的 `chartDashboardTemplate` JSON 必须先安全解析，失败时显示错误，不执行字符串。
 - 红色设置保留迁移说明，但不向用户展示一个看似可用、实际依赖 mock 的开关。
+- 后端保存前会从当前有效草稿生成全部 48 个已知键；未知后端键原样往返，但鉴权凭证和本地专属键永不进入 payload。

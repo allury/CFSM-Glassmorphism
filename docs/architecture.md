@@ -75,10 +75,10 @@ UI (render and user intent only)
 - `servers.ts` 管理按来源分开的集合，以 `base::id` 作为稳定键，避免不同站点 UUID 冲突。
 - `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。
 - `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
-- `dashboard-preferences.ts` 只保存首页本地偏好：system/light/dark、card/compact/mini/list、离线置底与以 source+id 标识的收藏；读取时严格校验版本化快照，浏览器存储不可用时仍保持当前会话可用。
+- `dashboard-preferences.ts` 只保存以 source+id 标识的收藏。旧快照中的主题、视图与离线排序由 theme settings 层一次性迁移，避免同一外观状态有两个写入者。
+- `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。
 - `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
-- theme settings 后续仍建立独立 store，不堆入首页或详情状态。
 
 ### UI
 
@@ -108,7 +108,8 @@ schema defaults
 - 保存后端时先把 defaults、当前 backend 和允许持久化的用户编辑合并为完整对象，再调用 `POST /api/theme_options`。
 - 本地专属状态（例如一次性 UI 展开状态、JWT、Turnstile 凭证）绝不混入后端快照。
 - 保存成功后以后端响应替换 backend 层；401/403/400 时保留草稿并显示准确动作。
-- 第 3 轮只落地首页所需的轻量本地偏好；完整 48 项 schema、设置界面、backend/local 分层编辑与后端保存仍属于后续阶段。
+- backend 快照中的未知 key 会保留以支持前向兼容；已知 key 按类型、枚举和范围校验。JWT、Turnstile、收藏及一次性 UI 状态在序列化边界排除。
+- 第 6 轮已落地完整 48 项 schema 和 `/#/settings`：即时预览、本地覆盖、回落后端、完整 JSON、JWT + Turnstile 后端保存与成功后 config 回读。后续轮次能力只迁移/往返其配置值，不提前显示伪开关。
 
 ## WebSocket
 
@@ -145,6 +146,7 @@ server click -> its source -> detail/history/ws
 
 - 首页 `/#/`
 - 详情 `/#/server/:id`
+- 主题设置 `/#/settings`
 - 管理 `/admin#admin`，由 CFSM 官方前端负责
 
 `vue-router` 使用 Hash History，详情刷新可恢复。主题不实现管理员私有接口、不复制登录管理逻辑、不调用 `save_settings`。
@@ -158,6 +160,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 5 轮完成边界
+## 第 6 轮完成边界
 
-第 5 轮在第 4.5 轮稳定领域模型上新增正式详情路由、owning-base 单节点 REST/WS、官方九种时间范围 History、真实资源/GPU/Disk IO/Ping/Loss 展示与 SVG 图表。详情 probe 同时覆盖旧四线路与 Node 1–4，并沿用 `false / null / number`，没有在 UI 重新解释 wire 字段。以下仍是后续阶段：完整主题设置及后端保存、Earth/Map、高级工具与最终专项性能/视觉回归；本轮不进入这些范围。
+第 6 轮在既有 REST、WebSocket 与详情领域模型之上新增集中主题配置层和正式设置路由。当前运行时已消费主题模式、视图/卡片密度、公告、总览/快捷控制、离线排序、列表元数据、登录隐私、GPU 图表、配色、动画及安全自定义背景；后端保存只走官方主题接口并在成功后回读 config。Earth/Map、磁盘预测、可配置指标面板、高级工具与最终专项性能/视觉回归仍属于后续阶段，本轮没有实现其 UI 或运行逻辑。

@@ -21,12 +21,15 @@ import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
-import type { DashboardSort, GlassServer } from '@/types/glassmorphism'
+import { useThemeSettingsStore } from '@/stores/theme-settings'
+import { parseSettingKeys } from '@/theme/settings'
+import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
 const app = useAppStore()
 const serverStore = useServersStore()
 const preferences = useDashboardPreferencesStore()
 const realtime = useRealtimeStore()
+const theme = useThemeSettingsStore()
 const router = useRouter()
 
 const query = ref('')
@@ -37,6 +40,20 @@ const favoritesOnly = ref(false)
 const selectedServerKey = ref<string | null>(null)
 
 const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
+const viewMode = computed({
+  get: () => theme.viewMode,
+  set: (value: DashboardViewMode) => theme.setDashboardViewMode(value),
+})
+const offlineLast = computed({
+  get: () => theme.runtime.offlineNodesLast,
+  set: (value: boolean) => theme.setLocalSetting('offlineNodesLast', value),
+})
+const visibleAdminUrl = computed(() => (
+  theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
+    ? null
+    : app.administrationUrl
+))
+const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMetadataFields))
 const glassServers = computed(() => (
   serverStore.servers.map((server) => toGlassServer(server, app.config))
 ))
@@ -50,7 +67,7 @@ const visibleServers = computed(() => sortServers(
     favoritesOnly.value ? preferences.favorites : undefined,
   ),
   sort.value,
-  preferences.offlineLast,
+  theme.runtime.offlineNodesLast,
 ))
 const groupedServers = computed(() => groupServers(visibleServers.value))
 const favoriteCount = computed(() => glassServers.value.reduce(
@@ -142,7 +159,6 @@ function cardStyle(index: number): Record<string, string> {
 onMounted(async () => {
   preferences.initialize()
   await refreshRest()
-  preferences.adoptPreferredTheme(app.config?.preferredTheme ?? 'auto')
   realtime.start(refreshRest)
 })
 
@@ -160,10 +176,10 @@ onUnmounted(() => realtime.stop())
         :online="summary.online"
         :total="summary.total"
         :source-count="sourceCount"
-        :admin-url="app.administrationUrl"
-        :theme-mode="preferences.themeMode"
+        :admin-url="visibleAdminUrl"
+        :theme-mode="theme.runtime.themeMode"
         @refresh="refresh"
-        @cycle-theme="preferences.cycleTheme"
+        @cycle-theme="theme.cycleTheme"
       />
 
       <main class="dashboard">
@@ -190,6 +206,20 @@ onUnmounted(() => realtime.stop())
             <template v-if="failure.status">（HTTP {{ failure.status }}）</template>
           </span>
         </div>
+
+        <section
+          v-if="theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
+          class="theme-announcement glass-panel"
+          role="status"
+        >
+          <span class="theme-announcement__mark" aria-hidden="true">i</span>
+          <div>
+            <strong>{{ theme.runtime.alertTitle || '站点公告' }}</strong>
+            <p v-if="theme.runtime.alertContent">
+              {{ theme.runtime.alertContent }}
+            </p>
+          </div>
+        </section>
 
         <div
           v-if="realtime.timedOut"
@@ -267,7 +297,7 @@ onUnmounted(() => realtime.stop())
         </template>
 
         <template v-else>
-          <OverviewCards :summary="summary" />
+          <OverviewCards v-if="!theme.runtime.hideGeneralCard" :summary="summary" />
 
           <div
             v-if="serverStore.state === 'error'"
@@ -296,12 +326,13 @@ onUnmounted(() => realtime.stop())
               v-model:query="query"
               v-model:group="selectedGroup"
               v-model:sort="sort"
-              v-model:view-mode="preferences.viewMode"
+              v-model:view-mode="viewMode"
               v-model:favorites-only="favoritesOnly"
-              v-model:offline-last="preferences.offlineLast"
+              v-model:offline-last="offlineLast"
               :groups="groups"
               :result-count="visibleServers.length"
               :favorite-count="favoriteCount"
+              :quick-controls-enabled="theme.runtime.homeQuickControlsEnabled"
             />
 
             <div
@@ -337,10 +368,11 @@ onUnmounted(() => realtime.stop())
                 </header>
 
                 <div
-                  v-if="preferences.viewMode !== 'list'"
+                  v-if="viewMode !== 'list'"
                   :class="[
                     'server-grid',
-                    `server-grid--${preferences.viewMode}`,
+                    `server-grid--${viewMode}`,
+                    `server-grid--size-${theme.runtime.nodeCardSize}`,
                     { 'server-grid--dense': isDenseCollection },
                   ]"
                 >
@@ -349,8 +381,9 @@ onUnmounted(() => realtime.stop())
                     :key="server.key"
                     :server="server"
                     :show-source="showSource"
-                    :density="preferences.viewMode"
+                    :density="viewMode"
                     :favorite="preferences.isFavorite(server.key)"
+                    :high-load-threshold="theme.runtime.homeHighLoadThreshold"
                     :style="cardStyle(index)"
                     @open="openServer(server)"
                     @toggle-favorite="preferences.toggleFavorite(server.key)"
@@ -361,6 +394,9 @@ onUnmounted(() => realtime.stop())
                   :servers="group.servers"
                   :show-source="showSource"
                   :favorite-keys="preferences.favorites"
+                  :metadata-enabled="theme.runtime.nodeListMetadataEnabled"
+                  :metadata-fields="metadataFields"
+                  :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
                   @open="openServer"
                   @toggle-favorite="preferences.toggleFavorite"
                 />

@@ -6,50 +6,30 @@ import {
 } from '@/stores/dashboard-preferences'
 
 describe('dashboard local preferences', () => {
-  it('accepts only supported visual preferences and deduplicates stable favorites', () => {
+  it('deduplicates stable favorites and ignores former appearance fields', () => {
     expect(normalizeDashboardPreferences({
       themeMode: 'dark',
       viewMode: 'mini',
       offlineLast: true,
       favoriteKeys: ['https%3A%2F%2Fa.example:one', 'https%3A%2F%2Fa.example:one', '', 42],
     })).toEqual({
-      themeMode: 'dark',
-      viewMode: 'mini',
-      offlineLast: true,
       favoriteKeys: ['https%3A%2F%2Fa.example:one'],
     })
   })
 
-  it('falls back safely for malformed or future values', () => {
-    expect(normalizeDashboardPreferences({
-      themeMode: 'beijing',
-      viewMode: 'earth',
-      offlineLast: 'true',
-      favoriteKeys: null,
-    })).toEqual({
-      themeMode: null,
-      viewMode: 'card',
-      offlineLast: false,
-      favoriteKeys: [],
-    })
-    expect(normalizeDashboardPreferences('invalid')).toEqual({
-      themeMode: null,
-      viewMode: 'card',
-      offlineLast: false,
-      favoriteKeys: [],
-    })
+  it('falls back safely for malformed values', () => {
+    expect(normalizeDashboardPreferences({ favoriteKeys: null })).toEqual({ favoriteKeys: [] })
+    expect(normalizeDashboardPreferences('invalid')).toEqual({ favoriteKeys: [] })
   })
 
-  it('adopts the site preference only until the user chooses a theme', () => {
+  it('keeps favorites in their dedicated store', () => {
     setActivePinia(createPinia())
     const preferences = useDashboardPreferencesStore()
 
     preferences.initialize()
-    preferences.adoptPreferredTheme('dark')
-    expect(preferences.themeMode).toBe('dark')
-
-    preferences.cycleTheme()
-    preferences.adoptPreferredTheme('light')
-    expect(preferences.themeMode).toBe('system')
+    preferences.toggleFavorite('https://a.example::one')
+    expect(preferences.isFavorite('https://a.example::one')).toBe(true)
+    preferences.toggleFavorite('https://a.example::one')
+    expect(preferences.isFavorite('https://a.example::one')).toBe(false)
   })
 })

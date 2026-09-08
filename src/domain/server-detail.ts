@@ -39,11 +39,11 @@ export interface DetailChartModel {
 }
 
 const COLORS = [
-  '#43d3a7',
-  '#75b7ff',
-  '#f1b457',
-  '#b9a4ff',
-  '#ff7b86',
+  'var(--emerald)',
+  'var(--blue)',
+  'var(--amber)',
+  'var(--violet)',
+  'var(--red)',
   '#58d5e8',
   '#9bd36a',
   '#f28ec8',

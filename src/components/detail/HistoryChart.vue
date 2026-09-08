@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { DetailChartModel, DetailChartPoint } from '@/domain/server-detail'
+import { useThemeSettingsStore } from '@/stores/theme-settings'
 import {
   formatBytes,
   formatCount,
@@ -15,6 +16,7 @@ import {
 const props = defineProps<{
   chart: DetailChartModel
 }>()
+const theme = useThemeSettingsStore()
 
 const WIDTH = 800
 const HEIGHT = 220
@@ -69,6 +71,11 @@ function pathSegments(points: DetailChartPoint[]): string[] {
   }
   if (current) segments.push(current)
   return segments
+}
+
+function seriesDash(index: number): string | undefined {
+  if (theme.runtime.colorVisionMode !== '色觉友好') return undefined
+  return [undefined, '8 4', '3 3', '10 3 2 3', '2 4'][index % 5]
 }
 
 const renderedSeries = computed(() => props.chart.series.map((item) => {
@@ -129,13 +136,14 @@ function formatMetric(value: number | null | false): string {
             <text x="4" :y="TOP + index * 85 + 4">{{ formatMetric(tick) }}</text>
           </template>
         </g>
-        <g v-for="item in renderedSeries" :key="item.key">
+        <g v-for="(item, seriesIndex) in renderedSeries" :key="item.key">
           <path
             v-for="(path, index) in item.paths"
             :key="index"
             class="history-chart__line"
             :d="path"
             :stroke="item.color"
+            :stroke-dasharray="seriesDash(seriesIndex)"
           />
           <circle
             v-for="(dot, index) in item.dots"

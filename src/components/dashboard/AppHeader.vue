@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import type { DashboardThemeMode } from '@/types/glassmorphism'
+import type { ThemeMode } from '@/theme/settings'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
 
 defineProps<{
@@ -11,7 +11,7 @@ defineProps<{
   total: number
   sourceCount: number
   adminUrl: string | null
-  themeMode: DashboardThemeMode
+  themeMode: ThemeMode
 }>()
 
 defineEmits<{
@@ -60,7 +60,7 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
       </div>
 
       <div class="header-actions">
-        <AppTooltip :content="`主题：${themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'}（点击切换）`">
+        <AppTooltip :content="`主题：${themeMode === 'beijing' ? '北京时间自动' : themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'}（点击切换）`">
           <button
             class="icon-button"
             type="button"
@@ -83,6 +83,11 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
           >
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M19 11a7 7 0 1 0 .2 3" /></svg>
           </button>
+        </AppTooltip>
+        <AppTooltip content="主题设置">
+          <RouterLink class="icon-button" :to="{ name: 'theme-settings' }" aria-label="主题设置">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="13" cy="18" r="2" /></svg>
+          </RouterLink>
         </AppTooltip>
         <AppTooltip v-if="adminUrl" content="打开 CFSM 官方管理端">
           <a class="icon-button" :href="adminUrl" aria-label="管理端">

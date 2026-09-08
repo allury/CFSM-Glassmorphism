@@ -14,6 +14,11 @@ export const router = createRouter({
       component: () => import('@/views/ServerDetailView.vue'),
     },
     {
+      path: '/settings',
+      name: 'theme-settings',
+      component: () => import('@/views/ThemeSettingsView.vue'),
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/',
     },

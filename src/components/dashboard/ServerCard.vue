@@ -20,6 +20,7 @@ const props = defineProps<{
   showSource: boolean
   density: Exclude<DashboardViewMode, 'list'>
   favorite: boolean
+  highLoadThreshold: number
 }>()
 
 const emit = defineEmits<{
@@ -33,8 +34,8 @@ const cpuFill = computed(() => ({
 const cpuTone = computed(() => {
   const cpu = props.server.cpu
   if (cpu === null) return 'neutral'
-  if (cpu >= 90) return 'danger'
-  if (cpu >= 75) return 'warning'
+  if (cpu >= props.highLoadThreshold) return 'danger'
+  if (cpu >= props.highLoadThreshold * 0.8) return 'warning'
   return 'normal'
 })
 const hasRuntimeStats = computed(() => (
@@ -162,12 +163,12 @@ function handleKeydown(event: KeyboardEvent): void {
           Load {{ formatLoad(server.load.one) }} / {{ formatLoad(server.load.five) }} / {{ formatLoad(server.load.fifteen) }}
         </span>
       </div>
-      <ResourceMeter label="RAM" :metric="server.memory" />
+      <ResourceMeter label="RAM" :metric="server.memory" :high-load-threshold="highLoadThreshold" />
     </section>
 
     <section v-if="density !== 'mini'" class="resource-grid" aria-label="资源使用">
-      <ResourceMeter label="Disk" :metric="server.disk" />
-      <ResourceMeter v-if="density === 'card'" label="Swap" :metric="server.swap" />
+      <ResourceMeter label="Disk" :metric="server.disk" :high-load-threshold="highLoadThreshold" />
+      <ResourceMeter v-if="density === 'card'" label="Swap" :metric="server.swap" :high-load-threshold="highLoadThreshold" />
     </section>
 
     <section class="network-panel" aria-label="网络">

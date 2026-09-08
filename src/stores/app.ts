@@ -37,6 +37,12 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  function applyConfig(nextConfig: SiteConfig): void {
+    config.value = nextConfig
+    state.value = 'ready'
+    error.value = null
+  }
+
   return {
     apiBases,
     config,
@@ -45,5 +51,6 @@ export const useAppStore = defineStore('app', () => {
     primaryBase,
     administrationUrl,
     initialize,
+    applyConfig,
   }
 })
