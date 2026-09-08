@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   fetchAllServerSources,
   fetchHistory,
@@ -80,6 +80,22 @@ describe('CFSM REST services', () => {
     expect(result.stats).toEqual({ total: 0 })
   })
 
+  it('loads 50+ home nodes with one list request and no per-node detail or history calls', async () => {
+    const requests: string[] = []
+    const fetcher: typeof fetch = async (input) => {
+      requests.push(String(input))
+      return new Response(JSON.stringify({
+        servers: Array.from({ length: 64 }, (_, index) => ({ id: `node-${index}` })),
+        stats: { total: 64 },
+      }), { status: 200 })
+    }
+
+    const result = await fetchAllServerSources(['https://status.example'], { fetcher })
+
+    expect(result.collections[0]?.servers).toHaveLength(64)
+    expect(requests).toEqual(['https://status.example/api/servers'])
+  })
+
   it('loads detail and history from the owning API base without a list request', async () => {
     const requests: string[] = []
     const fetcher: typeof fetch = async (input) => {
@@ -150,5 +166,15 @@ describe('CFSM REST services', () => {
       source: { base: 'https://status.example', label: 'status.example' },
       points: [],
     })
+  })
+
+  it('rejects invalid server IDs before issuing detail or history requests', async () => {
+    const fetcher = vi.fn<typeof fetch>()
+
+    await expect(fetchServer('../invalid id', 'https://status.example', { fetcher }))
+      .rejects.toMatchObject({ status: 400, code: 'invalidServerId' })
+    await expect(fetchHistory('../invalid id', 24, 'https://status.example', { fetcher }))
+      .rejects.toMatchObject({ status: 400, code: 'invalidServerId' })
+    expect(fetcher).not.toHaveBeenCalled()
   })
 })

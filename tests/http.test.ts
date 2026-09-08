@@ -104,6 +104,49 @@ describe('CFSM HTTP transport', () => {
     expect(storage.getItem(STORAGE_KEYS.jwt)).toBeNull()
   })
 
+  it('clears Turnstile credentials on 403 without clearing the JWT', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.jwt, 'still-valid')
+    storage.setItem(STORAGE_KEYS.turnstileToken, 'expired-token')
+    storage.setItem(STORAGE_KEYS.turnstileVerified, 'expired-proof')
+    const fetcher: typeof fetch = async () => new Response(
+      '{"message":"turnstileRequired"}',
+      { status: 403 },
+    )
+
+    await expect(cfsmGet('/api/config', {
+      base: 'https://status.example',
+      storage,
+      fetcher,
+    })).rejects.toMatchObject({ status: 403, code: 'turnstileRequired' })
+    expect(storage.getItem(STORAGE_KEYS.jwt)).toBe('still-valid')
+    expect(storage.getItem(STORAGE_KEYS.turnstileToken)).toBeNull()
+    expect(storage.getItem(STORAGE_KEYS.turnstileVerified)).toBeNull()
+  })
+
+  it.each([404, 409, 500, 503])('surfaces HTTP %i without replacing the response', async (status) => {
+    const fetcher: typeof fetch = async () => new Response(
+      JSON.stringify({ message: `status-${status}` }),
+      { status },
+    )
+
+    await expect(cfsmGet('/api/server?id=node-a', {
+      base: 'https://status.example',
+      fetcher,
+    })).rejects.toMatchObject({ status, code: `status-${status}` })
+  })
+
+  it('classifies an unreachable API as a network transport error', async () => {
+    const fetcher: typeof fetch = async () => {
+      throw new TypeError('connection refused')
+    }
+
+    await expect(cfsmGet('/api/servers', {
+      base: 'https://status.example',
+      fetcher,
+    })).rejects.toMatchObject({ status: null, code: 'networkError' })
+  })
+
   it('posts the complete theme-options object to the only public theme write API', async () => {
     let receivedBody: string | undefined
     const fetcher: typeof fetch = async (_input, init) => {
@@ -154,4 +197,3 @@ describe('CFSM HTTP transport', () => {
     }
   })
 })
-

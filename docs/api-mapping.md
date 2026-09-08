@@ -45,6 +45,7 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 - 仅拉取指定节点；详情页不得先拉 `/api/servers` 再前端过滤。
 - 请求必须发往该节点的 `source.base`。
+- `src/services/cfsm/identifiers.ts` 的 `normalizeServerId` 是统一的 server ID 白名单校验（`/^[A-Za-z0-9._:-]{1,64}$/`）。`fetchServer`、`fetchServerFromSources` 与 `fetchHistory` 在发出任何请求前先校验；非法 id 直接抛 `CfsmRequestError(status 400, code invalidServerId)`，不产生无效网络请求。WebSocket 的 `sanitizeSubscriptionIds` 复用同一校验器，避免各处重复定义订阅 ID 规则。
 - 首页进入详情时通过 URL query 携带已经归一化的 owning base；直接打开详情链接且未携带来源时，只对配置的 apiBases 调用单节点接口来解析归属，不会调用 `/api/servers`。解析成功后 Config、History 与 WebSocket 全部固定回到同一 base。
 - 404 原样表现为节点不存在；不创建演示节点。
 - 详情响应不提供列表页的 ping/loss 窗口数组。
@@ -97,7 +98,10 @@ CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 No
 | 403 | Turnstile 验证失败 | 清除 `turnstile_token` 与 `turnstile_verified`，要求重新验证 |
 | 404 | 节点不存在 | 显示真实空/不存在状态 |
 | 409 | 数据库需要升级 | 显示 `databaseUpgradeRequired` 引导 |
+| 500–599（非 503） | 服务端请求失败 | 归类为 `server-error`，明示真实 HTTP 状态并保留最后一份真实快照，不生成替代数据 |
 | 503 | 暂不可用或额度限制 | 明示服务端状态，可提供用户触发的重试 |
+
+`src/services/cfsm/errors.ts` 的 issue 分类现覆盖 `unauthorized`(401)、`forbidden`(403)、`not-found`(404)、`upgrade-required`(409/`databaseUpgradeRequired`)、`unavailable`(503)、`server-error`(5xx)、`network`、`invalid-request`(400) 与 `unknown`。第 9 轮补齐了 `forbidden` 与 `server-error` 两类：此前它们落入 `unknown`，现由详情视图给出专属可操作文案，且失败一律保留当前真实快照与草稿，不自动跳转、不 mock。
 
 存储键与 CFSM 官方前端保持一致：
 

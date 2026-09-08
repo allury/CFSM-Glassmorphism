@@ -179,6 +179,66 @@ describe('CFSM WebSocket transport', () => {
     connection.close()
   })
 
+  it('does not reset backoff when a socket opens and immediately disconnects', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    const connection = createCfsmSocket({
+      base: 'https://a.example',
+      ids: ['node-a'],
+      timeoutMinutes: 0,
+      socketFactory: () => {
+        const socket = new FakeSocket()
+        sockets.push(socket)
+        return socket
+      },
+      onSamples: vi.fn(),
+      onState: vi.fn(),
+      onTimeout: vi.fn(),
+    })
+
+    sockets[0]?.open()
+    sockets[0]?.remoteClose(1006)
+    vi.advanceTimersByTime(1_000)
+    expect(sockets).toHaveLength(2)
+
+    sockets[1]?.open()
+    sockets[1]?.remoteClose(1006)
+    vi.advanceTimersByTime(1_999)
+    expect(sockets).toHaveLength(2)
+    vi.advanceTimersByTime(1)
+    expect(sockets).toHaveLength(3)
+    connection.close()
+  })
+
+  it('resets reconnect backoff only after a stable open interval', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    const connection = createCfsmSocket({
+      base: 'https://a.example',
+      ids: ['node-a'],
+      timeoutMinutes: 0,
+      socketFactory: () => {
+        const socket = new FakeSocket()
+        sockets.push(socket)
+        return socket
+      },
+      onSamples: vi.fn(),
+      onState: vi.fn(),
+      onTimeout: vi.fn(),
+    })
+
+    sockets[0]?.remoteClose(1006)
+    vi.advanceTimersByTime(1_000)
+    sockets[1]?.open()
+    vi.advanceTimersByTime(10_000)
+    sockets[1]?.remoteClose(1006)
+    vi.advanceTimersByTime(999)
+    expect(sockets).toHaveLength(2)
+    vi.advanceTimersByTime(1)
+    expect(sockets).toHaveLength(3)
+    connection.close()
+  })
+
   it('stops silently reconnecting when the configured lifetime expires', () => {
     vi.useFakeTimers()
     const sockets: FakeSocket[] = []

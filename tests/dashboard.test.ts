@@ -176,7 +176,7 @@ describe('dashboard selectors', () => {
     ])
   })
 
-  it.each([0, 1, 10, 30])('preserves truthful collection cardinality for %i nodes', (count) => {
+  it.each([0, 1, 10, 30, 64])('preserves truthful collection cardinality for %i nodes', (count) => {
     const servers = Array.from({ length: count }, (_, index) => makeServer(String(index), {
       name: index === 0 ? 'A very long production server name that must remain searchable' : `Node ${index}`,
       tags: index === 0 ? Array.from({ length: 14 }, (__, tagIndex) => `tag-${tagIndex}`) : [],

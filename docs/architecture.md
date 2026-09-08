@@ -51,7 +51,8 @@ UI (render and user intent only)
 - `websocket.ts` 只负责单一 base 的 URL、订阅帧、消息适配、连接时限、keepalive 和有界退避。
 - `dashboard-realtime.ts` 负责首页多 base 协调、visibility 生命周期、REST 补偿与用户超时决策；不会跨来源拼接订阅 ID。
 - `detail-realtime.ts` 只建立 owning base 的 `subscribe=<serverId>` 连接；页面恢复可见时先刷新单节点 REST，失败时以单个低频 REST 循环补偿。
-- `errors.ts` 把 400/401/404/409/503、网络错误与未知错误转换为稳定 issue；UI 只选择对应文案，不解析响应体。
+- `errors.ts` 把 400/401/403/404/409/5xx（含 503）、网络错误与未知错误转换为稳定 issue（含 `forbidden` 与 `server-error`）；UI 只选择对应文案，不解析响应体。
+- `identifiers.ts` 提供统一的 `normalizeServerId` 白名单校验，`api.ts` 详情/历史请求与 `websocket.ts` 订阅 ID 清洗共用；非法 id 在发请求前即被拒绝（400 `invalidServerId`）。
 
 ### Adapter
 
@@ -169,3 +170,15 @@ server click -> its source -> detail/history/ws
 ## 第 8 轮完成边界
 
 第 8 轮只在当前首页数据流上增加 Earth/Map 和高级工具。`EarthMap.vue` 提供 realistic、cobe、tiled 三种纯前端视觉，并以真实 `region` 聚合、选择节点；`AdvancedTools.vue` 提供健康摘要、分币种性价比、当前快照 JSON/CSV 和分类拓扑。健康历史只使用列表端已加载的真实 Ping/Loss 窗口，不调用逐节点 History；快照不包含 JWT、Turnstile 或管理数据；客户端导出二次口令是确认步骤而非安全边界；Audit Log 没有公开端点，保持隐藏。设置层仍为原 48 项三层架构，没有引入新的持久化协议。
+
+## 第 9 轮完成边界
+
+第 9 轮只做性能、稳定性、异常与测试收敛，不改动首页布局、Header/Footer、节点卡片结构、Card/List 点击路径、详情视觉结构、Earth/Map 渲染方式、弹窗/抽屉与主要交互动画；渲染输出保持不变。
+
+- **稳定性 / 异常**：`errors.ts` 新增 `forbidden`(403) 与 `server-error`(5xx) 两类稳定 issue，详情视图给出专属可操作文案并保留真实快照；`identifiers.ts` 集中 server ID 白名单校验，详情、历史与 WebSocket 订阅共用，非法 id 在请求前即被拒绝（400 `invalidServerId`）。
+- **WebSocket 重连稳定性**：`websocket.ts` 的重连退避仅在连接稳定保持 10 秒（`STABLE_CONNECTION_MS`）后才把 `reconnectAttempt` 归零，避免 open→立即断开的抖动风暴反复重置退避；退避区间与"单条连接仅一个待执行重试"约束不变。
+- **渲染性能**：`stores/servers.ts` 与 `stores/server-detail.ts` 对大体积归一化集合改用 `shallowRef`；`glassmorphism-adapter.ts` 新增 `createGlassServerMapper()`，以 `CfsmServer` 引用 + `config` 身份的 WeakMap 缓存复用未变化的 `GlassServer`，50+ 节点实时更新时仅重算发生变化的节点；`ServerList.vue` 行级 `v-memo`；`HomeView.vue` 用预计算的节点动画延迟数组替代每次渲染新建样式对象。这些优化只减少重算与响应式开销，不改变可见结构或数据语义。
+- **发布体积门槛**：`scripts/validate-dist.mjs` 增加 JS 512 KiB、CSS 128 KiB、总资源 768 KiB 的硬性预算，超出即让 dist 校验失败。
+- **历史陈旧响应 / 并发切换**：详情 hours 切换控件在 `historyState === 'loading'` 时禁用，配合 store 内 `revision` 版本号与 AbortController，保证同一节点上不会并发触发历史请求、详情切换会取消在途请求，乱序陈旧响应不会写回。本轮经核验此前已妥善处理，未改动相关代码。
+
+与原 Komari Glassmorphism 的高保真视觉差异如在本轮发现，仅记录、留待第 9.5 轮，不在第 9 轮修改。

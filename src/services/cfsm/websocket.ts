@@ -5,11 +5,12 @@ import type {
 } from '@/types/cfsm'
 import { normalizeSocketBatch } from './adapters'
 import { readStorage, STORAGE_KEYS, webSocketBase } from './config'
+import { normalizeServerId } from './identifiers'
 
 const MAX_SUBSCRIPTION_IDS = 500
-const SERVER_ID_PATTERN = /^[A-Za-z0-9._:-]{1,64}$/
 const RECONNECT_BASE_DELAY_MS = 1_000
 const RECONNECT_MAX_DELAY_MS = 30_000
+const STABLE_CONNECTION_MS = 10_000
 const KEEPALIVE_INTERVAL_MS = 30_000
 const POLICY_VIOLATION_CLOSE_CODE = 1008
 const SOCKET_OPEN_STATE = 1
@@ -92,8 +93,8 @@ function currentLocationHost(): string {
 export function sanitizeSubscriptionIds(ids: readonly string[]): string[] {
   const unique = new Set<string>()
   for (const id of ids) {
-    const value = id.trim()
-    if (!SERVER_ID_PATTERN.test(value)) continue
+    const value = normalizeServerId(id)
+    if (value === null) continue
     unique.add(value)
     if (unique.size >= MAX_SUBSCRIPTION_IDS) break
   }
@@ -135,6 +136,7 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   let state: CfsmSocketState = 'idle'
   let reconnectAttempt = 0
   let reconnectTimer: TimerHandle | null = null
+  let stabilityTimer: TimerHandle | null = null
   let keepaliveTimer: TimerHandle | null = null
   let lifetimeTimer: TimerHandle | null = null
   let closed = false
@@ -146,8 +148,10 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   }
 
   function clearConnectionTimers(): void {
+    if (stabilityTimer !== null) scheduler.clearTimeout(stabilityTimer)
     if (keepaliveTimer !== null) scheduler.clearInterval(keepaliveTimer)
     if (lifetimeTimer !== null) scheduler.clearTimeout(lifetimeTimer)
+    stabilityTimer = null
     keepaliveTimer = null
     lifetimeTimer = null
   }
@@ -211,9 +215,12 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
 
     current.onopen = () => {
       if (socket !== current || closed) return
-      reconnectAttempt = 0
       if (!sendSubscription(current)) return
       setState('open')
+      stabilityTimer = scheduler.setTimeout(() => {
+        if (socket === current && current.readyState === SOCKET_OPEN_STATE) reconnectAttempt = 0
+        stabilityTimer = null
+      }, STABLE_CONNECTION_MS)
       keepaliveTimer = scheduler.setInterval(() => {
         if (socket !== current || current.readyState !== SOCKET_OPEN_STATE) return
         try {

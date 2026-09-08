@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type {
   CfsmRealtimeSample,
@@ -21,7 +21,7 @@ function timestampMilliseconds(value: number | null): number | null {
 }
 
 export const useServersStore = defineStore('servers', () => {
-  const collections = ref<ServerCollection[]>([])
+  const collections = shallowRef<ServerCollection[]>([])
   const state = ref<LoadState>('idle')
   const error = ref<string | null>(null)
   const sourceFailures = ref<ServerSourceFailure[]>([])

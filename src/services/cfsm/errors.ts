@@ -4,9 +4,11 @@ import { CfsmRequestError } from './http'
 function issueKind(status: number | null, code: string | null): CfsmRequestIssueKind {
   if (status === 400) return 'invalid-request'
   if (status === 401) return 'unauthorized'
+  if (status === 403) return 'forbidden'
   if (status === 404) return 'not-found'
   if (status === 409 || code === 'databaseUpgradeRequired') return 'upgrade-required'
   if (status === 503) return 'unavailable'
+  if (status !== null && status >= 500 && status <= 599) return 'server-error'
   if (status === null && (code === 'networkError' || code === 'timeout')) return 'network'
   return 'unknown'
 }

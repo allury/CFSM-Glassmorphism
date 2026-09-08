@@ -44,7 +44,7 @@ frozen install
 -> artifact upload
 ~~~
 
-The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contains only `index.html` and `assets/`. Generated dist directories and ZIP files are not committed.
+The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contains only `index.html` and `assets/`. `bun run validate:dist` also scans for forbidden Komari runtime markers and enforces release size budgets (JavaScript 512 KiB, CSS 128 KiB, total assets 768 KiB), failing the build when exceeded. Generated dist directories and ZIP files are not committed.
 
 ## Documentation
 

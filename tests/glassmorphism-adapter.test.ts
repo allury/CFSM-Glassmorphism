@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  createGlassServerMapper,
+  mergeRealtimeSample,
   normalizeServer,
   normalizeSiteConfig,
   toGlassServer,
@@ -134,6 +136,33 @@ describe('Server to Glassmorphism adapter', () => {
     expect(view.latency).toEqual([])
   })
 
+  it('keeps every optional empty-field scenario truthful and hidden-capable', () => {
+    const normalized = normalizeServer({ id: 'sparse-node' }, source)
+    const view = toGlassServer(normalized, null)
+
+    expect(normalized).toMatchObject({
+      group: '',
+      tags: [],
+      price: null,
+      expireDate: null,
+      trafficLimit: null,
+      diskIo: undefined,
+      gpus: [],
+      latencyWindow: [],
+      packetLossWindow: [],
+    })
+    expect(view).toMatchObject({
+      group: '',
+      tags: [],
+      price: null,
+      expireDate: null,
+      trafficLimit: null,
+      latency: [],
+      history: { latencySamples: [], packetLossSamples: [] },
+      gpus: [],
+    })
+  })
+
   it('uses the same centralized legacy labels when config is unavailable', () => {
     const view = toGlassServer(normalizeServer({
       id: 'fallback-label-node',
@@ -147,5 +176,30 @@ describe('Server to Glassmorphism adapter', () => {
       latency: 0,
       packetLoss: 0,
     }])
+  })
+
+  it('reuses unchanged view models across a 50+ node realtime update', () => {
+    const config = normalizeSiteConfig({ site_title: 'Scale test' })
+    const servers = Array.from({ length: 64 }, (_, index) => normalizeServer({
+      id: `node-${index}`,
+      name: `Node ${index}`,
+      cpu: index,
+      is_online: true,
+    }, source))
+    const mapper = createGlassServerMapper()
+    const initial = mapper.map(servers, config)
+    const changed = servers.map((server, index) => index === 31
+      ? mergeRealtimeSample(server, {
+          serverId: server.id,
+          timestamp: 2,
+          data: { cpu: 99 },
+        }, 2)
+      : server)
+    const updated = mapper.map(changed, config)
+
+    expect(updated).toHaveLength(64)
+    expect(updated.filter((server, index) => server === initial[index])).toHaveLength(63)
+    expect(updated[31]).not.toBe(initial[31])
+    expect(updated[31]?.cpu).toBe(99)
   })
 })

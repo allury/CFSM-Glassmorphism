@@ -121,3 +121,23 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     lastUpdated: server.lastUpdated ?? server.timestamp,
   }
 }
+
+export interface GlassServerMapper {
+  map(servers: readonly CfsmServer[], config: SiteConfig | null): GlassServer[]
+}
+
+export function createGlassServerMapper(): GlassServerMapper {
+  const cache = new WeakMap<CfsmServer, { config: SiteConfig | null, value: GlassServer }>()
+
+  return {
+    map(servers, config) {
+      return servers.map((server) => {
+        const cached = cache.get(server)
+        if (cached?.config === config) return cached.value
+        const value = toGlassServer(server, config)
+        cache.set(server, { config, value })
+        return value
+      })
+    },
+  }
+}

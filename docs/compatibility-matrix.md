@@ -27,6 +27,10 @@
 
 登录态首页高级工具只复用已经加载的真实 CFSM 快照：健康摘要综合在线状态、CPU、RAM、Swap、Disk、Load/Core、GPU、流量配额、到期、当前 Ping/Loss 及 `/api/servers` 真实 Ping/Loss 窗口；性价比按可识别账期折算月价、免费/未知价格不参与排行、币种绝不混算；快照导出保留 probe 的 `unconfigured / timeout / number` 三态；拓扑明确是 region → group → server/tags 的分类视图而非网络链路。Audit Log 因没有公开主题 API 而隐藏。
 
+## 第 9 轮实现进度
+
+第 9 轮不新增功能、不改动上表任何状态，只在既有实现上做性能、稳定性、异常与测试收敛：统一 server ID 白名单校验并在请求前拦截非法 id；错误分类补齐 `forbidden`(403) 与 `server-error`(5xx)；WebSocket 重连退避改为连接稳定 10 秒后才归零，抑制 open→立即断开的重连风暴；首页大规模节点改用 `shallowRef` 与 WeakMap 缓存的 `GlassServer` 映射、列表行 `v-memo`、预计算动画延迟，降低 50+ 节点实时更新的重算开销；dist 校验新增 JS/CSS/总资源体积预算。历史陈旧响应/并发切换经核验由控件禁用 + `revision`/AbortController 保护，未改动代码。上述改动均不影响数据真实性边界与视觉结构。
+
 ## 矩阵
 
 | 功能 | 原 Komari 实现 | CFSM 数据/API | 处理方式 | 状态 |

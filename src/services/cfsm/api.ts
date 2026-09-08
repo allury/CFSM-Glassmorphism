@@ -16,6 +16,7 @@ import {
 } from './adapters'
 import { apiSource, getApiBases } from './config'
 import { CfsmRequestError, cfsmGet, cfsmPost, type CfsmRequestOptions } from './http'
+import { normalizeServerId } from './identifiers'
 
 export const HISTORY_HOURS = [0.167, 0.5, 1, 6, 12, 24, 48, 96, 168] as const
 export type HistoryHours = (typeof HISTORY_HOURS)[number]
@@ -27,6 +28,16 @@ type SharedRequestOptions = Partial<Pick<
 
 export function isHistoryHours(value: number): value is HistoryHours {
   return HISTORY_HOURS.some((hours) => hours === value)
+}
+
+function requiredServerId(id: string, path: string): string {
+  const normalized = normalizeServerId(id)
+  if (normalized !== null) return normalized
+  throw new CfsmRequestError('Invalid CFSM server ID', {
+    status: 400,
+    path,
+    code: 'invalidServerId',
+  })
 }
 
 export async function fetchSiteConfig(
@@ -84,8 +95,9 @@ export async function fetchServer(
   base: string,
   options: SharedRequestOptions = {},
 ) {
+  const serverId = requiredServerId(id, '/api/server')
   const source = apiSource(base)
-  const query = new URLSearchParams({ id }).toString()
+  const query = new URLSearchParams({ id: serverId }).toString()
   const payload = await cfsmGet('/api/server?' + query, { ...options, base })
   return normalizeServer(payload, source)
 }
@@ -96,15 +108,16 @@ export async function fetchServerFromSources(
   options: SharedRequestOptions = {},
   preferredBase?: string,
 ): Promise<CfsmServer> {
+  const serverId = requiredServerId(id, '/api/server')
   const uniqueBases = [...new Set(bases)]
   if (uniqueBases.length === 0) throw new Error('No CFSM API base is configured')
 
   if (preferredBase && uniqueBases.includes(preferredBase)) {
-    return fetchServer(id, preferredBase, options)
+    return fetchServer(serverId, preferredBase, options)
   }
 
   const settled = await Promise.allSettled(
-    uniqueBases.map((base) => fetchServer(id, base, options)),
+    uniqueBases.map((base) => fetchServer(serverId, base, options)),
   )
   for (const result of settled) {
     if (result.status === 'fulfilled') return result.value
@@ -127,10 +140,11 @@ export async function fetchHistory(
   base: string,
   options: SharedRequestOptions = {},
 ): Promise<HistorySeries> {
+  const serverId = requiredServerId(id, '/api/history/all')
   const source = apiSource(base)
-  const query = new URLSearchParams({ id, hours: String(hours) }).toString()
+  const query = new URLSearchParams({ id: serverId, hours: String(hours) }).toString()
   const payload = await cfsmGet('/api/history/all?' + query, { ...options, base })
-  return { serverId: id, source, points: normalizeHistory(payload) }
+  return { serverId, source, points: normalizeHistory(payload) }
 }
 
 export async function saveThemeOptions(

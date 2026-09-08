@@ -1,5 +1,15 @@
 # 视觉与响应式验证
 
+## 第 9 轮复验
+
+第 9 轮为性能、稳定性与异常收敛，未改动首页布局、Header/Footer、节点卡片结构、Card/List 点击路径、详情视觉结构、Earth/Map 渲染方式、弹窗/抽屉与主要动画；`shallowRef`、`createGlassServerMapper()` WeakMap 缓存、`v-memo` 与预计算动画延迟均只降低重算开销，不改变可见 DOM 结构或渲染输出，因此不存在需要更新的截图/像素基线。
+
+- 375、430、768、1024、1440、1920 六档响应式结构由 `tests/responsive-contract.test.ts` 以源码断言锁定，本轮全部通过；无页面级横向溢出策略保持不变。
+- 首页大规模节点行为由 `tests/performance-contract.test.ts` 锁定：视图与逐节点组件不得出现 `fetch`/`setInterval`/`setTimeout`，`HomeView` 不引用 `fetchHistory`，列表保留 `v-memo` 与 `.server-grid--dense` 的 `content-visibility: auto`，路由保持 3 处懒加载 `import()`，运行时依赖仅 `pinia`/`vue`/`vue-router`。
+- 50+/64 节点首页加载经 `tests/api.test.ts`、`tests/dashboard.test.ts` 与 `tests/glassmorphism-adapter.test.ts` 核验：单次 `/api/servers`、无逐节点详情/历史请求，实时更新仅重算发生变化的节点视图模型。
+- WebSocket 断连、503、重连风暴、可见性 hide/show 与历史陈旧响应/并发切换由 `tests/websocket.test.ts`、`tests/http.test.ts`、`tests/dashboard-realtime.test.ts`、`tests/detail-realtime.test.ts` 及详情 store 的控件禁用 + `revision`/AbortController 覆盖，行为稳定，无运行时异常。
+- 本轮未发现由第 9 轮改动引入的视觉回归；与原 Komari Glassmorphism 的高保真差异（若有）仅记录、留待第 9.5 轮。
+
 ## 第 8 轮复验
 
 第 8 轮继续以生产构建和只监听 `127.0.0.1` 的 CFSM 形状测试服务验证。本地场景覆盖 10 台节点、5 个明确 region、长名称、大量 tags、离线/高负载、两种付费币种和免费节点；测试数据只位于 Git 忽略的 `work/`，不进入产品源码或构建产物。

@@ -213,9 +213,11 @@ export interface CfsmRealtimeSample {
 
 export type CfsmRequestIssueKind =
   | 'unauthorized'
+  | 'forbidden'
   | 'not-found'
   | 'upgrade-required'
   | 'unavailable'
+  | 'server-error'
   | 'network'
   | 'invalid-request'
   | 'unknown'

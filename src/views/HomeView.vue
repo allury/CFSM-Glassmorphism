@@ -25,7 +25,7 @@ import {
   resolveQuickControlKeys,
   type QuickControlKey,
 } from '@/domain/theme-presentation'
-import { toGlassServer } from '@/services/cfsm'
+import { createGlassServerMapper } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useRealtimeStore } from '@/stores/realtime'
@@ -40,6 +40,7 @@ const preferences = useDashboardPreferencesStore()
 const realtime = useRealtimeStore()
 const theme = useThemeSettingsStore()
 const router = useRouter()
+const glassServerMapper = createGlassServerMapper()
 
 const query = ref('')
 const selectedGroup = ref(ALL_GROUPS)
@@ -47,6 +48,9 @@ const sort = ref<DashboardSort>('order')
 const refreshing = ref(false)
 const activeQuickFilter = ref<QuickControlKey | null>(null)
 const selectedServerKey = ref<string | null>(null)
+const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
+  '--node-item-delay': `${index * 34}ms`,
+}))
 
 const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
 const viewMode = computed({
@@ -65,7 +69,7 @@ const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMet
 const providerAliases = computed(() => parseProviderAliases(theme.runtime.providerAliases))
 const quickControlKeys = computed(() => resolveQuickControlKeys(theme.runtime))
 const glassServers = computed(() => (
-  serverStore.servers.map((server) => toGlassServer(server, app.config))
+  glassServerMapper.map(serverStore.servers, app.config)
 ))
 const summary = computed(() => summarizeServers(glassServers.value))
 const groups = computed(() => availableGroups(glassServers.value))
@@ -176,7 +180,7 @@ function viewServerDetails(server: GlassServer): void {
 }
 
 function cardStyle(index: number): Record<string, string> {
-  return { '--node-item-delay': `${Math.min(index, 12) * 34}ms` }
+  return NODE_ITEM_DELAY_STYLES[Math.min(index, 12)] ?? NODE_ITEM_DELAY_STYLES[0] ?? {}
 }
 
 function quickAction(key: QuickControlKey): void {

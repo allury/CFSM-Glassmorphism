@@ -69,6 +69,7 @@ function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
         <tr
           v-for="server in servers"
           :key="server.key"
+          v-memo="[server, favoriteKeys.has(server.key), showSource, metadataEnabled, metadataFields, customTagsVisible, providerAliases]"
           :class="{ 'is-offline': !server.online }"
           tabindex="0"
           :aria-label="`查看 ${server.name} 当前快照`"

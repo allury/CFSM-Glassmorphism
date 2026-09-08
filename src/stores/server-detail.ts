@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type {
   CfsmRequestIssue,
@@ -23,9 +23,9 @@ export type DetailLoadState = 'idle' | 'loading' | 'ready' | 'error'
 export type HistoryLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 export const useServerDetailStore = defineStore('server-detail', () => {
-  const server = ref<CfsmServer | null>(null)
-  const sourceConfig = ref<SiteConfig | null>(null)
-  const history = ref<HistorySeries | null>(null)
+  const server = shallowRef<CfsmServer | null>(null)
+  const sourceConfig = shallowRef<SiteConfig | null>(null)
+  const history = shallowRef<HistorySeries | null>(null)
   const historyHours = ref<HistoryHours>(24)
   const state = ref<DetailLoadState>('idle')
   const historyState = ref<HistoryLoadState>('idle')
