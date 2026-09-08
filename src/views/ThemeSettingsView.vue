@@ -218,13 +218,35 @@ onMounted(async () => {
                   <span class="settings-number"><input v-model.number="theme.draft.homeHighLoadThreshold" type="number" min="1" max="100"><i>%</i></span>
                   <small :class="{ 'is-error': issueFor('homeHighLoadThreshold') }">{{ issueFor('homeHighLoadThreshold') ?? 'CPU、内存或磁盘达到该值时使用高负载状态。' }}</small>
                 </label>
+                <label class="settings-field">
+                  <span>总览卡片方案</span>
+                  <select v-model="theme.draft.generalCardPreset">
+                    <option v-for="value in ['官方', '基础', '运维', '资源', '财务', '流量', 'GPU', '资产', '完整', '自定义']" :key="value" :value="value">{{ value }}</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span>快捷控制方案</span>
+                  <select v-model="theme.draft.homeQuickControlPreset" :disabled="!theme.draft.homeQuickControlsEnabled">
+                    <option v-for="value in ['基础', '流量', '运维', '完整', '自定义']" :key="value" :value="value">{{ value }}</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span>流量预警阈值</span>
+                  <span class="settings-number"><input v-model.number="theme.draft.homeTrafficWarningThreshold" type="number" min="1" max="100"><i>%</i></span>
+                  <small :class="{ 'is-error': issueFor('homeTrafficWarningThreshold') }">{{ issueFor('homeTrafficWarningThreshold') ?? '仅对可可靠解析的 traffic_limit 生效。' }}</small>
+                </label>
+                <label class="settings-field">
+                  <span>即将到期天数</span>
+                  <span class="settings-number"><input v-model.number="theme.draft.homeExpiringDays" type="number" min="1" max="3650"><i>天</i></span>
+                  <small :class="{ 'is-error': issueFor('homeExpiringDays') }">{{ issueFor('homeExpiringDays') ?? '使用 CFSM expire_date。' }}</small>
+                </label>
               </div>
               <label class="settings-field settings-field--wide">
                 <span>公告内容</span>
                 <textarea v-model="theme.draft.alertContent" rows="4" :disabled="!theme.draft.alertEnabled" />
               </label>
               <div class="settings-fields settings-fields--two settings-fields--switches">
-                <label class="settings-switch"><input v-model="theme.draft.homeQuickControlsEnabled" type="checkbox"><span><strong>显示快捷控制</strong><small>收藏与离线置底。</small></span></label>
+                <label class="settings-switch"><input v-model="theme.draft.homeQuickControlsEnabled" type="checkbox"><span><strong>显示快捷控制</strong><small>收藏、流量排序与运维筛选。</small></span></label>
                 <label class="settings-switch"><input v-model="theme.draft.offlineNodesLast" type="checkbox"><span><strong>离线节点置底</strong><small>沿用统一五分钟在线判定。</small></span></label>
                 <label class="settings-switch"><input v-model="theme.draft.nodeListMetadataEnabled" type="checkbox"><span><strong>列表信息栏</strong><small>只展示 CFSM 确实返回的字段。</small></span></label>
                 <label class="settings-switch"><input v-model="theme.draft.nodeListCustomTagsVisible" type="checkbox" :disabled="!theme.draft.nodeListMetadataEnabled"><span><strong>列表显示标签</strong><small>还需 fields 包含 tags。</small></span></label>
@@ -232,9 +254,24 @@ onMounted(async () => {
                 <label class="settings-switch"><input v-model="theme.draft.hidePriceWhenLoggedOut" type="checkbox"><span><strong>未登录隐藏价格</strong><small>不改变 CFSM 服务端权限过滤。</small></span></label>
               </div>
               <label class="settings-field settings-field--wide">
+                <span>自定义总览卡片 keys</span>
+                <textarea v-model="theme.draft.generalCardKeys" rows="4" :disabled="theme.draft.generalCardPreset !== '自定义'" spellcheck="false" />
+                <small>支持真实聚合字段；CFSM 不提供的数据 key 会被忽略，不生成占位值。</small>
+              </label>
+              <label class="settings-field settings-field--wide">
+                <span>自定义快捷控制 keys</span>
+                <textarea v-model="theme.draft.homeQuickControlKeys" rows="3" :disabled="!theme.draft.homeQuickControlsEnabled || theme.draft.homeQuickControlPreset !== '自定义'" spellcheck="false" />
+                <small>favorite、totalTraffic、upload、download、peak、offline、highLoad、expiring。</small>
+              </label>
+              <label class="settings-field settings-field--wide">
                 <span>列表信息字段 keys</span>
                 <textarea v-model="theme.draft.nodeListMetadataFields" rows="3" :disabled="!theme.draft.nodeListMetadataEnabled" spellcheck="false" />
                 <small>当前可用：region、group、tags。provider 仅在有可靠别名匹配后显示；city / asn 无公开数据时忽略。</small>
+              </label>
+              <label class="settings-field settings-field--wide">
+                <span>厂商别名</span>
+                <input v-model="theme.draft.providerAliases" type="text" placeholder="Provider:alias1,alias2;Provider2:alias">
+                <small>只匹配节点 name、group、tags、region 中的真实文本，不通过 IP 猜测厂商。</small>
               </label>
             </section>
 
@@ -248,11 +285,29 @@ onMounted(async () => {
                   <input v-model="theme.draft.gpuChartEnabled" type="checkbox">
                   <span><strong>显示 GPU 历史图</strong><small>无真实数字序列时仍自动隐藏。</small></span>
                 </label>
+                <label class="settings-field">
+                  <span>详情卡片方案</span>
+                  <select v-model="theme.draft.detailMetricCardPreset">
+                    <option v-for="value in ['财务', '状态', '资源', '网络', 'GPU', '综合', '自定义']" :key="value" :value="value">{{ value }}</option>
+                  </select>
+                </label>
+                <label class="settings-field">
+                  <span>历史图表方案</span>
+                  <select v-model="theme.draft.chartDashboardPreset">
+                    <option v-for="value in ['默认', '精简', '资源', '网络', 'GPU', '延迟', '运维', '完整', '自定义']" :key="value" :value="value">{{ value }}</option>
+                  </select>
+                </label>
               </div>
-              <div class="settings-boundary-note">
-                <strong>本轮边界</strong>
-                <p>分区标签页、可配置指标预设、磁盘预测与高级工具仍保留在 schema 中以兼容后端快照，但本轮不提供看似可用的开关。</p>
-              </div>
+              <label class="settings-field settings-field--wide">
+                <span>自定义详情卡片 keys</span>
+                <textarea v-model="theme.draft.detailMetricCardKeys" rows="4" :disabled="theme.draft.detailMetricCardPreset !== '自定义'" spellcheck="false" />
+                <small>只有 normalized detail model 中存在的字段才显示；缺失数据自动收起。</small>
+              </label>
+              <label class="settings-field settings-field--wide">
+                <span>自定义图表 keys</span>
+                <textarea v-model="theme.draft.chartDashboardTemplate" rows="4" :disabled="theme.draft.chartDashboardPreset !== '自定义'" spellcheck="false" />
+                <small>cpu、memory、disk、network、traffic、gpu、ping、pingLoss；缺失序列不会合成。</small>
+              </label>
             </section>
 
             <section class="settings-section glass-panel">
@@ -302,8 +357,8 @@ onMounted(async () => {
               <div class="settings-limitations">
                 <article><strong>RPC 模式</strong><span>CFSM 固定使用官方 REST + WebSocket，不提供旧主题的传输模式切换。</span></article>
                 <article><strong>访客信息</strong><span>公开主题 API 不提供访客 IP 或审计数据，强制关闭且不生成占位信息。</span></article>
-                <article><strong>Earth / Map</strong><span>仍保留兼容配置，待对应开发轮次实现；本轮不提前进入。</span></article>
-                <article><strong>高级工具</strong><span>只有真实数据支持的工具才会在后续轮次出现。</span></article>
+                <article><strong>Earth / Map</strong><span>保留兼容配置；本轮没有地理数据能力，不显示伪控制。</span></article>
+                <article><strong>高级工具与磁盘预测</strong><span>需要独立交互或足量历史样本的功能继续隐藏，避免无效开关。</span></article>
               </div>
             </section>
           </div>

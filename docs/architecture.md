@@ -89,6 +89,7 @@ UI (render and user intent only)
 - 用户动作调用 store/service，鉴权失败保留当前页面和编辑内容。
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
 - 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
+- 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
 - 节点快速查看只展开当前 REST 快照，不触发详情、历史或 WebSocket 请求；桌面为模态框，移动端为底部抽屉。
 - `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。轻量 SVG 图表按真实时间戳绘制，缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
@@ -109,7 +110,7 @@ schema defaults
 - 本地专属状态（例如一次性 UI 展开状态、JWT、Turnstile 凭证）绝不混入后端快照。
 - 保存成功后以后端响应替换 backend 层；401/403/400 时保留草稿并显示准确动作。
 - backend 快照中的未知 key 会保留以支持前向兼容；已知 key 按类型、枚举和范围校验。JWT、Turnstile、收藏及一次性 UI 状态在序列化边界排除。
-- 第 6 轮已落地完整 48 项 schema 和 `/#/settings`：即时预览、本地覆盖、回落后端、完整 JSON、JWT + Turnstile 后端保存与成功后 config 回读。后续轮次能力只迁移/往返其配置值，不提前显示伪开关。
+- 第 6 轮已落地完整 48 项 schema 和 `/#/settings`：即时预览、本地覆盖、回落后端、完整 JSON、JWT + Turnstile 后端保存与成功后 config 回读。第 7 轮没有改造该架构，只把总览、快捷控制、metadata/provider aliases、阈值、详情卡片和图表预设接到同一 runtime。
 
 ## WebSocket
 
@@ -160,6 +161,6 @@ server click -> its source -> detail/history/ws
 - GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
 - `dist/` 是生成物，不进入版本控制。
 
-## 第 6 轮完成边界
+## 第 7 轮完成边界
 
-第 6 轮在既有 REST、WebSocket 与详情领域模型之上新增集中主题配置层和正式设置路由。当前运行时已消费主题模式、视图/卡片密度、公告、总览/快捷控制、离线排序、列表元数据、登录隐私、GPU 图表、配色、动画及安全自定义背景；后端保存只走官方主题接口并在成功后回读 config。Earth/Map、磁盘预测、可配置指标面板、高级工具与最终专项性能/视觉回归仍属于后续阶段，本轮没有实现其 UI 或运行逻辑。
+第 7 轮在既有主题 store 和 normalized data model 上完成配置驱动展示：总览和快捷控制不再是固定结构，列表 provider 只匹配用户声明的真实元数据文本，流量/到期/负载阈值有统一谓词，详情概览和 History 由预设或自定义 key 选择。响应式继续采用 CSS 网格与移动端抽屉，375/430/768/1024/1440/1920 六档均验证无页面横向溢出；长名称使用截断/换行策略，大量 tags 受有界容器保护。Earth/Map、磁盘预测与高级工具不属于本轮，没有显示无效开关。

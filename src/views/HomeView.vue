@@ -16,6 +16,13 @@ import {
   sortServers,
   summarizeServers,
 } from '@/domain/dashboard'
+import {
+  isExpiring,
+  isHighLoad,
+  parseProviderAliases,
+  resolveQuickControlKeys,
+  type QuickControlKey,
+} from '@/domain/theme-presentation'
 import { toGlassServer } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
@@ -36,7 +43,7 @@ const query = ref('')
 const selectedGroup = ref(ALL_GROUPS)
 const sort = ref<DashboardSort>('order')
 const refreshing = ref(false)
-const favoritesOnly = ref(false)
+const activeQuickFilter = ref<QuickControlKey | null>(null)
 const selectedServerKey = ref<string | null>(null)
 
 const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
@@ -44,28 +51,33 @@ const viewMode = computed({
   get: () => theme.viewMode,
   set: (value: DashboardViewMode) => theme.setDashboardViewMode(value),
 })
-const offlineLast = computed({
-  get: () => theme.runtime.offlineNodesLast,
-  set: (value: boolean) => theme.setLocalSetting('offlineNodesLast', value),
-})
 const visibleAdminUrl = computed(() => (
   theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
     ? null
     : app.administrationUrl
 ))
 const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMetadataFields))
+const providerAliases = computed(() => parseProviderAliases(theme.runtime.providerAliases))
+const quickControlKeys = computed(() => resolveQuickControlKeys(theme.runtime))
 const glassServers = computed(() => (
   serverStore.servers.map((server) => toGlassServer(server, app.config))
 ))
 const summary = computed(() => summarizeServers(glassServers.value))
 const groups = computed(() => availableGroups(glassServers.value))
-const visibleServers = computed(() => sortServers(
-  filterServers(
+const filteredServers = computed(() => {
+  const servers = filterServers(
     glassServers.value,
     query.value,
     selectedGroup.value,
-    favoritesOnly.value ? preferences.favorites : undefined,
-  ),
+    activeQuickFilter.value === 'favorite' ? preferences.favorites : undefined,
+  )
+  if (activeQuickFilter.value === 'offline') return servers.filter((server) => !server.online)
+  if (activeQuickFilter.value === 'highLoad') return servers.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold))
+  if (activeQuickFilter.value === 'expiring') return servers.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays))
+  return servers
+})
+const visibleServers = computed(() => sortServers(
+  filteredServers.value,
   sort.value,
   theme.runtime.offlineNodesLast,
 ))
@@ -74,6 +86,12 @@ const favoriteCount = computed(() => glassServers.value.reduce(
   (count, server) => count + (preferences.isFavorite(server.key) ? 1 : 0),
   0,
 ))
+const quickCounts = computed<Partial<Record<QuickControlKey, number>>>(() => ({
+  favorite: favoriteCount.value,
+  offline: glassServers.value.filter((server) => !server.online).length,
+  highLoad: glassServers.value.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold)).length,
+  expiring: glassServers.value.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
+}))
 const selectedServer = computed(() => (
   glassServers.value.find((server) => server.key === selectedServerKey.value) ?? null
 ))
@@ -154,6 +172,22 @@ function viewServerDetails(server: GlassServer): void {
 
 function cardStyle(index: number): Record<string, string> {
   return { '--node-item-delay': `${Math.min(index, 12) * 34}ms` }
+}
+
+function quickAction(key: QuickControlKey): void {
+  if (activeQuickFilter.value === key) {
+    activeQuickFilter.value = null
+    if (['totalTraffic', 'upload', 'download', 'peak'].includes(key)) sort.value = 'order'
+    return
+  }
+  activeQuickFilter.value = key
+  const sorts: Partial<Record<QuickControlKey, DashboardSort>> = {
+    totalTraffic: 'traffic',
+    upload: 'upload',
+    download: 'download',
+    peak: 'peak',
+  }
+  if (sorts[key]) sort.value = sorts[key] as DashboardSort
 }
 
 onMounted(async () => {
@@ -297,7 +331,7 @@ onUnmounted(() => realtime.stop())
         </template>
 
         <template v-else>
-          <OverviewCards v-if="!theme.runtime.hideGeneralCard" :summary="summary" />
+          <OverviewCards v-if="!theme.runtime.hideGeneralCard" :servers="glassServers" :settings="theme.runtime" />
 
           <div
             v-if="serverStore.state === 'error'"
@@ -327,12 +361,13 @@ onUnmounted(() => realtime.stop())
               v-model:group="selectedGroup"
               v-model:sort="sort"
               v-model:view-mode="viewMode"
-              v-model:favorites-only="favoritesOnly"
-              v-model:offline-last="offlineLast"
               :groups="groups"
               :result-count="visibleServers.length"
-              :favorite-count="favoriteCount"
               :quick-controls-enabled="theme.runtime.homeQuickControlsEnabled"
+              :quick-control-keys="quickControlKeys"
+              :quick-counts="quickCounts"
+              :active-quick-filter="activeQuickFilter"
+              @quick-action="quickAction"
             />
 
             <div
@@ -396,6 +431,7 @@ onUnmounted(() => realtime.stop())
                   :favorite-keys="preferences.favorites"
                   :metadata-enabled="theme.runtime.nodeListMetadataEnabled"
                   :metadata-fields="metadataFields"
+                  :provider-aliases="providerAliases"
                   :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
                   @open="openServer"
                   @toggle-favorite="preferences.toggleFavorite"

@@ -27,6 +27,14 @@ export interface GlassServer {
   group: string
   tags: string[]
   region: string | null
+  price: string | null
+  billingCycle: string | null
+  currency: string | null
+  expireDate: string | null
+  trafficLimit: string | null
+  trafficCalculationType: string | null
+  showExpire: boolean
+  showTraffic: boolean
   online: boolean
   sortOrder: number | null
   cpu: number | null
@@ -68,6 +76,7 @@ export interface GlassServer {
 export type DashboardViewMode = 'card' | 'compact' | 'mini' | 'list'
 export type DashboardThemeMode = 'system' | 'light' | 'dark'
 export type DashboardSort = 'order' | 'name' | 'status' | 'cpu' | 'memory' | 'network'
+  | 'traffic' | 'upload' | 'download' | 'peak'
 
 export interface DashboardSummary {
   total: number

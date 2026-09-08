@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { DashboardSort, DashboardViewMode } from '@/types/glassmorphism'
 import { ALL_GROUPS } from '@/domain/dashboard'
+import type { QuickControlKey } from '@/domain/theme-presentation'
 
 const viewOptions: ReadonlyArray<{ value: DashboardViewMode, label: string, icon: string }> = [
   { value: 'card', label: '卡片', icon: '▦' },
@@ -16,10 +17,10 @@ defineProps<{
   viewMode: DashboardViewMode
   groups: string[]
   resultCount: number
-  favoritesOnly: boolean
-  favoriteCount: number
-  offlineLast: boolean
   quickControlsEnabled: boolean
+  quickControlKeys: QuickControlKey[]
+  quickCounts: Partial<Record<QuickControlKey, number>>
+  activeQuickFilter: QuickControlKey | null
 }>()
 
 defineEmits<{
@@ -27,9 +28,19 @@ defineEmits<{
   'update:group': [value: string]
   'update:sort': [value: DashboardSort]
   'update:viewMode': [value: DashboardViewMode]
-  'update:favoritesOnly': [value: boolean]
-  'update:offlineLast': [value: boolean]
+  'quickAction': [value: QuickControlKey]
 }>()
+
+const quickLabels: Record<QuickControlKey, { icon: string, label: string }> = {
+  favorite: { icon: '★', label: '收藏' },
+  totalTraffic: { icon: '◫', label: '总流量' },
+  upload: { icon: '↑', label: '上行' },
+  download: { icon: '↓', label: '下行' },
+  peak: { icon: '↟', label: '峰值' },
+  offline: { icon: '○', label: '离线' },
+  highLoad: { icon: '!', label: '高负载' },
+  expiring: { icon: '⌛', label: '即将到期' },
+}
 
 function inputValue(event: Event): string {
   return event.target instanceof HTMLInputElement ? event.target.value : ''
@@ -75,23 +86,16 @@ function sortValue(event: Event): DashboardSort {
     <div class="dashboard-controls__row">
       <div v-if="quickControlsEnabled" class="quick-controls" aria-label="快捷筛选">
         <button
+          v-for="key in quickControlKeys"
+          :key="key"
           type="button"
-          :class="{ 'is-active': favoritesOnly }"
-          :aria-pressed="favoritesOnly"
-          @click="$emit('update:favoritesOnly', !favoritesOnly)"
+          :class="{ 'is-active': activeQuickFilter === key }"
+          :aria-pressed="activeQuickFilter === key"
+          @click="$emit('quickAction', key)"
         >
-          <span aria-hidden="true">★</span>
-          收藏
-          <small>{{ favoriteCount }}</small>
-        </button>
-        <button
-          type="button"
-          :class="{ 'is-active': offlineLast }"
-          :aria-pressed="offlineLast"
-          @click="$emit('update:offlineLast', !offlineLast)"
-        >
-          <span class="quick-controls__dot" aria-hidden="true" />
-          离线置底
+          <span aria-hidden="true">{{ quickLabels[key].icon }}</span>
+          {{ quickLabels[key].label }}
+          <small v-if="quickCounts[key] !== undefined">{{ quickCounts[key] }}</small>
         </button>
       </div>
 

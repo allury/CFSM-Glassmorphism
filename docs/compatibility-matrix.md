@@ -6,7 +6,7 @@
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 7b9dcbea8108b4a27124c96d916b4f412f599618 | 第 5 轮详情/History 基线；第 6 轮在其上开发 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | ed820aeac15dbced5e51d19d4fa2108a28b0ff9b | 第 6 轮主题持久化基线；第 7 轮在其上开发 |
 | huilang-me/CF-Server-Monitor | main | 924e71d32e5a0b5493cb52fdb2c184a9d6bd71e3 | 最新 theme-develop.md Ping/Node 契约与公开 config handler |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -15,11 +15,11 @@
 
 状态统计：**✅ 1:1 31 项、🟢 等价实现 20 项、🟡 降级实现 5 项、🔴 CFSM API 暂不支持 4 项，共 60 项。**
 
-## 第 6 轮实现进度
+## 第 7 轮实现进度
 
-第 6 轮新增 `src/theme/settings.ts` 的完整 48 项 schema 与 `src/stores/theme-settings.ts` 的 defaults → backend → local 三层解析。`/#/settings` 提供即时预览、本地保存、使用后端、完整 JSON 和已登录时的 CFSM 后端保存；200 响应会立即应用并回读 `/api/config`，400/401/403/网络失败保留草稿。未知 backend key 保留，鉴权凭证和本地收藏不会进入 theme_options。
+第 6 轮的完整 48 项 schema、defaults → backend → local 三层解析和保存协议维持不变。第 7 轮将可由当前公开 CFSM 数据真实兑现的展示配置全部接入 `src/domain/theme-presentation.ts`：总览、八个快捷控制、provider aliases、metadata、三类阈值、详情卡片和 History 图表族均从统一 runtime 驱动。
 
-首页、详情和动态背景现在只消费统一 runtime。已落地的选项真实控制主题/色觉配色、卡片密度、公告、总览与快捷控制、离线排序、列表元数据、登录隐私、GPU History、动画和安全图片/视频背景。RPC 与访客信息明确禁用；Earth/Map、磁盘预测、可配置指标面板和高级工具仅保留迁移值，不提前展示。
+预设与自定义 key 都保持声明顺序并去重；不受支持的 key 以及当前实体缺失的数据自动隐藏。流量预警兼容 CFSM 数字 GiB 与显式单位文本，并服从 dl/ul/max/total；到期判断使用受校验的 `expire_date`。RPC 与访客信息明确禁用；Earth/Map、磁盘预测和高级工具仅保留迁移值，不提前展示。
 
 ## 矩阵
 

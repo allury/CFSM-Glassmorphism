@@ -10,6 +10,7 @@ import {
   buildMetricHistoryCharts,
   buildProbeHistoryCharts,
 } from '@/domain/server-detail'
+import { buildDetailCards, filterChartsBySettings } from '@/domain/theme-presentation'
 import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useServerDetailStore } from '@/stores/server-detail'
@@ -20,8 +21,6 @@ import {
   formatCfsmDate,
   formatCount,
   formatLatency,
-  formatLoad,
-  formatMebibytes,
   formatPercent,
   formatPrice,
   formatProbePercent,
@@ -59,10 +58,11 @@ const requestedSource = computed(() => (
   typeof route.query.source === 'string' ? route.query.source : undefined
 ))
 const labels = computed(() => sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS)
-const metricCharts = computed(() => buildMetricHistoryCharts(historyPoints.value).filter((chart) => (
-  chart.key !== 'gpu' || theme.runtime.gpuChartEnabled
-)))
-const probeCharts = computed(() => buildProbeHistoryCharts(historyPoints.value, labels.value))
+const historyCharts = computed(() => filterChartsBySettings(
+  buildMetricHistoryCharts(historyPoints.value),
+  buildProbeHistoryCharts(historyPoints.value, labels.value),
+  theme.runtime,
+))
 const probeTargets = computed(() => (
   server.value ? activeProbeTargets(server.value, historyPoints.value) : []
 ))
@@ -76,15 +76,6 @@ const websocketLabel = computed(() => {
   if (socketState.value === 'open') return '单节点实时更新'
   if (socketState.value === 'connecting' || socketState.value === 'backoff') return '实时连接中'
   return 'REST 快照'
-})
-const resourceItems = computed(() => {
-  const current = server.value
-  if (!current) return []
-  return [
-    { key: 'ram', label: 'RAM', used: current.memoryUsed, total: current.memoryTotal, tone: 'emerald' },
-    { key: 'swap', label: 'Swap', used: current.swapUsed, total: current.swapTotal, tone: 'violet' },
-    { key: 'disk', label: 'Disk', used: current.diskUsed, total: current.diskTotal, tone: 'amber' },
-  ]
 })
 const showPrice = computed(() => {
   const current = server.value
@@ -107,6 +98,15 @@ const showTrafficPolicy = computed(() => {
     && (current.trafficLimit !== null || current.trafficCalculationType !== null
       || current.resetDay !== null)
 })
+const detailCards = computed(() => {
+  if (!server.value) return []
+  return buildDetailCards(server.value, theme.runtime).filter((card) => {
+    if ((card.key === 'nodePrice' || card.key === 'monthlyCost') && !showPrice.value) return false
+    if (card.key === 'remainingTime' && !showExpiry.value) return false
+    if (card.key === 'trafficQuota' && !showTrafficPolicy.value) return false
+    return true
+  })
+})
 
 const historyLabels: Record<HistoryHours, string> = {
   0.167: '10 分钟',
@@ -120,11 +120,6 @@ const historyLabels: Record<HistoryHours, string> = {
   168: '7 天',
 }
 const historyOptions = HISTORY_HOURS.map((value) => ({ value, label: historyLabels[value] }))
-
-function resourcePercentage(used: number | null, total: number | null): number | null {
-  if (used === null || total === null || total <= 0 || used < 0) return null
-  return Math.min(Math.max((used / total) * 100, 0), 100)
-}
 
 function meterWidth(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '0%'
@@ -317,25 +312,17 @@ onUnmounted(() => detail.close())
 
           <section class="detail-section">
             <header class="detail-section__header">
-              <div><span class="eyebrow">LIVE METRICS</span><h2>资源状态</h2></div>
-              <span>数据来自当前节点</span>
+              <div><span class="eyebrow">LIVE METRICS</span><h2>详情概览</h2></div>
+              <span>{{ theme.runtime.detailMetricCardPreset }}方案 · 仅显示真实字段</span>
             </header>
             <div class="detail-resource-grid">
-              <article class="detail-metric-card glass-panel detail-metric-card--cpu">
-                <span>CPU</span>
-                <strong>{{ formatPercent(server.cpu) }}</strong>
-                <div class="detail-meter">
-                  <i :style="{ width: meterWidth(server.cpu) }" />
+              <article v-for="card in detailCards" :key="card.key" class="detail-metric-card glass-panel" :class="`detail-metric-card--${card.key}`">
+                <span>{{ card.icon }} {{ card.label }}</span>
+                <strong>{{ card.value }}</strong>
+                <div v-if="card.percentage !== undefined" class="detail-meter">
+                  <i :style="{ width: meterWidth(card.percentage ?? null) }" />
                 </div>
-                <small>Load {{ formatLoad(server.load1) }} / {{ formatLoad(server.load5) }} / {{ formatLoad(server.load15) }}</small>
-              </article>
-              <article v-for="item in resourceItems" :key="item.key" class="detail-metric-card glass-panel" :class="`detail-metric-card--${item.tone}`">
-                <span>{{ item.label }}</span>
-                <strong>{{ formatPercent(resourcePercentage(item.used, item.total)) }}</strong>
-                <div class="detail-meter">
-                  <i :style="{ width: meterWidth(resourcePercentage(item.used, item.total)) }" />
-                </div>
-                <small>{{ formatMebibytes(item.used) }} / {{ formatMebibytes(item.total) }}</small>
+                <small>{{ card.hint }}</small>
               </article>
             </div>
           </section>
@@ -495,13 +482,12 @@ onUnmounted(() => detail.close())
               <strong>暂无历史数据</strong>
               <p>CFSM 返回了空数组。页面不会复制当前指标生成伪造趋势。</p>
             </div>
-            <div v-else-if="historyState === 'ready' && metricCharts.length + probeCharts.length === 0" class="history-state glass-panel">
+            <div v-else-if="historyState === 'ready' && historyCharts.length === 0" class="history-state glass-panel">
               <strong>没有可绘制的数值</strong>
               <p>后端返回了历史行，但其中没有有效的数值序列。</p>
             </div>
             <div v-else class="history-chart-grid">
-              <HistoryChart v-for="chart in metricCharts" :key="chart.key" :chart="chart" />
-              <HistoryChart v-for="chart in probeCharts" :key="chart.key" :chart="chart" />
+              <HistoryChart v-for="chart in historyCharts" :key="chart.key" :chart="chart" />
             </div>
           </section>
         </template>

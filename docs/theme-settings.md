@@ -4,13 +4,17 @@
 
 共审计 **48** 个设置：**✅ 1:1 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
 
-## 第 6 轮落地范围
+## 第 7 轮落地范围
 
-第 6 轮已在 `src/theme/settings.ts` 建立全部 48 项的版本化默认值、逐字段归一化、旧格式迁移、完整快照序列化和安全背景 / 自定义颜色校验。`src/stores/theme-settings.ts` 是 backend、local、draft 与 runtime 的唯一所有者；首页、详情、动态背景和 `/#/settings` 不再各自读取 `theme_options` 或浏览器外观键。
+第 6 轮建立的 48 项版本化 schema、defaults → backend → local 三层架构与唯一 store 保持不变。第 7 轮新增 `src/domain/theme-presentation.ts`，把总览卡片、快捷控制、列表厂商别名、预警条件、详情卡片和图表族选择集中为纯领域选择器；组件仍只消费 normalized model，不读取 CFSM wire 字段。
 
 设置页提供即时预览、保存到当前浏览器、清除本地覆盖并使用后端、保存到 CFSM、完整 JSON 复制/查看。后端保存只调用 `POST /api/theme_options`，发送 48 个已知项加保留的未知后端项；JWT、Turnstile 和收藏等本地专属键会被剔除。成功时先采用响应中的 `theme_options`，清除 local，重建 runtime/draft，再回读 `/api/config`；400、401、403 与网络错误都保留草稿。
 
-本轮可编辑项仅覆盖现有 UI 能真实兑现的外观、布局、公告、首页控制、隐私显示、GPU 图表和自定义背景。Earth/Map、磁盘预测、可配置指标面板与高级工具的值仍按 schema 迁移和往返保存，但在对应开发轮次前不显示伪开关。`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。
+设置页现已开放并真实兑现总览卡片预设 / 自定义 keys、五套快捷控制方案、列表 metadata 与 provider aliases、高负载 / 流量 / 到期阈值、详情卡片预设 / 自定义 keys、图表预设 / 自定义指标族以及 GPU 图表开关。不可用 key 在领域注册表边界被忽略；字段存在但当前节点没有数据时对应卡片或序列自动收起。
+
+Earth/Map、磁盘耗尽预测与高级工具仍需要独立数据/交互轮次，因此继续只迁移和往返其配置值，不显示伪开关。`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。
+
+首页快捷控制八个 key 均有实际行为：`favorite`、`offline`、`highLoad`、`expiring` 过滤当前结果；`totalTraffic`、`upload`、`download`、`peak` 使用真实指标排序。流量预警只接受数字（按 CFSM 当前管理端语义视为 GiB）或带 B/KiB/MiB/GiB/TiB 单位的可靠上限，并按 `traffic_calc_type` 的 dl/ul/max/total 语义计算；无法解析时不计入预警。
 
 原 `cfsm-glassmorphism.dashboard.v1` 中的主题、视图和离线排序会一次性迁移到 `cfsm-glassmorphism.theme-options.v1`；旧 key 此后只保留 source+id 收藏。本地覆盖使用带 `version: 1` 的独立快照，即使清空也保留空层标记，避免再次迁移旧外观值。
 

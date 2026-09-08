@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { GlassServer } from '@/types/glassmorphism'
+import { matchProvider, type ProviderAlias } from '@/domain/theme-presentation'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
 import {
   formatBytes,
@@ -19,6 +20,7 @@ const props = defineProps<{
   metadataEnabled: boolean
   metadataFields: string[]
   customTagsVisible: boolean
+  providerAliases: ProviderAlias[]
 }>()
 
 const emit = defineEmits<{
@@ -35,6 +37,7 @@ function firstLatency(server: GlassServer): string {
 function metadataText(server: GlassServer): string {
   const fields = new Set(props.metadataFields)
   return [
+    fields.has('provider') ? matchProvider(server, props.providerAliases) : null,
     fields.has('group') ? server.group : null,
     fields.has('region') ? server.region : null,
   ].filter(Boolean).join(' · ')

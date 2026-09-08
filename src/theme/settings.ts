@@ -543,6 +543,12 @@ export function validateThemeSettingsDraft(value: ThemeSettings): ThemeDraftIssu
   if (!Number.isFinite(value.homeHighLoadThreshold) || value.homeHighLoadThreshold < 1 || value.homeHighLoadThreshold > 100) {
     issues.push({ key: 'homeHighLoadThreshold', message: '高负载阈值必须在 1–100 之间。' })
   }
+  if (!Number.isFinite(value.homeTrafficWarningThreshold) || value.homeTrafficWarningThreshold < 1 || value.homeTrafficWarningThreshold > 100) {
+    issues.push({ key: 'homeTrafficWarningThreshold', message: '流量预警阈值必须在 1–100 之间。' })
+  }
+  if (!Number.isInteger(value.homeExpiringDays) || value.homeExpiringDays < 1 || value.homeExpiringDays > 3650) {
+    issues.push({ key: 'homeExpiringDays', message: '即将到期天数必须是 1–3650 的整数。' })
+  }
   if (!Number.isFinite(value.backgroundBlur) || value.backgroundBlur < 0 || value.backgroundBlur > 80) {
     issues.push({ key: 'backgroundBlur', message: '背景模糊必须在 0–80 px 之间。' })
   }

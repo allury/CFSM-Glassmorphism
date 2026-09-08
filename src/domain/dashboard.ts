@@ -107,6 +107,26 @@ export function sortServers(
         result = compareNullable(leftSpeed, rightSpeed, -1)
         break
       }
+      case 'traffic':
+        result = compareNullable(
+          left.network.received === null && left.network.transmitted === null ? null : (left.network.received ?? 0) + (left.network.transmitted ?? 0),
+          right.network.received === null && right.network.transmitted === null ? null : (right.network.received ?? 0) + (right.network.transmitted ?? 0),
+          -1,
+        )
+        break
+      case 'upload':
+        result = compareNullable(left.network.outSpeed, right.network.outSpeed, -1)
+        break
+      case 'download':
+        result = compareNullable(left.network.inSpeed, right.network.inSpeed, -1)
+        break
+      case 'peak':
+        result = compareNullable(
+          left.network.inSpeed === null && left.network.outSpeed === null ? null : Math.max(left.network.inSpeed ?? 0, left.network.outSpeed ?? 0),
+          right.network.inSpeed === null && right.network.outSpeed === null ? null : Math.max(right.network.inSpeed ?? 0, right.network.outSpeed ?? 0),
+          -1,
+        )
+        break
       case 'order':
         result = compareNullable(left.sortOrder, right.sortOrder, 1)
         break
