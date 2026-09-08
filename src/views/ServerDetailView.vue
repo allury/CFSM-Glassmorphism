@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import HistoryChart from '@/components/detail/HistoryChart.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import {
   activeProbeTargets,
@@ -326,7 +327,7 @@ onUnmounted(() => detail.close())
             </header>
             <div class="detail-resource-grid">
               <article v-for="card in detailCards" :key="card.key" class="detail-metric-card glass-panel" :class="`detail-metric-card--${card.key}`">
-                <span>{{ card.icon }} {{ card.label }}</span>
+                <span><AppIcon :name="card.icon" :size="14" />{{ card.label }}</span>
                 <strong>{{ card.value }}</strong>
                 <div v-if="card.percentage !== undefined" class="detail-meter">
                   <i :style="{ width: meterWidth(card.percentage ?? null) }" />

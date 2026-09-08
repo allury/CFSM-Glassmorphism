@@ -27,7 +27,7 @@ function glass(overrides: Partial<GlassServer> = {}): GlassServer {
     key: 'source:node', id: 'node', sourceBase: source.base, sourceLabel: source.label,
     name: 'Acme Hong Kong Edge', group: 'Production', tags: ['premium'], region: 'HK',
     price: null, billingCycle: null, currency: null, expireDate: null, trafficLimit: null,
-    trafficCalculationType: null, showExpire: true, showTraffic: true,
+    trafficCalculationType: null, showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: null, cpu: null, load: { one: null, five: null, fifteen: null },
     memory: { used: null, total: null, percentage: null },
     swap: { used: null, total: null, percentage: null },

@@ -17,7 +17,7 @@ function server(overrides: Partial<GlassServer> = {}): GlassServer {
   return {
     key: 'source:node-1', id: 'node-1', sourceBase: 'https://monitor.example', sourceLabel: 'Primary',
     name: '真实节点', group: '生产', tags: ['边缘'], region: 'HK', price: '120', billingCycle: 'year', currency: 'CNY',
-    expireDate: '2027-01-01', trafficLimit: '2 TiB', trafficCalculationType: 'total', showExpire: true, showTraffic: true,
+    expireDate: '2027-01-01', trafficLimit: '2 TiB', trafficCalculationType: 'total', showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: 1, cpu: 25, load: { one: 0.5, five: 0.4, fifteen: 0.3 },
     memory: { used: 4096, total: 8192, percentage: 50 }, swap: { used: 0, total: 1024, percentage: 0 },
     disk: { used: 51200, total: 102400, percentage: 50 },

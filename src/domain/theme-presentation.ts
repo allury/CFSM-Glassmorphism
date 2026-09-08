@@ -1,3 +1,4 @@
+import type { IconName } from '@/constants/icons'
 import type { DetailChartModel } from '@/domain/server-detail'
 import { parseSettingKeys, type ThemeSettings } from '@/theme/settings'
 import type { CfsmServer } from '@/types/cfsm'
@@ -170,7 +171,8 @@ function sum(values: Array<number | null>): number | null {
   return samples.length ? samples.reduce((total, value) => total + value, 0) : null
 }
 
-export interface PresentationCard { key: string, icon: string, label: string, value: string, hint: string, percentage?: number | null }
+/** `icon` 使用与 Komari 一致的图标名（见 `@/constants/icons`），由 `AppIcon` 渲染。 */
+export interface PresentationCard { key: string, icon: IconName, label: string, value: string, hint: string, percentage?: number | null }
 
 export function buildGeneralCards(servers: GlassServer[], settings: ThemeSettings, now = Date.now()): PresentationCard[] {
   const online = servers.filter((server) => server.online)
@@ -196,28 +198,28 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
   const regions = new Set(servers.map((server) => server.region).filter(Boolean)).size
   const systems = new Set(servers.map((server) => server.operatingSystem).filter(Boolean)).size
   const values: Record<GeneralCardKey, PresentationCard | null> = {
-    currentTime: { key: 'currentTime', icon: '◷', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now), hint: '浏览器本地时间' },
-    onlineNodes: { key: 'onlineNodes', icon: '◉', label: '在线节点', value: `${online.length} / ${servers.length}`, hint: `${servers.length - online.length} 台离线` },
-    offlineNodes: { key: 'offlineNodes', icon: '○', label: '离线节点', value: String(servers.length - online.length), hint: '五分钟统一判定' },
-    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: '⌁', label: '在线平均 CPU', value: formatPercent(avgCpu), hint: '有采样的在线节点' },
-    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: '◇', label: '平均 GPU', value: formatPercent(avgGpu), hint: '有 GPU 采样的在线节点' },
-    avgLoad: avgLoad === null ? null : { key: 'avgLoad', icon: '∿', label: '平均负载', value: formatLoad(avgLoad), hint: '在线节点 1 分钟负载' },
-    memory: memory.percentage === null ? null : { key: 'memory', icon: '▥', label: '内存', value: formatPercent(memory.percentage), hint: `${formatBytes(memory.used === null ? null : memory.used * 1024 ** 2)} / ${formatBytes(memory.total === null ? null : memory.total * 1024 ** 2)}`, percentage: memory.percentage },
-    disk: disk.percentage === null ? null : { key: 'disk', icon: '▰', label: '磁盘', value: formatPercent(disk.percentage), hint: `${formatBytes(disk.used === null ? null : disk.used * 1024 ** 2)} / ${formatBytes(disk.total === null ? null : disk.total * 1024 ** 2)}`, percentage: disk.percentage },
-    swap: swap.percentage === null ? null : { key: 'swap', icon: '▧', label: '交换内存', value: formatPercent(swap.percentage), hint: `${formatBytes(swap.used === null ? null : swap.used * 1024 ** 2)} / ${formatBytes(swap.total === null ? null : swap.total * 1024 ** 2)}`, percentage: swap.percentage },
-    processes: processCount === null ? null : { key: 'processes', icon: '⋮', label: '进程总数', value: formatCount(processCount), hint: '在线节点合计' },
-    connections: connectionCount === null ? null : { key: 'connections', icon: '⌘', label: '连接总数', value: formatCount(connectionCount), hint: 'TCP + UDP' },
-    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: '▦', label: 'CPU 核心', value: formatCount(coreCount), hint: '有数据节点合计' },
-    gpuNodes: { key: 'gpuNodes', icon: '◆', label: 'GPU 节点', value: String(servers.filter((server) => server.gpus.length > 0).length), hint: '包含真实 gpu_info' },
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: '◫', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
-    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: '↑', label: '实时上传', value: formatSpeed(upload), hint: '在线节点合计' },
-    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: '↓', label: '实时下载', value: formatSpeed(download), hint: '在线节点合计' },
-    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: '↟', label: '实时峰值', value: formatSpeed(peak), hint: '单节点单方向最大值' },
-    highLoadNodes: { key: 'highLoadNodes', icon: '!', label: '高负载节点', value: String(servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length), hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
-    expiringNodes: { key: 'expiringNodes', icon: '⌛', label: '即将到期', value: String(servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length), hint: `${settings.homeExpiringDays} 天内` },
-    trafficWarnings: { key: 'trafficWarnings', icon: '△', label: '流量预警', value: String(servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length), hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
-    regionDistribution: { key: 'regionDistribution', icon: '⌖', label: '地区分布', value: String(regions), hint: '有真实 region 的地区数' },
-    systemDistribution: { key: 'systemDistribution', icon: '▣', label: '系统分布', value: String(systems), hint: '有真实 OS 的系统数' },
+    currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now), hint: '浏览器本地时间' },
+    onlineNodes: { key: 'onlineNodes', icon: 'tabler:plug-connected', label: '在线节点', value: `${online.length} / ${servers.length}`, hint: `${servers.length - online.length} 台离线` },
+    offlineNodes: { key: 'offlineNodes', icon: 'tabler:plug-connected-x', label: '离线节点', value: String(servers.length - online.length), hint: '五分钟统一判定' },
+    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: 'tabler:cpu', label: '在线平均 CPU', value: formatPercent(avgCpu), hint: '有采样的在线节点' },
+    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: 'tabler:cpu-2', label: '平均 GPU', value: formatPercent(avgGpu), hint: '有 GPU 采样的在线节点' },
+    avgLoad: avgLoad === null ? null : { key: 'avgLoad', icon: 'tabler:gauge', label: '平均负载', value: formatLoad(avgLoad), hint: '在线节点 1 分钟负载' },
+    memory: memory.percentage === null ? null : { key: 'memory', icon: 'icon-park-outline:memory', label: '内存', value: formatPercent(memory.percentage), hint: `${formatBytes(memory.used === null ? null : memory.used * 1024 ** 2)} / ${formatBytes(memory.total === null ? null : memory.total * 1024 ** 2)}`, percentage: memory.percentage },
+    disk: disk.percentage === null ? null : { key: 'disk', icon: 'tabler:server-2', label: '磁盘', value: formatPercent(disk.percentage), hint: `${formatBytes(disk.used === null ? null : disk.used * 1024 ** 2)} / ${formatBytes(disk.total === null ? null : disk.total * 1024 ** 2)}`, percentage: disk.percentage },
+    swap: swap.percentage === null ? null : { key: 'swap', icon: 'icon-park-outline:switch', label: '交换内存', value: formatPercent(swap.percentage), hint: `${formatBytes(swap.used === null ? null : swap.used * 1024 ** 2)} / ${formatBytes(swap.total === null ? null : swap.total * 1024 ** 2)}`, percentage: swap.percentage },
+    processes: processCount === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程总数', value: formatCount(processCount), hint: '在线节点合计' },
+    connections: connectionCount === null ? null : { key: 'connections', icon: 'tabler:activity', label: '连接总数', value: formatCount(connectionCount), hint: 'TCP + UDP' },
+    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), hint: '有数据节点合计' },
+    gpuNodes: { key: 'gpuNodes', icon: 'tabler:cpu-2', label: 'GPU 节点', value: String(servers.filter((server) => server.gpus.length > 0).length), hint: '包含真实 gpu_info' },
+    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:chart-histogram', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
+    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:arrow-big-up-lines', label: '实时上传', value: formatSpeed(upload), hint: '在线节点合计' },
+    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:arrow-big-down-lines', label: '实时下载', value: formatSpeed(download), hint: '在线节点合计' },
+    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:chart-line', label: '实时峰值', value: formatSpeed(peak), hint: '单节点单方向最大值' },
+    highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:activity-heartbeat', label: '高负载节点', value: String(servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length), hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
+    expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: String(servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length), hint: `${settings.homeExpiringDays} 天内` },
+    trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:alert-triangle', label: '流量预警', value: String(servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length), hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
+    regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: String(regions), hint: '有真实 region 的地区数' },
+    systemDistribution: { key: 'systemDistribution', icon: 'tabler:device-desktop', label: '系统分布', value: String(systems), hint: '有真实 OS 的系统数' },
   }
   return resolveGeneralCardKeys(settings).flatMap((key) => values[key] ? [values[key] as PresentationCard] : [])
 }
@@ -247,22 +249,22 @@ export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, no
           : (rx ?? 0) + (tx ?? 0)
   const monthly = monthlyPrice(server)
   const model: Record<DetailCardKey, PresentationCard | null> = {
-    nodePrice: server.price === null ? null : { key: 'nodePrice', icon: '¥', label: '节点价格', value: formatPrice(server.price, server.currency, server.billingCycle), hint: 'CFSM 套餐字段' },
-    monthlyCost: monthly === null ? null : { key: 'monthlyCost', icon: '≋', label: '月均支出', value: monthly, hint: '按账期等分，不做汇率换算' },
-    remainingTime: days === null ? null : { key: 'remainingTime', icon: '⌛', label: '剩余时间', value: days < 0 ? `已过期 ${Math.abs(days)} 天` : `${days} 天`, hint: server.expireDate ?? '' },
-    cpuUsage: server.cpu === null ? null : { key: 'cpuUsage', icon: '⌁', label: 'CPU', value: formatPercent(server.cpu), hint: `Load ${formatLoad(server.load1)} / ${formatLoad(server.load5)} / ${formatLoad(server.load15)}`, percentage: server.cpu },
-    gpuUsage: gpu === null ? null : { key: 'gpuUsage', icon: '◆', label: 'GPU', value: formatPercent(gpu), hint: `${server.gpus.length} 个设备`, percentage: gpu },
-    memoryUsage: percent(server.memoryUsed, server.memoryTotal) === null ? null : { key: 'memoryUsage', icon: '▥', label: 'RAM', value: formatPercent(percent(server.memoryUsed, server.memoryTotal)), hint: `${formatBytes(server.memoryUsed === null ? null : server.memoryUsed * 1024 ** 2)} / ${formatBytes(server.memoryTotal === null ? null : server.memoryTotal * 1024 ** 2)}`, percentage: percent(server.memoryUsed, server.memoryTotal) },
-    swapUsage: percent(server.swapUsed, server.swapTotal) === null ? null : { key: 'swapUsage', icon: '▧', label: 'Swap', value: formatPercent(percent(server.swapUsed, server.swapTotal)), hint: '真实使用比例', percentage: percent(server.swapUsed, server.swapTotal) },
-    diskUsage: percent(server.diskUsed, server.diskTotal) === null ? null : { key: 'diskUsage', icon: '▰', label: 'Disk', value: formatPercent(percent(server.diskUsed, server.diskTotal)), hint: '真实使用比例', percentage: percent(server.diskUsed, server.diskTotal) },
-    load: server.load1 === null ? null : { key: 'load', icon: '∿', label: '系统负载', value: formatLoad(server.load1), hint: `${formatLoad(server.load5)} / ${formatLoad(server.load15)}` },
-    processes: server.processes === null ? null : { key: 'processes', icon: '⋮', label: '进程', value: formatCount(server.processes), hint: '当前上报值' },
-    connections: server.tcpConnections === null && server.udpConnections === null ? null : { key: 'connections', icon: '⌘', label: '连接', value: formatCount((server.tcpConnections ?? 0) + (server.udpConnections ?? 0)), hint: `TCP ${formatCount(server.tcpConnections)} · UDP ${formatCount(server.udpConnections)}` },
-    uptime: server.bootTime === null ? null : { key: 'uptime', icon: '◷', label: '运行时间', value: formatUptime(server.bootTime, now), hint: '根据 boot_time 计算' },
-    uploadSpeed: server.networkOutSpeed === null ? null : { key: 'uploadSpeed', icon: '↑', label: '实时上传', value: formatSpeed(server.networkOutSpeed), hint: '当前节点' },
-    downloadSpeed: server.networkInSpeed === null ? null : { key: 'downloadSpeed', icon: '↓', label: '实时下载', value: formatSpeed(server.networkInSpeed), hint: '当前节点' },
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: '◫', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
-    trafficQuota: quotaLimit === null || quotaUsed === null ? null : { key: 'trafficQuota', icon: '△', label: '流量配额', value: formatPercent(quotaUsed / quotaLimit * 100), hint: `${formatBytes(quotaUsed)} / ${formatBytes(quotaLimit)}`, percentage: quotaUsed / quotaLimit * 100 },
+    nodePrice: server.price === null ? null : { key: 'nodePrice', icon: 'tabler:cash', label: '节点价格', value: formatPrice(server.price, server.currency, server.billingCycle), hint: 'CFSM 套餐字段' },
+    monthlyCost: monthly === null ? null : { key: 'monthlyCost', icon: 'tabler:receipt-2', label: '月均支出', value: monthly, hint: '按账期等分，不做汇率换算' },
+    remainingTime: days === null ? null : { key: 'remainingTime', icon: 'tabler:hourglass', label: '剩余时间', value: days < 0 ? `已过期 ${Math.abs(days)} 天` : `${days} 天`, hint: server.expireDate ?? '' },
+    cpuUsage: server.cpu === null ? null : { key: 'cpuUsage', icon: 'tabler:cpu', label: 'CPU', value: formatPercent(server.cpu), hint: `Load ${formatLoad(server.load1)} / ${formatLoad(server.load5)} / ${formatLoad(server.load15)}`, percentage: server.cpu },
+    gpuUsage: gpu === null ? null : { key: 'gpuUsage', icon: 'tabler:cpu-2', label: 'GPU', value: formatPercent(gpu), hint: `${server.gpus.length} 个设备`, percentage: gpu },
+    memoryUsage: percent(server.memoryUsed, server.memoryTotal) === null ? null : { key: 'memoryUsage', icon: 'icon-park-outline:memory', label: 'RAM', value: formatPercent(percent(server.memoryUsed, server.memoryTotal)), hint: `${formatBytes(server.memoryUsed === null ? null : server.memoryUsed * 1024 ** 2)} / ${formatBytes(server.memoryTotal === null ? null : server.memoryTotal * 1024 ** 2)}`, percentage: percent(server.memoryUsed, server.memoryTotal) },
+    swapUsage: percent(server.swapUsed, server.swapTotal) === null ? null : { key: 'swapUsage', icon: 'icon-park-outline:switch', label: 'Swap', value: formatPercent(percent(server.swapUsed, server.swapTotal)), hint: '真实使用比例', percentage: percent(server.swapUsed, server.swapTotal) },
+    diskUsage: percent(server.diskUsed, server.diskTotal) === null ? null : { key: 'diskUsage', icon: 'tabler:server-2', label: 'Disk', value: formatPercent(percent(server.diskUsed, server.diskTotal)), hint: '真实使用比例', percentage: percent(server.diskUsed, server.diskTotal) },
+    load: server.load1 === null ? null : { key: 'load', icon: 'tabler:gauge', label: '系统负载', value: formatLoad(server.load1), hint: `${formatLoad(server.load5)} / ${formatLoad(server.load15)}` },
+    processes: server.processes === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程', value: formatCount(server.processes), hint: '当前上报值' },
+    connections: server.tcpConnections === null && server.udpConnections === null ? null : { key: 'connections', icon: 'tabler:activity', label: '连接', value: formatCount((server.tcpConnections ?? 0) + (server.udpConnections ?? 0)), hint: `TCP ${formatCount(server.tcpConnections)} · UDP ${formatCount(server.udpConnections)}` },
+    uptime: server.bootTime === null ? null : { key: 'uptime', icon: 'tabler:clock', label: '运行时间', value: formatUptime(server.bootTime, now), hint: '根据 boot_time 计算' },
+    uploadSpeed: server.networkOutSpeed === null ? null : { key: 'uploadSpeed', icon: 'tabler:arrow-big-up-lines', label: '实时上传', value: formatSpeed(server.networkOutSpeed), hint: '当前节点' },
+    downloadSpeed: server.networkInSpeed === null ? null : { key: 'downloadSpeed', icon: 'tabler:arrow-big-down-lines', label: '实时下载', value: formatSpeed(server.networkInSpeed), hint: '当前节点' },
+    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:chart-histogram', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
+    trafficQuota: quotaLimit === null || quotaUsed === null ? null : { key: 'trafficQuota', icon: 'tabler:alert-triangle', label: '流量配额', value: formatPercent(quotaUsed / quotaLimit * 100), hint: `${formatBytes(quotaUsed)} / ${formatBytes(quotaLimit)}`, percentage: quotaUsed / quotaLimit * 100 },
   }
   return resolveDetailCardKeys(settings).flatMap((key) => model[key] ? [model[key] as PresentationCard] : [])
 }

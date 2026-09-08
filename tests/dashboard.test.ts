@@ -26,6 +26,7 @@ function makeServer(id: string, overrides: Partial<GlassServer> = {}): GlassServ
     expireDate: null,
     trafficLimit: null,
     trafficCalculationType: null,
+    showPrice: true,
     showExpire: true,
     showTraffic: true,
     online: true,

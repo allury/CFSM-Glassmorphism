@@ -50,6 +50,7 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     expireDate: server.expireDate,
     trafficLimit: server.trafficLimit,
     trafficCalculationType: server.trafficCalculationType,
+    showPrice: server.systemConfig?.showPrice !== false,
     showExpire: server.systemConfig?.showExpire !== false,
     showTraffic: server.systemConfig?.showTraffic !== false,
     online: server.online,

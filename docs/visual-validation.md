@@ -1,5 +1,18 @@
 # 视觉与响应式验证
 
+## 第 9.9 轮：表现层深度收敛
+
+第 9.9 轮继续以 Komari v3.3.7（`bf83765`）源码为权威基准，逐项终态见 `docs/fidelity-audit.md`。
+
+- **总览卡片**：无独立标题区，12 栅格 `span 4`；`tests/fidelity-contract.test.ts` 锁定卡片解剖与栅格契约。
+- **节点卡片**：状态点 + 名称 / 收藏 + OS + 旗帜 / 芯片 / 四项进度 / 三列指标盒 / 延迟丢包面板 / 标签 / 离线遮罩，区块顺序由契约测试锁定；mini / compact / comfortable / large 与 dense 集合渲染继续生效。
+- **节点列表**：十列栅格契约（状态 / 系统 / 节点 / 信息 / 运行时间 / CPU / 内存 / 硬盘 / 流量 / 速率），行高 64px；窄屏保留列结构并允许容器横向滚动，不再拆成堆叠卡片。
+- **图标**：全部字符占位替换为同名 Tabler / IconPark 图标；`AppIcon` 不含任何网络请求，契约测试断言不出现 `api.iconify.design`。
+- **响应式**：375 / 430 / 768 / 1024 / 1440 / 1920 六档由 `tests/responsive-contract.test.ts` 锁定；新增断言确保 `.quick-view*` 与旧 SVG 地图样式不再进入产物。
+- **视觉 token**：卡片 12px、列表行与指标盒 8px 圆角，指标网格 16/10px，芯片 11px——按 Komari 的 Tailwind 尺度校准。
+
+尚未对齐因而**未做**视觉基线更新的区域：历史图表（仍为手写 SVG）、详情页信息层级、UI 基元与弹层族。
+
 ## 第 9.5 轮：1:1 高保真收敛
 
 第 9.5 轮以原 Komari Glassmorphism（`bf83765`，v3.3.7）源码为唯一权威基准做表现层收敛，逐项差异见 `docs/fidelity-audit.md`。
@@ -30,7 +43,7 @@
 
 第 8 轮继续以生产构建和只监听 `127.0.0.1` 的 CFSM 形状测试服务验证。本地场景覆盖 10 台节点、5 个明确 region、长名称、大量 tags、离线/高负载、两种付费币种和免费节点；测试数据只位于 Git 忽略的 `work/`，不进入产品源码或构建产物。
 
-- realistic、cobe、tiled 三种渲染均逐一切换；国家/地区聚合标记、在线计数、节点快速查看和“非精确位置”说明保持可见。
+- realistic、cobe、tiled 三种渲染均逐一切换；国家/地区聚合标记、在线计数和“非精确位置”说明保持可见。
 - 健康摘要展示当前指标与 `/api/servers` Ping/Loss 窗口覆盖；性价比将 CNY 与 USD 分组，免费节点明确排除；快照页只提供当前 JSON/CSV；拓扑只展示 region → group → tags 分类；Audit Log 明确隐藏。
 - 375、430、768、1024、1440、1920 六个宽度均读取实际页面几何；`documentElement.scrollWidth` 与 `body.scrollWidth` 均不大于 `documentElement.clientWidth`，没有页面级横向溢出。
 - 375px 下 Earth 地区列表、两列总览、高级工具标签和健康卡片按移动端规则收缩；768px 及以上恢复横向工具标签和紧凑数据表。设置页的 renderer、隐藏/停止 Earth、高级工具与导出口令控件均可即时预览。

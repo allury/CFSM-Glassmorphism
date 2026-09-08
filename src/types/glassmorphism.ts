@@ -38,6 +38,7 @@ export interface GlassServer {
   expireDate: string | null
   trafficLimit: string | null
   trafficCalculationType: string | null
+  showPrice: boolean
   showExpire: boolean
   showTraffic: boolean
   online: boolean

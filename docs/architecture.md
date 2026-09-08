@@ -92,7 +92,7 @@ UI (render and user intent only)
 - 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
 - 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
 - 第 8 轮的 Earth 与高级工具领域模型位于 `src/domain/advanced-tools.ts`：`EarthMap` 和 `AdvancedTools` 只接收已经归一化的 `GlassServer`，不新增请求、不读取 wire payload。国家/地区中心、健康规则、月价折算、快照序列化和分类拓扑均为可单测的纯函数。
-- 节点快速查看只展开当前 REST 快照，不触发详情、历史或 WebSocket 请求；桌面为模态框，移动端为底部抽屉。
+- 节点卡片与列表行的主点击直达 `/#/server/:id`（与 Komari 一致），中间不再插入任何快速查看或二次确认层。
 - `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。轻量 SVG 图表按真实时间戳绘制，缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
 ## Theme Options
@@ -182,6 +182,18 @@ server click -> its source -> detail/history/ws
 - **历史陈旧响应 / 并发切换**：详情 hours 切换控件在 `historyState === 'loading'` 时禁用，配合 store 内 `revision` 版本号与 AbortController，保证同一节点上不会并发触发历史请求、详情切换会取消在途请求，乱序陈旧响应不会写回。本轮经核验此前已妥善处理，未改动相关代码。
 
 与原 Komari Glassmorphism 的高保真视觉差异如在本轮发现，仅记录、留待第 9.5 轮，不在第 9 轮修改。
+
+## 第 9.9 轮完成边界
+
+第 9.9 轮继续把表现层向 Komari 收敛，不新增功能，也不触碰数据 / 协议底座（REST、WebSocket partial merge、10 秒稳定后重置退避、History revision 与 AbortController、probe 三态、`theme_options`、JWT / Turnstile、多 apiBase 归属、server ID 校验、403 / 5xx 分类、50+ 节点性能优化）。
+
+- **总览卡片**：去掉 CFSM 自创标题区，`OverviewCards` 的根即 `general-stage__cards` 所在的 12 栅格；卡片为 `span 4` 单元，标签左上 / 图标右上 / 数值与单位基线对齐。
+- **节点卡片与列表**：`ServerCard` 按 Komari 区块顺序重建；`ServerList` 由语义化表格改为栅格行与十列契约，「信息」列受 `nodeListMetadataEnabled` 控制。两者继续只消费 `GlassServer`，不解析 wire payload。
+- **图标体系**：新增 `src/constants/icons.ts`（构建期内联的 Tabler / IconPark 路径）与 `src/components/ui/AppIcon.vue`。`PresentationCard.icon` 由字符占位改为 `IconName`。运行时不访问外部图标 CDN——这是自托管与严格 CSP 环境下必要的交付方式差异。
+- **静态资源约定**：`src/utils/os-icon.ts` 对照 CFSM 官方 `osIcon.js` 的关键字映射，OS 图标使用默认皮肤的 `/os-icons/<filename>`；旗帜沿用 `/flags/<code>.svg`。两者都不打包进主题。
+- **价格与流量可见性**：`GlassServer` 新增 `showPrice`；卡片与列表同时遵守主题级 `hidePriceWhenLoggedOut` 与每台节点的 `showPrice` / `showTraffic`，与详情页口径一致。
+
+仍未对齐的 P1（历史图表 echarts 组件族、详情页信息层级、UI 基元与弹层族）在 `docs/fidelity-audit.md` 中标记为 FAIL，不得被当作已对齐。
 
 ## 第 9.5 轮完成边界
 

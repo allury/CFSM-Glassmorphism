@@ -66,6 +66,10 @@ const showAdvancedTools = computed(() => (
   theme.runtime.homeToolsEnabled && app.config?.authorization === true
 ))
 const isDark = computed(() => theme.resolvedTheme === 'dark')
+/** 主题级价格隐私；每台节点自身的 showPrice 仍在卡片与列表内单独生效。 */
+const priceVisible = computed(() => (
+  !theme.runtime.hidePriceWhenLoggedOut || app.config?.authorization === true
+))
 // 与 Komari NodeGeneralCards 一致：Earth 与总览卡片同处一个栅格容器。
 // 球体渲染器在桌面端占右半、卡片占左半；tiled 则卡片在上、整幅地图在下。
 const showEarth = computed(() => !theme.runtime.hideEarth)
@@ -322,18 +326,13 @@ onUnmounted(() => realtime.stop())
         </div>
 
         <template v-if="initialLoading">
-          <section class="overview-stage overview-stage--loading" aria-label="正在加载总览">
-            <div class="overview-stage__heading">
-              <span class="skeleton skeleton--line" />
-            </div>
-            <div class="overview-grid">
-              <span
-                v-for="index in 6"
-                :key="index"
-                class="skeleton skeleton--overview"
-              />
-            </div>
-          </section>
+          <div class="overview-grid" aria-label="正在加载总览">
+            <span
+              v-for="index in 6"
+              :key="index"
+              class="skeleton skeleton--overview"
+            />
+          </div>
           <section class="skeleton-grid" aria-label="正在加载节点">
             <span
               v-for="index in 3"
@@ -460,6 +459,7 @@ onUnmounted(() => realtime.stop())
                     :density="viewMode"
                     :favorite="preferences.isFavorite(server.key)"
                     :high-load-threshold="theme.runtime.homeHighLoadThreshold"
+                    :price-visible="priceVisible"
                     :style="cardStyle(index)"
                     @open="openServer(server)"
                     @toggle-favorite="preferences.toggleFavorite(server.key)"
@@ -474,6 +474,7 @@ onUnmounted(() => realtime.stop())
                   :metadata-fields="metadataFields"
                   :provider-aliases="providerAliases"
                   :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
+                  :price-visible="priceVisible"
                   @open="openServer"
                   @toggle-favorite="preferences.toggleFavorite"
                 />

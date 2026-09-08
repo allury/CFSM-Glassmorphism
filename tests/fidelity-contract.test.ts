@@ -147,4 +147,92 @@ describe('Komari fidelity contracts', () => {
     expect(stylesheet).toMatch(/\.general-stage--globe \.general-stage__earth\s*\{[^}]*grid-row: 1/s)
     expect(stylesheet).toMatch(/\.general-stage--tiled \.general-stage__earth\s*\{[^}]*grid-row: 2/s)
   })
+
+  /* 第 9.9 轮：表现层深度收敛。 */
+
+  it('builds overview cards with the Komari card anatomy and no invented heading block', () => {
+    const overview = source('../src/components/dashboard/OverviewCards.vue')
+    const stylesheet = source('../src/styles/main.css')
+
+    // Komari 的总览区没有独立标题块，卡片本身就是栅格单元。
+    expect(overview).not.toContain('overview-stage')
+    expect(overview).not.toContain('节点总览</h1>')
+    // 标签在左上、图标在右上，数值与单位基线对齐在底部。
+    expect(overview).toContain('overview-card__head')
+    expect(overview).toContain('overview-card__label')
+    expect(overview).toContain('overview-card__icon')
+    expect(overview).toContain('overview-card__number')
+    expect(overview).toContain('overview-card__unit')
+    expect(stylesheet).toMatch(/\.overview-grid\s*\{[^}]*grid-template-columns: repeat\(12/s)
+    expect(stylesheet).toMatch(/\.overview-card\s*\{[^}]*grid-column: span 4/s)
+  })
+
+  it('builds the node card with the Komari section order', () => {
+    const card = source('../src/components/dashboard/ServerCard.vue')
+
+    for (const marker of [
+      'node-card__header',
+      'node-card__header-extra',
+      'node-card__chips',
+      'node-metrics',
+      'node-boxes',
+      'node-probes',
+      'node-tags',
+      'node-card__offline',
+    ]) {
+      expect(card).toContain(marker)
+    }
+    // 头部右侧与 Komari 一致：收藏、OS 图标、地区旗帜。
+    expect(card).toContain('osIconUrl(server.operatingSystem)')
+    expect(card).toContain('flagUrl(regionCode)')
+    // 四项进度：CPU / 内存 / 硬盘 / 流量。
+    expect(card).toContain('node-metric__label--cpu')
+    expect(card).toContain('node-metric__label--memory')
+    expect(card).toContain('node-metric__label--disk')
+    expect(card).toContain('node-metric__label--traffic')
+  })
+
+  it('builds the node list as a Komari-style grid with its column contract', () => {
+    const list = source('../src/components/dashboard/ServerList.vue')
+
+    // Komari 使用栅格行而非语义化表格标签。
+    expect(list).not.toMatch(/<table[\s>]/)
+    expect(list).not.toMatch(/<tbody[\s>]/)
+    expect(list).toContain('node-list__row')
+    expect(list).toContain('gridTemplateColumns')
+    for (const key of ['status', 'os', 'name', 'metadata', 'uptime', 'cpu', 'mem', 'disk', 'traffic', 'rate']) {
+      expect(list).toContain(`key: '${key}'`)
+    }
+    // 「信息」列由 nodeListMetadataEnabled 控制，与上游列过滤一致。
+    expect(list).toContain("column.key !== 'metadata' || props.metadataEnabled")
+    // 性能优化保留。
+    expect(list).toContain('v-memo=')
+  })
+
+  it('renders real icon components instead of text glyphs, without a runtime icon CDN', () => {
+    const icons = source('../src/constants/icons.ts')
+    const appIcon = source('../src/components/ui/AppIcon.vue')
+    const presentation = source('../src/domain/theme-presentation.ts')
+    const card = source('../src/components/dashboard/ServerCard.vue')
+
+    // 图标名与 Komari 一致，路径数据在构建期内联，运行时不访问图标 CDN。
+    expect(icons).toContain("'tabler:cpu'")
+    expect(icons).toContain("'icon-park-outline:memory'")
+    expect(appIcon).toContain('ICONS[props.name]')
+    expect(appIcon).not.toContain('api.iconify.design')
+    expect(icons).not.toMatch(/\bfetch\s*\(/)
+    // 卡片数据里不再出现字符占位图标，全部是 Komari 同源图标名。
+    expect(presentation).not.toMatch(/icon: '(?!tabler:|icon-park-outline:)[^']*'/)
+    expect(card).toContain('AppIcon')
+  })
+
+  it('keeps price visibility gated by both theme privacy and per-server settings', () => {
+    const card = source('../src/components/dashboard/ServerCard.vue')
+    const list = source('../src/components/dashboard/ServerList.vue')
+    const home = source('../src/views/HomeView.vue')
+
+    expect(home).toContain('hidePriceWhenLoggedOut')
+    expect(card).toContain('!props.priceVisible || !props.server.showPrice')
+    expect(list).toContain('!props.priceVisible || !server.showPrice')
+  })
 })

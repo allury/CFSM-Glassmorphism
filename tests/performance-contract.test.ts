@@ -30,7 +30,7 @@ describe('release performance contracts', () => {
     expect(home).toContain('glassServerMapper.map')
     expect(home).toContain('NODE_ITEM_DELAY_STYLES')
     expect(list).toContain('v-memo=')
-    expect(stylesheet).toMatch(/\.server-grid--dense \.server-card\s*\{[^}]*content-visibility: auto/s)
+    expect(stylesheet).toMatch(/\.server-grid--dense \.node-card\s*\{[^}]*content-visibility: auto/s)
     expect(router.match(/component: \(\) => import\(/g)).toHaveLength(3)
   })
 
