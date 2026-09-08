@@ -19,6 +19,8 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
 
+第 8 轮 Earth/Map、健康、性价比、快照与分类拓扑没有增加端点。它们只消费首页已经通过 `/api/config`、`/api/servers` 和 adapter 得到的 normalized snapshot；健康历史覆盖只来自 `/api/servers` 的真实 Ping/Loss 窗口，不在首页批量请求 `/api/history/all`。CFSM 没有公开 Audit Log 主题端点，因此该工具不渲染，也不回退到管理端私有 API。
+
 ## 请求契约
 
 ### GET /api/config

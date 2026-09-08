@@ -9,7 +9,7 @@ describe('responsive layout contract', () => {
     expect(stylesheet).toContain('width: min(100% - 32px, 1280px)')
   })
 
-  it('covers mobile cards, list conversion, detail charts, settings and modal drawer', () => {
+  it('covers mobile cards, Earth, advanced tools, list conversion, detail charts, settings and modal drawer', () => {
     expect(stylesheet).toContain('@media (max-width: 768px)')
     expect(stylesheet).toContain('@media (max-width: 520px)')
     expect(stylesheet).toContain('@media (max-width: 430px)')
@@ -18,6 +18,10 @@ describe('responsive layout contract', () => {
     expect(stylesheet).toContain('.quick-view__panel')
     expect(stylesheet).toContain('.history-chart-grid')
     expect(stylesheet).toContain('.settings-layout')
+    expect(stylesheet).toContain('.earth-layout')
+    expect(stylesheet).toContain('.advanced-tools__tabs')
+    expect(stylesheet).toContain('.topology-grid')
+    expect(stylesheet).toContain('@media (max-width: 560px)')
     expect(stylesheet).toContain('overflow-wrap: anywhere')
   })
 })

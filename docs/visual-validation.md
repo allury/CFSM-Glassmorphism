@@ -1,5 +1,14 @@
 # 视觉与响应式验证
 
+## 第 8 轮复验
+
+第 8 轮继续以生产构建和只监听 `127.0.0.1` 的 CFSM 形状测试服务验证。本地场景覆盖 10 台节点、5 个明确 region、长名称、大量 tags、离线/高负载、两种付费币种和免费节点；测试数据只位于 Git 忽略的 `work/`，不进入产品源码或构建产物。
+
+- realistic、cobe、tiled 三种渲染均逐一切换；国家/地区聚合标记、在线计数、节点快速查看和“非精确位置”说明保持可见。
+- 健康摘要展示当前指标与 `/api/servers` Ping/Loss 窗口覆盖；性价比将 CNY 与 USD 分组，免费节点明确排除；快照页只提供当前 JSON/CSV；拓扑只展示 region → group → tags 分类；Audit Log 明确隐藏。
+- 375、430、768、1024、1440、1920 六个宽度均读取实际页面几何；`documentElement.scrollWidth` 与 `body.scrollWidth` 均不大于 `documentElement.clientWidth`，没有页面级横向溢出。
+- 375px 下 Earth 地区列表、两列总览、高级工具标签和健康卡片按移动端规则收缩；768px 及以上恢复横向工具标签和紧凑数据表。设置页的 renderer、隐藏/停止 Earth、高级工具与导出口令控件均可即时预览。
+
 ## 第 7 轮复验
 
 第 7 轮对生产构建启动本地 CFSM 形状测试服务，只访问 `127.0.0.1`。六档视口均读取实际 DOM 几何并检查 `documentElement.scrollWidth <= innerWidth`；结果全部无页面级横向溢出。浏览器控制台无 warning/error。

@@ -231,6 +231,15 @@ onMounted(async () => {
                   </select>
                 </label>
                 <label class="settings-field">
+                  <span>Earth / Map 样式</span>
+                  <select v-model="theme.draft.earthRenderer" :disabled="theme.draft.hideEarth">
+                    <option value="realistic">Realistic Globe</option>
+                    <option value="cobe">Cobe Matrix</option>
+                    <option value="tiled">Tiled Map</option>
+                  </select>
+                  <small>三种渲染均只使用 region 的国家/地区中心坐标。</small>
+                </label>
+                <label class="settings-field">
                   <span>流量预警阈值</span>
                   <span class="settings-number"><input v-model.number="theme.draft.homeTrafficWarningThreshold" type="number" min="1" max="100"><i>%</i></span>
                   <small :class="{ 'is-error': issueFor('homeTrafficWarningThreshold') }">{{ issueFor('homeTrafficWarningThreshold') ?? '仅对可可靠解析的 traffic_limit 生效。' }}</small>
@@ -252,6 +261,9 @@ onMounted(async () => {
                 <label class="settings-switch"><input v-model="theme.draft.nodeListCustomTagsVisible" type="checkbox" :disabled="!theme.draft.nodeListMetadataEnabled"><span><strong>列表显示标签</strong><small>还需 fields 包含 tags。</small></span></label>
                 <label class="settings-switch"><input v-model="theme.draft.hideAdminEntryWhenLoggedOut" type="checkbox"><span><strong>未登录隐藏后台入口</strong><small>登录后仍指向 /admin#admin。</small></span></label>
                 <label class="settings-switch"><input v-model="theme.draft.hidePriceWhenLoggedOut" type="checkbox"><span><strong>未登录隐藏价格</strong><small>不改变 CFSM 服务端权限过滤。</small></span></label>
+                <label class="settings-switch"><input v-model="theme.draft.hideEarth" type="checkbox"><span><strong>隐藏 Earth / Map</strong><small>只隐藏地图视觉区，不改变节点数据。</small></span></label>
+                <label class="settings-switch"><input v-model="theme.draft.stopEarth" type="checkbox" :disabled="theme.draft.hideEarth || theme.draft.earthRenderer === 'tiled'"><span><strong>停止地球动画</strong><small>地图标记始终可点击，平铺地图本身不旋转。</small></span></label>
+                <label class="settings-switch"><input v-model="theme.draft.homeToolsEnabled" type="checkbox"><span><strong>登录后显示高级工具</strong><small>健康、分币种性价比、快照与分类拓扑。</small></span></label>
               </div>
               <label class="settings-field settings-field--wide">
                 <span>自定义总览卡片 keys</span>
@@ -272,6 +284,11 @@ onMounted(async () => {
                 <span>厂商别名</span>
                 <input v-model="theme.draft.providerAliases" type="text" placeholder="Provider:alias1,alias2;Provider2:alias">
                 <small>只匹配节点 name、group、tags、region 中的真实文本，不通过 IP 猜测厂商。</small>
+              </label>
+              <label class="settings-field settings-field--wide">
+                <span>快照导出二级确认密码</span>
+                <input v-model="theme.draft.exportSecondaryPassword" type="password" autocomplete="new-password" :disabled="!theme.draft.homeToolsEnabled">
+                <small>可选，仅用于已登录高级工具中的浏览器端确认；不替代 CFSM 权限控制。</small>
               </label>
             </section>
 
@@ -357,8 +374,9 @@ onMounted(async () => {
               <div class="settings-limitations">
                 <article><strong>RPC 模式</strong><span>CFSM 固定使用官方 REST + WebSocket，不提供旧主题的传输模式切换。</span></article>
                 <article><strong>访客信息</strong><span>公开主题 API 不提供访客 IP 或审计数据，强制关闭且不生成占位信息。</span></article>
-                <article><strong>Earth / Map</strong><span>保留兼容配置；本轮没有地理数据能力，不显示伪控制。</span></article>
-                <article><strong>高级工具与磁盘预测</strong><span>需要独立交互或足量历史样本的功能继续隐藏，避免无效开关。</span></article>
+                <article><strong>精确地理信息</strong><span>公开数据只有 region；Earth / Map 只映射国家/地区中心，不声称城市或机房坐标。</span></article>
+                <article><strong>Audit Log</strong><span>第三方主题 API 不提供审计日志，功能保持隐藏且不访问管理端私有接口。</span></article>
+                <article><strong>磁盘耗尽预测</strong><span>仍需详情 History 的足量连续样本，本轮不展示无效开关。</span></article>
               </div>
             </section>
           </div>

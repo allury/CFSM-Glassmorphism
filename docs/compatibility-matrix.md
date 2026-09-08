@@ -6,7 +6,7 @@
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | ed820aeac15dbced5e51d19d4fa2108a28b0ff9b | 第 6 轮主题持久化基线；第 7 轮在其上开发 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | 22e545fa85ca129d3351cc3d585e1be847dcef8a | 第 7 轮完成基线；第 8 轮在其上开发 |
 | huilang-me/CF-Server-Monitor | main | 924e71d32e5a0b5493cb52fdb2c184a9d6bd71e3 | 最新 theme-develop.md Ping/Node 契约与公开 config handler |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -20,6 +20,12 @@
 第 6 轮的完整 48 项 schema、defaults → backend → local 三层解析和保存协议维持不变。第 7 轮将可由当前公开 CFSM 数据真实兑现的展示配置全部接入 `src/domain/theme-presentation.ts`：总览、八个快捷控制、provider aliases、metadata、三类阈值、详情卡片和 History 图表族均从统一 runtime 驱动。
 
 预设与自定义 key 都保持声明顺序并去重；不受支持的 key 以及当前实体缺失的数据自动隐藏。流量预警兼容 CFSM 数字 GiB 与显式单位文本，并服从 dl/ul/max/total；到期判断使用受校验的 `expire_date`。RPC 与访客信息明确禁用；Earth/Map、磁盘预测和高级工具仅保留迁移值，不提前展示。
+
+## 第 8 轮实现进度
+
+第 8 轮在既有 normalized model 与主题 store 上启用 realistic、cobe、tiled 三种 Earth/Map 视觉。定位只接受可可靠归一化的 `region` 国家/地区代码或名称，并聚合到国家/地区中心；无法定位的节点会明确计数并排除，不用节点名、标签、IP、ASN、城市或外部 Geo 服务猜测位置。
+
+登录态首页高级工具只复用已经加载的真实 CFSM 快照：健康摘要综合在线状态、CPU、RAM、Swap、Disk、Load/Core、GPU、流量配额、到期、当前 Ping/Loss 及 `/api/servers` 真实 Ping/Loss 窗口；性价比按可识别账期折算月价、免费/未知价格不参与排行、币种绝不混算；快照导出保留 probe 的 `unconfigured / timeout / number` 三态；拓扑明确是 region → group → server/tags 的分类视图而非网络链路。Audit Log 因没有公开主题 API 而隐藏。
 
 ## 矩阵
 

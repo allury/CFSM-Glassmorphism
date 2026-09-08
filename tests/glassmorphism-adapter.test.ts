@@ -44,6 +44,8 @@ describe('Server to Glassmorphism adapter', () => {
       loss_ct: 0,
       ping_cu: false,
       loss_cu: null,
+      ping: [{ ts: 1_700_000_000_000, ct: 18, cu: null, cm: false, bd: 0 }],
+      loss: [{ ts: 1_700_000_000_000, ct: 1, cu: null, cm: false, bd: 0 }],
       gpu_info: [{ id: '0', name: 'GPU 0', info: 45 }],
       ip_v4: '1',
       ip_v6: '0',
@@ -94,6 +96,7 @@ describe('Server to Glassmorphism adapter', () => {
         packetLoss: null,
       },
     ])
+    expect(view.history).toEqual({ latencySamples: [18, 0], packetLossSamples: [1, 0] })
     expect(view.gpus).toEqual([{ id: '0', name: 'GPU 0', utilization: 45 }])
   })
 

@@ -2,7 +2,7 @@
 
 CFSM-Glassmorphism is a Vue 3, TypeScript and Vite port of Komari Glassmorphism for the public third-party-theme APIs of CF-Server-Monitor.
 
-The project currently includes the engineering foundation, a visually restored home dashboard, a real `/#/server/:id` detail experience, and a centralized `/#/settings` theme editor. The home page loads `/api/config` and `/api/servers`, while detail uses the owning source's `/api/server`, `/api/history/all` and single-node `/api/ws?subscribe=<id>` connection. Partial `batchUpdate` samples merge without erasing REST state; reconnects use bounded backoff and low-frequency REST fallback. Theme settings resolve defaults, backend `theme_options` and browser overrides in one strict store; authenticated saves use only `POST /api/theme_options`, send a complete snapshot, and re-fetch config without a reload. Earth/Map and advanced tools intentionally remain for later rounds.
+The project currently includes the engineering foundation, a visually restored home dashboard, a real `/#/server/:id` detail experience, a centralized `/#/settings` theme editor, three Earth/Map renderers, and authenticated advanced tools. The home page loads `/api/config` and `/api/servers`, while detail uses the owning source's `/api/server`, `/api/history/all` and single-node `/api/ws?subscribe=<id>` connection. Partial `batchUpdate` samples merge without erasing REST state; reconnects use bounded backoff and low-frequency REST fallback. Theme settings resolve defaults, backend `theme_options` and browser overrides in one strict store; authenticated saves use only `POST /api/theme_options`, send a complete snapshot, and re-fetch config without a reload. Earth placement uses only explicit country/region centers, while health, value, snapshot and classification-topology tools consume the same normalized real-data model.
 
 ## Authority and attribution
 
@@ -54,4 +54,4 @@ The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contai
 - docs/api-mapping.md: public endpoint ownership and source references.
 - docs/architecture.md: target layers and data flow.
 - docs/theme-settings.md: all 48 upstream settings and their CFSM disposition.
-- docs/visual-validation.md: Round 3 breakpoint, scale and interaction verification.
+- docs/visual-validation.md: current breakpoint, renderer and interaction verification.

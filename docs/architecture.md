@@ -90,6 +90,7 @@ UI (render and user intent only)
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
 - 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
 - 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
+- 第 8 轮的 Earth 与高级工具领域模型位于 `src/domain/advanced-tools.ts`：`EarthMap` 和 `AdvancedTools` 只接收已经归一化的 `GlassServer`，不新增请求、不读取 wire payload。国家/地区中心、健康规则、月价折算、快照序列化和分类拓扑均为可单测的纯函数。
 - 节点快速查看只展开当前 REST 快照，不触发详情、历史或 WebSocket 请求；桌面为模态框，移动端为底部抽屉。
 - `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。轻量 SVG 图表按真实时间戳绘制，缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
@@ -110,7 +111,7 @@ schema defaults
 - 本地专属状态（例如一次性 UI 展开状态、JWT、Turnstile 凭证）绝不混入后端快照。
 - 保存成功后以后端响应替换 backend 层；401/403/400 时保留草稿并显示准确动作。
 - backend 快照中的未知 key 会保留以支持前向兼容；已知 key 按类型、枚举和范围校验。JWT、Turnstile、收藏及一次性 UI 状态在序列化边界排除。
-- 第 6 轮已落地完整 48 项 schema 和 `/#/settings`：即时预览、本地覆盖、回落后端、完整 JSON、JWT + Turnstile 后端保存与成功后 config 回读。第 7 轮没有改造该架构，只把总览、快捷控制、metadata/provider aliases、阈值、详情卡片和图表预设接到同一 runtime。
+- 第 6 轮已落地完整 48 项 schema 和 `/#/settings`：即时预览、本地覆盖、回落后端、完整 JSON、JWT + Turnstile 后端保存与成功后 config 回读。第 7、8 轮没有改造该架构，只把配置驱动展示、Earth/Map 与高级工具接到同一 runtime。
 
 ## WebSocket
 
@@ -164,3 +165,7 @@ server click -> its source -> detail/history/ws
 ## 第 7 轮完成边界
 
 第 7 轮在既有主题 store 和 normalized data model 上完成配置驱动展示：总览和快捷控制不再是固定结构，列表 provider 只匹配用户声明的真实元数据文本，流量/到期/负载阈值有统一谓词，详情概览和 History 由预设或自定义 key 选择。响应式继续采用 CSS 网格与移动端抽屉，375/430/768/1024/1440/1920 六档均验证无页面横向溢出；长名称使用截断/换行策略，大量 tags 受有界容器保护。Earth/Map、磁盘预测与高级工具不属于本轮，没有显示无效开关。
+
+## 第 8 轮完成边界
+
+第 8 轮只在当前首页数据流上增加 Earth/Map 和高级工具。`EarthMap.vue` 提供 realistic、cobe、tiled 三种纯前端视觉，并以真实 `region` 聚合、选择节点；`AdvancedTools.vue` 提供健康摘要、分币种性价比、当前快照 JSON/CSV 和分类拓扑。健康历史只使用列表端已加载的真实 Ping/Loss 窗口，不调用逐节点 History；快照不包含 JWT、Turnstile 或管理数据；客户端导出二次口令是确认步骤而非安全边界；Audit Log 没有公开端点，保持隐藏。设置层仍为原 48 项三层架构，没有引入新的持久化协议。

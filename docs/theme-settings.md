@@ -4,7 +4,7 @@
 
 共审计 **48** 个设置：**✅ 1:1 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
 
-## 第 7 轮落地范围
+## 第 7 至 8 轮落地范围
 
 第 6 轮建立的 48 项版本化 schema、defaults → backend → local 三层架构与唯一 store 保持不变。第 7 轮新增 `src/domain/theme-presentation.ts`，把总览卡片、快捷控制、列表厂商别名、预警条件、详情卡片和图表族选择集中为纯领域选择器；组件仍只消费 normalized model，不读取 CFSM wire 字段。
 
@@ -12,7 +12,7 @@
 
 设置页现已开放并真实兑现总览卡片预设 / 自定义 keys、五套快捷控制方案、列表 metadata 与 provider aliases、高负载 / 流量 / 到期阈值、详情卡片预设 / 自定义 keys、图表预设 / 自定义指标族以及 GPU 图表开关。不可用 key 在领域注册表边界被忽略；字段存在但当前节点没有数据时对应卡片或序列自动收起。
 
-Earth/Map、磁盘耗尽预测与高级工具仍需要独立数据/交互轮次，因此继续只迁移和往返其配置值，不显示伪开关。`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。
+第 8 轮继续复用同一 48 项 schema 与保存协议，并启用 `earthRenderer`、`stopEarth`、`hideEarth`、`homeToolsEnabled` 和 `exportSecondaryPassword` 的实际界面。Earth 只按显式 region 的国家/地区中心放点；高级工具只在 `/api/config.authorization === true` 时显示，并消费首页已加载的 normalized snapshot。导出二次口令只提供客户端确认，不宣称后端安全边界。磁盘耗尽预测仍等待独立轮次；`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。
 
 首页快捷控制八个 key 均有实际行为：`favorite`、`offline`、`highLoad`、`expiring` 过滤当前结果；`totalTraffic`、`upload`、`download`、`peak` 使用真实指标排序。流量预警只接受数字（按 CFSM 当前管理端语义视为 GiB）或带 B/KiB/MiB/GiB/TiB 单位的可靠上限，并按 `traffic_calc_type` 的 dl/ul/max/total 语义计算；无法解析时不计入预警。
 
@@ -37,9 +37,9 @@ Earth/Map、磁盘耗尽预测与高级工具仍需要独立数据/交互轮次�
 | 6 | `alertEnabled` | switch / `false` | 存于 theme_options，控制首页公告 | ✅ 1:1 |
 | 7 | `alertTitle` | string / 空 | 存于 theme_options | ✅ 1:1 |
 | 8 | `alertContent` | richtext / 空 | 支持受限 Markdown 渲染并做 XSS 清理 | ✅ 1:1 |
-| 9 | `stopEarth` | switch / `false` | 控制前端地球动画 | ✅ 1:1 |
-| 10 | `earthRenderer` | select / `realistic` | 保留 realistic/cobe/tiled | ✅ 1:1 |
-| 11 | `hideEarth` | switch / `false` | 控制首页视觉区 | ✅ 1:1 |
+| 9 | `stopEarth` | switch / `false` | 控制 realistic/cobe 动画；tiled 本身不旋转 | ✅ 1:1 |
+| 10 | `earthRenderer` | select / `realistic` | 已实现 realistic/cobe/tiled 三种可区分渲染 | ✅ 1:1 |
+| 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 1:1 |
 | 12 | `hideGeneralCard` | switch / `false` | 控制头部/总览区 | ✅ 1:1 |
 | 13 | `visitorInfoEnabled` | switch / `true` | CFSM 公开主题 API 不提供访客 IP 或审计能力；强制关闭 | 🔴 不支持 |
 | 14 | `glassColorPreset` | select / `翡翠` | 保留翡翠/柔和/高对比/午夜/自定义 | ✅ 1:1 |
@@ -47,11 +47,11 @@ Earth/Map、磁盘耗尽预测与高级工具仍需要独立数据/交互轮次�
 | 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 1:1 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |
 | 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 可用 keys 保留；虚拟化、精确配额等缺失项不展示 | 🟡 降级 |
-| 19 | `homeToolsEnabled` | switch / `true` | 只显示可由真实 CFSM 数据支持的健康、价值、导出等工具 | 🟡 降级 |
+| 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
 | 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 1:1 |
 | 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段 | ✅ 1:1 |
 | 22 | `providerAliases` | string / 空 | 仅匹配 name/group/tags/region 中真实文本，不做 IP Geo 猜测 | 🟢 等价 |
-| 23 | `exportSecondaryPassword` | string / 空 | 保留客户端导出二次确认；不宣称后端安全边界 | ✅ 1:1 |
+| 23 | `exportSecondaryPassword` | string / 空 | 已用于客户端导出二次确认；不宣称后端安全边界 | ✅ 1:1 |
 | 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 1:1 |
 | 25 | `homeQuickControlsEnabled` | switch / `true` | 保留快捷控制区 | ✅ 1:1 |
 | 26 | `homeQuickControlPreset` | select / `完整` | 保留基础/流量/运维/完整/自定义 | ✅ 1:1 |

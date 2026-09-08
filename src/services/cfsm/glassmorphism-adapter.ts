@@ -88,6 +88,20 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
         packetLoss,
       }]
     }),
+    history: {
+      latencySamples: server.latencyWindow.flatMap((sample) => (
+        latencyCarrierKeys().flatMap((carrier) => {
+          const value = sample[carrier]
+          return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : []
+        })
+      )),
+      packetLossSamples: server.packetLossWindow.flatMap((sample) => (
+        latencyCarrierKeys().flatMap((carrier) => {
+          const value = sample[carrier]
+          return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : []
+        })
+      )),
+    },
     gpus: server.gpus.map((gpu) => ({
       id: gpu.id,
       name: gpu.name,

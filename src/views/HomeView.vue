@@ -2,8 +2,10 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
+import AdvancedTools from '@/components/dashboard/AdvancedTools.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
+import EarthMap from '@/components/dashboard/EarthMap.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
@@ -55,6 +57,9 @@ const visibleAdminUrl = computed(() => (
   theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
     ? null
     : app.administrationUrl
+))
+const showAdvancedTools = computed(() => (
+  theme.runtime.homeToolsEnabled && app.config?.authorization === true
 ))
 const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMetadataFields))
 const providerAliases = computed(() => parseProviderAliases(theme.runtime.providerAliases))
@@ -331,7 +336,23 @@ onUnmounted(() => realtime.stop())
         </template>
 
         <template v-else>
+          <EarthMap
+            v-if="!theme.runtime.hideEarth"
+            :servers="glassServers"
+            :renderer="theme.runtime.earthRenderer"
+            :stopped="theme.runtime.stopEarth"
+            @select="openServer"
+          />
+
           <OverviewCards v-if="!theme.runtime.hideGeneralCard" :servers="glassServers" :settings="theme.runtime" />
+
+          <AdvancedTools
+            v-if="showAdvancedTools"
+            :servers="glassServers"
+            :settings="theme.runtime"
+            :site-title="siteTitle"
+            @select="openServer"
+          />
 
           <div
             v-if="serverStore.state === 'error'"

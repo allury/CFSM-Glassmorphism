@@ -18,6 +18,11 @@ export interface GlassGpuMetric {
   utilization: number | null
 }
 
+export interface GlassHistorySummary {
+  latencySamples: number[]
+  packetLossSamples: number[]
+}
+
 export interface GlassServer {
   key: string
   id: string
@@ -58,6 +63,7 @@ export interface GlassServer {
   tcpConnections: number | null
   udpConnections: number | null
   latency: GlassLatencyMetric[]
+  history: GlassHistorySummary
   gpus: GlassGpuMetric[]
   connectivity: {
     ipv4: Reachability
