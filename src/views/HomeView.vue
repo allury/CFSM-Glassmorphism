@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import AdvancedTools from '@/components/dashboard/AdvancedTools.vue'
@@ -9,7 +10,6 @@ import EarthMap from '@/components/dashboard/EarthMap.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
-import ServerQuickView from '@/components/dashboard/ServerQuickView.vue'
 import {
   ALL_GROUPS,
   availableGroups,
@@ -28,6 +28,7 @@ import {
 import { createGlassServerMapper } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
+import { useDashboardViewStore } from '@/stores/dashboard-view'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
@@ -42,12 +43,11 @@ const theme = useThemeSettingsStore()
 const router = useRouter()
 const glassServerMapper = createGlassServerMapper()
 
-const query = ref('')
-const selectedGroup = ref(ALL_GROUPS)
-const sort = ref<DashboardSort>('order')
+// 首页浏览状态放在会话级 store 中，保证「首页 → 详情 → 返回首页」后
+// 搜索词、分组、排序与快捷筛选保持不变，不需要刷新或重新筛选。
+const viewState = useDashboardViewStore()
+const { query, selectedGroup, sort, activeQuickFilter } = storeToRefs(viewState)
 const refreshing = ref(false)
-const activeQuickFilter = ref<QuickControlKey | null>(null)
-const selectedServerKey = ref<string | null>(null)
 const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
   '--node-item-delay': `${index * 34}ms`,
 }))
@@ -65,6 +65,17 @@ const visibleAdminUrl = computed(() => (
 const showAdvancedTools = computed(() => (
   theme.runtime.homeToolsEnabled && app.config?.authorization === true
 ))
+const isDark = computed(() => theme.resolvedTheme === 'dark')
+// 与 Komari NodeGeneralCards 一致：Earth 与总览卡片同处一个栅格容器。
+// 球体渲染器在桌面端占右半、卡片占左半；tiled 则卡片在上、整幅地图在下。
+const showEarth = computed(() => !theme.runtime.hideEarth)
+const showGeneralCards = computed(() => !theme.runtime.hideGeneralCard)
+const isTiledEarth = computed(() => showEarth.value && theme.runtime.earthRenderer === 'tiled')
+const showGeneralStage = computed(() => showEarth.value || showGeneralCards.value)
+const generalStageClass = computed(() => {
+  if (!showEarth.value) return 'general-stage--cards-only'
+  return isTiledEarth.value ? 'general-stage--tiled' : 'general-stage--globe'
+})
 const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMetadataFields))
 const providerAliases = computed(() => parseProviderAliases(theme.runtime.providerAliases))
 const quickControlKeys = computed(() => resolveQuickControlKeys(theme.runtime))
@@ -101,9 +112,6 @@ const quickCounts = computed<Partial<Record<QuickControlKey, number>>>(() => ({
   highLoad: glassServers.value.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold)).length,
   expiring: glassServers.value.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
 }))
-const selectedServer = computed(() => (
-  glassServers.value.find((server) => server.key === selectedServerKey.value) ?? null
-))
 const isDenseCollection = computed(() => visibleServers.value.length >= 30)
 const showSource = computed(() => (
   app.apiBases.length > 1 || serverStore.collections.length > 1
@@ -162,16 +170,12 @@ async function refresh(): Promise<void> {
   realtime.sync()
 }
 
+/**
+ * 与 Komari 的 NodeCard / NodeList 主路径一致：卡片或列表行的主点击直接进入节点详情，
+ * 中间不插入快速预览、二次确认或任何其它中间层。
+ * 多 apiBase 场景必须带上该节点的 owning source，避免把节点解析到错误的后端。
+ */
 function openServer(server: GlassServer): void {
-  selectedServerKey.value = server.key
-}
-
-function closeServer(): void {
-  selectedServerKey.value = null
-}
-
-function viewServerDetails(server: GlassServer): void {
-  closeServer()
   void router.push({
     name: 'server-detail',
     params: { id: server.id },
@@ -340,15 +344,27 @@ onUnmounted(() => realtime.stop())
         </template>
 
         <template v-else>
-          <EarthMap
-            v-if="!theme.runtime.hideEarth"
-            :servers="glassServers"
-            :renderer="theme.runtime.earthRenderer"
-            :stopped="theme.runtime.stopEarth"
-            @select="openServer"
-          />
+          <section
+            v-if="showGeneralStage"
+            class="general-stage"
+            :class="generalStageClass"
+          >
+            <EarthMap
+              v-if="showEarth"
+              class="general-stage__earth"
+              :servers="glassServers"
+              :renderer="theme.runtime.earthRenderer"
+              :stopped="theme.runtime.stopEarth"
+              :is-dark="isDark"
+            />
 
-          <OverviewCards v-if="!theme.runtime.hideGeneralCard" :servers="glassServers" :settings="theme.runtime" />
+            <OverviewCards
+              v-if="showGeneralCards"
+              class="general-stage__cards"
+              :servers="glassServers"
+              :settings="theme.runtime"
+            />
+          </section>
 
           <AdvancedTools
             v-if="showAdvancedTools"
@@ -404,7 +420,7 @@ onUnmounted(() => realtime.stop())
               <p>请调整搜索词或分组筛选。</p>
               <button
                 type="button"
-                @click="query = ''; selectedGroup = ALL_GROUPS"
+                @click="viewState.clearFilters()"
               >
                 清除筛选
               </button>
@@ -477,15 +493,5 @@ onUnmounted(() => realtime.stop())
         <span>Glassmorphism Theme · {{ realtimeLabel }}</span>
       </footer>
     </div>
-
-    <ServerQuickView
-      :open="selectedServer !== null"
-      :server="selectedServer"
-      :favorite="selectedServer ? preferences.isFavorite(selectedServer.key) : false"
-      :show-source="showSource"
-      @close="closeServer"
-      @toggle-favorite="selectedServer && preferences.toggleFavorite(selectedServer.key)"
-      @view-details="selectedServer && viewServerDetails(selectedServer)"
-    />
   </div>
 </template>

@@ -1,5 +1,21 @@
 # 视觉与响应式验证
 
+## 第 9.5 轮：1:1 高保真收敛
+
+第 9.5 轮以原 Komari Glassmorphism（`bf83765`，v3.3.7）源码为唯一权威基准做表现层收敛，逐项差异见 `docs/fidelity-audit.md`。
+
+已恢复并锁定的 Komari 真实行为：
+
+- **Earth 三套渲染器互不退化**：realistic 走 `globe.gl` + `three`（原贴图、bump/specular、atmosphere、点与环、四光源、自转与阻尼、resize、可见性暂停），cobe 走真实 `cobe`（RAF、指针拖拽、theta 钳制、静态重绘窗口、标签球面投影），tiled 为独立渲染器（真实贴图三层叠加、等距投影、图例四级密度、移动端横向滚动）。`tests/fidelity-contract.test.ts` 断言三者不得含手绘 SVG 剪影、不得互相复用。
+- **Earth 与总览同栅格**：桌面球体右半 / 卡片左半同一行，移动端卡片负边距上移叠加，tiled 改为卡片在上、地图在下；由 `general-stage` 样式与契约测试锁定。
+- **主点击路径**：节点卡片与列表行点击直达 `/#/server/:id`（携带 owning `source`），`ServerQuickView` 强制中间层已删除；收藏等独立控件仍 `stopPropagation`，不触发导航。
+- **首页往返**：`首页 → 详情 → 返回首页`保持搜索、分组、排序与快捷筛选，并由路由 `savedPosition` 恢复滚动位置，无需刷新。
+- **旗帜**：使用 CFSM 默认皮肤的 `/flags/<code>.svg`（小写），缺失时静默隐藏，不打包进主题。
+
+响应式与产物：六档断点结构仍由 `tests/responsive-contract.test.ts` 锁定；三个渲染器沿用 Komari 自身的断点与移动端行为（tiled 在 640px 以下保留 `min-width: 42rem` 的横向滚动容器，滚动被限制在地图容器内，不产生页面级横向溢出）。`bun run validate:dist` 实测 2281.6 KiB JS、78.8 KiB CSS、5275.8 KiB 总资源，dist 根仅 `index.html` 与 `assets/`。
+
+未完成项（不得视为已对齐）：总览卡片结构与财务明细弹窗、NodeCard/NodeList 内部 DOM、echarts 图表族、详情页信息层级、图标体系与 UI 基元、间距/圆角/阴影逐项校准、`.quick-view*` 死 CSS 清理 —— 均记录在 `docs/fidelity-audit.md`。
+
 ## 第 9 轮复验
 
 第 9 轮为性能、稳定性与异常收敛，未改动首页布局、Header/Footer、节点卡片结构、Card/List 点击路径、详情视觉结构、Earth/Map 渲染方式、弹窗/抽屉与主要动画；`shallowRef`、`createGlassServerMapper()` WeakMap 缓存、`v-memo` 与预计算动画延迟均只降低重算开销，不改变可见 DOM 结构或渲染输出，因此不存在需要更新的截图/像素基线。

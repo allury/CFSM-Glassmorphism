@@ -4,10 +4,21 @@ import { resolve } from 'node:path'
 const projectRoot = resolve(import.meta.dirname, '..')
 const distRoot = resolve(projectRoot, 'dist')
 const expectedRootEntries = ['assets', 'index.html']
+/*
+ * 发布体积预算。
+ *
+ * 第 9 轮的预算（JS 512 KiB / 总资源 768 KiB）建立在当时的单一 SVG 地图之上。
+ * 第 9.5 轮按 1:1 高保真要求恢复了 Komari 的三套真实 Earth 渲染器，
+ * globe.gl 与 three 是 realistic 渲染器本身的实现依赖，原主题地球贴图是它和
+ * tiled 地图的真实素材 —— 都不允许为了压体积换成 SVG 仿制。
+ *
+ * 因此预算按真实构成重设，仍保持「只留合理余量」以继续拦截意外膨胀：
+ * globe.gl 与 three 只在选用 realistic 渲染器时按需懒加载，不进入首屏包。
+ */
 const sizeBudgets = {
-  javascript: 512 * 1024,
+  javascript: 2816 * 1024,
   stylesheet: 128 * 1024,
-  allAssets: 768 * 1024,
+  allAssets: 6144 * 1024,
 }
 const forbiddenRuntimeMarkers = [
   '/api/public',
@@ -17,9 +28,16 @@ const forbiddenRuntimeMarkers = [
   '/rpc2',
   '/manage/',
   'Komari RPC',
-  'common:',
-  'public:',
-  'admin:',
+]
+
+/*
+ * Komari 的 RPC 命名空间只有作为字符串字面量被调用时才算运行时残留。
+ * 裸的 `common:` / `public:` 会误伤第三方库的对象字面量 —— 例如 three.js 的
+ * shader chunk 表就包含 `common:S_`。因此这里要求命名空间前必须是引号，
+ * 既能拦住 `"common:getRecords"` 这类真实调用，又不会误判依赖内部结构。
+ */
+const forbiddenRuntimePatterns = [
+  /['"`](?:common|public|private|admin):[a-z][a-zA-Z]/,
 ]
 
 async function collectFiles(directory) {
@@ -71,6 +89,10 @@ for (const file of textFiles) {
   const content = await readFile(file, 'utf8')
   const marker = forbiddenRuntimeMarkers.find((item) => content.includes(item))
   if (marker) throw new Error('Forbidden Komari runtime marker ' + marker + ' found in ' + file)
+  const pattern = forbiddenRuntimePatterns.find((item) => item.test(content))
+  if (pattern) {
+    throw new Error('Forbidden Komari RPC namespace ' + String(pattern) + ' found in ' + file)
+  }
 }
 
 console.log(

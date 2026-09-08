@@ -31,6 +31,16 @@
 
 第 9 轮不新增功能、不改动上表任何状态，只在既有实现上做性能、稳定性、异常与测试收敛：统一 server ID 白名单校验并在请求前拦截非法 id；错误分类补齐 `forbidden`(403) 与 `server-error`(5xx)；WebSocket 重连退避改为连接稳定 10 秒后才归零，抑制 open→立即断开的重连风暴；首页大规模节点改用 `shallowRef` 与 WeakMap 缓存的 `GlassServer` 映射、列表行 `v-memo`、预计算动画延迟，降低 50+ 节点实时更新的重算开销；dist 校验新增 JS/CSS/总资源体积预算。历史陈旧响应/并发切换经核验由控件禁用 + `revision`/AbortController 保护，未改动代码。上述改动均不影响数据真实性边界与视觉结构。
 
+## 第 9.5 轮实现进度
+
+第 9.5 轮为 1:1 高保真收敛，不改变任何 CFSM 数据能力，因此下表功能可行性状态不变；但两项状态的**实现方式**已向 Komari 对齐：
+
+- 「三种地球渲染器」由手绘 SVG 仿制改为 Komari 真实实现（globe.gl + three / cobe / 真实贴图等距地图），仍为 ✅ 1:1。
+- 「地球节点定位」仍是 🟡 降级实现：CFSM 只有 `region`，仅做国家/地区级定位，不猜测城市、不查外部 IP Geo。
+- 节点卡片与列表点击恢复为 Komari 的直达详情路径，`ServerQuickView` 中间层已移除。
+
+逐项高保真差异与未完成的 P1/P2 见 `docs/fidelity-audit.md`。
+
 ## 矩阵
 
 | 功能 | 原 Komari 实现 | CFSM 数据/API | 处理方式 | 状态 |

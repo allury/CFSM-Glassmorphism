@@ -1,3 +1,13 @@
+> **第 9.5 轮追加的最高 UI/UX 原则（由项目所有者下达）：**
+>
+> 原 Komari Glassmorphism 当前默认分支中的真实代码、组件、样式、布局、动画、路由行为与浏览器表现，是正式版 UI/UX 的**唯一权威基准**。
+>
+> 当前 CFSM-Glassmorphism 的既有实现只代表"已经实现的 CFSM 功能"，**不代表最终视觉设计真相**，也不是不可修改的兼容基线。二者不一致时，除本文件与 `docs/fidelity-audit.md` 列出的 CFSM 必要平台差异外，一律向 Komari 对齐。
+>
+> 不得以"UX 更好""更适合 CFSM""代码更简单""减少依赖"或"为了通过测试"为由偏离原主题，也不得把 Komari 真实使用的 renderer 替换为 SVG/CSS 仿制。
+>
+> 逐项差异审计记录在 `docs/fidelity-audit.md`。
+
 # CFSM-Glassmorphism 完整移植任务
 
 ## 0. 目标仓库

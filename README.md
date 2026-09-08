@@ -55,3 +55,8 @@ The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contai
 - docs/architecture.md: target layers and data flow.
 - docs/theme-settings.md: all 48 upstream settings and their CFSM disposition.
 - docs/visual-validation.md: current breakpoint, renderer and interaction verification.
+- docs/fidelity-audit.md: item-by-item comparison against upstream Komari Glassmorphism, with P0/P1/P2 priorities.
+
+## UI authority
+
+Komari Glassmorphism is the single source of truth for the released UI and UX. The existing implementation here records which CFSM features already work; it is not the visual truth. Differences are aligned to Komari unless they are required CFSM platform differences, and every audited difference is tracked in docs/fidelity-audit.md. The three Earth renderers are the upstream implementations (globe.gl + three, cobe, and the real tiled earth map) rather than imitations; three and globe.gl load lazily and only for the realistic renderer.

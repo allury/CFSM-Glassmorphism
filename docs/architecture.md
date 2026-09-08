@@ -182,3 +182,16 @@ server click -> its source -> detail/history/ws
 - **历史陈旧响应 / 并发切换**：详情 hours 切换控件在 `historyState === 'loading'` 时禁用，配合 store 内 `revision` 版本号与 AbortController，保证同一节点上不会并发触发历史请求、详情切换会取消在途请求，乱序陈旧响应不会写回。本轮经核验此前已妥善处理，未改动相关代码。
 
 与原 Komari Glassmorphism 的高保真视觉差异如在本轮发现，仅记录、留待第 9.5 轮，不在第 9 轮修改。
+
+## 第 9.5 轮完成边界
+
+第 9.5 轮把表现层向原 Komari Glassmorphism 收敛，不推翻既有 CFSM 数据层、适配层、实时层、History、Theme Settings、多 API Base 与构建体系；UI 继续只消费 normalized model，不重新解析 wire payload。Komari 是正式版 UI/UX 唯一权威基准，逐项差异见 `docs/fidelity-audit.md`。
+
+- **Earth 恢复三套真实渲染器**：`EarthMap.vue` 变为与 Komari `NodeEarthGlobe.vue` 等价的懒加载分发器，分发到 `NodeEarthRealisticGlobe.vue`（globe.gl + three）、`NodeEarthCobeGlobe.vue`（cobe）与 `NodeEarthTiledMap.vue`（真实贴图等距地图）。三者互不退化为 SVG 仿制。`three` 与 `globe.gl` 只在选用 realistic 时动态 import，不进首屏包。
+- **定位来源仍受数据真实性约束**：新增 `src/composables/useServerGeoClusters.ts` 复用 `buildEarthPoints`，只接受可可靠归一化的 `region` 并聚合到国家/地区中心；不做外部 IP Geo 查询，无法定位的节点不打点。旗帜按 `theme-develop.md` 使用 CFSM 默认皮肤的 `/flags/<code>.svg`，不打包进主题。
+- **Earth 与总览合为一个栅格**：`general-stage` 复刻 Komari `NodeGeneralCards` 的布局契约——球体渲染器在桌面端占右半、总览卡片占左半同一行，移动端卡片负边距上移叠加；tiled 改为卡片在上、整幅地图在下。
+- **主点击路径直达详情**：移除 `ServerQuickView` 强制中间层（组件已删除），节点卡片与列表行点击直接进入 `/#/server/:id` 并携带 owning `source`；收藏等独立控件保持 `stopPropagation`，多 apiBase 归属不变。
+- **首页往返状态**：新增会话级 `src/stores/dashboard-view.ts` 承载搜索、分组、排序与快捷筛选，`首页 → 详情 → 返回首页`不再重置；路由新增 `scrollBehavior` 以 `savedPosition` 恢复滚动位置。视图模式仍由主题设置层单独拥有，避免同一外观状态有两个写入者。
+- **发布护栏按真实构成重设**：`validate:dist` 体积预算改为 JS 2816 KiB / CSS 128 KiB / 总资源 6144 KiB；Komari RPC 残留扫描由裸 `common:` 收紧为字符串字面量正则，避免误判 three.js shader chunk 等第三方内部结构。
+
+本轮未完成的 P1/P2（总览卡片结构、NodeCard/NodeList 内部结构、echarts 图表族、详情页层级、图标与 UI 基元、间距校准、死 CSS 清理）在 `docs/fidelity-audit.md` 中逐条列出，不得视为已对齐。
