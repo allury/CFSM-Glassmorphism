@@ -121,8 +121,15 @@ jobs:
           git add -A
           git commit -m "chore: publish ${GITHUB_REF_NAME} theme build for the CFSM theme store"
           git tag "$theme_tag"
-          git push origin theme-dist
           git push origin "$theme_tag"
+
+          # 预发布版本只发布不可变的 theme-<tag>，不推进 theme-dist——
+          # 那条滚动分支代表「最新稳定版」，测试版不应改变它指向的内容。
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            echo "Pre-release $GITHUB_REF_NAME: leaving theme-dist untouched."
+          else
+            git push origin theme-dist
+          fi
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -158,9 +165,23 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match package version $package_version" >&2
             exit 1
           fi
-          release_file="CFSM-Glassmorphism-${package_version}.zip"
+          release_file="CFSM-Glassmorphism-${GITHUB_REF_NAME}.zip"
           mv "${{ needs.verify.outputs.artifact-name }}" "$release_file"
           echo "file=$release_file" >> "$GITHUB_OUTPUT"
+
+          # 带连字符的语义化版本（例如 1.1.0-test.1）按预发布处理：
+          # 标记为 pre-release，且不抢占 Latest。
+          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
+          if [[ ! -f "$notes_file" ]]; then
+            echo "Missing release notes: $notes_file" >&2
+            exit 1
+          fi
+          echo "notes=$notes_file" >> "$GITHUB_OUTPUT"
+          if [[ "$package_version" == *-* ]]; then
+            echo "flags=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "flags=--latest" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Publish GitHub Release
         env:
@@ -169,6 +190,6 @@ jobs:
           gh release create "$GITHUB_REF_NAME"
           "${{ steps.release.outputs.file }}#CFSM Glassmorphism theme archive"
           --verify-tag
-          --latest
+          ${{ steps.release.outputs.flags }}
           --title "CFSM Glassmorphism $GITHUB_REF_NAME"
-          --notes-file docs/releases/v1.0.0.md
+          --notes-file "${{ steps.release.outputs.notes }}"

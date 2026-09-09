@@ -10,6 +10,7 @@ import EarthMap from '@/components/dashboard/EarthMap.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import {
   ALL_GROUPS,
   availableGroups,
@@ -228,14 +229,28 @@ onUnmounted(() => realtime.stop())
         :source-count="sourceCount"
         :admin-url="visibleAdminUrl"
         :theme-mode="theme.runtime.themeMode"
-        :tools-available="advancedToolsAvailable"
-        :tools-visible="showAdvancedTools"
         @refresh="refresh"
         @cycle-theme="theme.cycleTheme"
-        @toggle-tools="advancedToolsVisible = !advancedToolsVisible"
       />
 
       <main class="dashboard">
+        <!-- 与 Komari 一致：公告位于总览与节点区之前，是首页第一块内容。 -->
+        <section
+          v-if="theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
+          class="theme-announcement glass-panel"
+          role="status"
+        >
+          <span class="theme-announcement__mark" aria-hidden="true">
+            <AppIcon name="lucide:info" :size="16" />
+          </span>
+          <div>
+            <strong>{{ theme.runtime.alertTitle || '站点公告' }}</strong>
+            <p v-if="theme.runtime.alertContent">
+              {{ theme.runtime.alertContent }}
+            </p>
+          </div>
+        </section>
+
         <div
           v-if="app.state === 'error'"
           class="notice notice--warning"
@@ -259,20 +274,6 @@ onUnmounted(() => realtime.stop())
             <template v-if="failure.status">（HTTP {{ failure.status }}）</template>
           </span>
         </div>
-
-        <section
-          v-if="theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
-          class="theme-announcement glass-panel"
-          role="status"
-        >
-          <span class="theme-announcement__mark" aria-hidden="true">i</span>
-          <div>
-            <strong>{{ theme.runtime.alertTitle || '站点公告' }}</strong>
-            <p v-if="theme.runtime.alertContent">
-              {{ theme.runtime.alertContent }}
-            </p>
-          </div>
-        </section>
 
         <div
           v-if="realtime.timedOut"
@@ -401,15 +402,16 @@ onUnmounted(() => realtime.stop())
             <DashboardControls
               v-model:query="query"
               v-model:group="selectedGroup"
-              v-model:sort="sort"
               v-model:view-mode="viewMode"
               :groups="groups"
-              :result-count="visibleServers.length"
               :quick-controls-enabled="theme.runtime.homeQuickControlsEnabled"
               :quick-control-keys="quickControlKeys"
               :quick-counts="quickCounts"
               :active-quick-filter="activeQuickFilter"
+              :tools-available="advancedToolsAvailable"
+              :tools-visible="showAdvancedTools"
               @quick-action="quickAction"
+              @toggle-tools="advancedToolsVisible = !advancedToolsVisible"
             />
 
             <div
@@ -428,10 +430,9 @@ onUnmounted(() => realtime.stop())
             </div>
 
             <div
-              v-else-if="viewMode !== 'list'"
+              v-else-if="viewMode === 'card'"
               :class="[
                 'server-grid',
-                `server-grid--${viewMode}`,
                 `server-grid--size-${theme.runtime.nodeCardSize}`,
                 { 'server-grid--dense': isDenseCollection },
               ]"
@@ -441,7 +442,7 @@ onUnmounted(() => realtime.stop())
                 :key="server.key"
                 :server="server"
                 :show-source="showSource"
-                :density="viewMode"
+                :density="theme.runtime.nodeCardSize"
                 :favorite="preferences.isFavorite(server.key)"
                 :high-load-threshold="theme.runtime.homeHighLoadThreshold"
                 :price-visible="priceVisible"

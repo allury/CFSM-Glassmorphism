@@ -1,8 +1,80 @@
+/*
+ * Signal 色阶：直接取自 Komari `styles/main.css` 的 --signal-1..5，
+ * 亮色、暗色与两套色觉友好变体原样移植，不映射到本主题既有的语义色。
+ * 延迟与丢包柱状图靠这套色阶分级，而不是靠柱子高度表达数值。
+ */
+:root {
+  --signal-1: #059669;
+  --signal-2: #4ade80;
+  --signal-3: #a3e635;
+  --signal-4: #facc15;
+  --signal-5: #f43f5e;
+}
+
+:root[data-theme='dark'] {
+  --signal-1: #10b981;
+  --signal-2: #4ade80;
+  --signal-3: #a3e635;
+  --signal-4: #fde047;
+  --signal-5: #fb7185;
+}
+
+:root[data-color-vision='friendly'] {
+  --signal-1: #0072b2;
+  --signal-2: #56b4e9;
+  --signal-3: #009e73;
+  --signal-4: #e69f00;
+  --signal-5: #d55e00;
+}
+
+:root[data-color-vision='friendly'][data-theme='dark'] {
+  --signal-1: #56b4e9;
+  --signal-2: #9bd7f0;
+  --signal-3: #44c7a0;
+  --signal-4: #e69f00;
+  --signal-5: #f28e5b;
+}
+
+/*
+ * 卡片表面令牌：取自 Komari `[data-slot='card']` 的实际生效值。
+ * 上游用一条 !important 规则统一覆盖了 Tailwind 的 bg-background/50，
+ * 因此总览卡片与节点卡片实际都是 74% 不透明的浅色块加 1px 边框，
+ * 卡片边界清晰可辨——不是接近透明的玻璃。
+ */
+:root {
+  --card-surface: rgb(241 245 249 / 74%);
+  --card-surface-hover: rgb(248 250 252 / 80%);
+  --card-surface-border: rgb(226 232 240 / 68%);
+  --card-surface-shadow: 0 8px 28px rgb(15 23 42 / 18%);
+  --card-surface-shadow-hover: 0 12px 38px rgb(15 23 42 / 20%);
+}
+
+:root[data-theme='dark'] {
+  --card-surface: rgb(10 14 22 / 82%);
+  --card-surface-hover: rgb(10 14 22 / 90%);
+  --card-surface-border: rgb(255 255 255 / 18%);
+  --card-surface-shadow: 0 8px 30px rgb(0 0 0 / 48%);
+  --card-surface-shadow-hover: 0 12px 38px rgb(0 0 0 / 52%);
+}
+
+/* 色觉友好模式下叠加纹理，使等级不只靠颜色区分。 */
+:root[data-color-vision='friendly'] .ping-signal-pattern-2 {
+  background-image: repeating-linear-gradient(135deg, transparent 0 2px, rgb(255 255 255 / 45%) 2px 3px);
+}
+
+:root[data-color-vision='friendly'] .ping-signal-pattern-3 {
+  background-image: repeating-linear-gradient(90deg, transparent 0 2px, rgb(0 0 0 / 28%) 2px 3px);
+}
+
+:root[data-color-vision='friendly'] .ping-signal-pattern-4 {
+  background-image: repeating-linear-gradient(45deg, transparent 0 1px, rgb(255 255 255 / 58%) 1px 2px);
+}
+
 :root {
   color-scheme: light;
+  /* 与 Komari `--font-sans` 一致，以系统字体优先，不强制 Inter。 */
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "Microsoft YaHei", sans-serif;
+    system-ui, -apple-system, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
   --page: #dfe9f4;
   --page-soft: #eef4f9;
   --ink: #101722;
@@ -26,12 +98,16 @@
   --red: #dc4c5a;
   --red-soft: rgb(220 76 90 / 12%);
   --violet: #8467d7;
-  --radius: 18px;
-  --radius-sm: 11px;
+  /* Komari `--radius: 0.625rem`；此前本主题用的 18px 让所有面板明显更圆。 */
+  --radius: 10px;
+  --radius-sm: 6px;
+  /* Komari 的 --selection：激活态强调色（分组标签、视图切换等）。 */
+  --selection: oklch(0.55 0.15 155);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+  --selection: oklch(0.74 0.17 162);
   --page: #070b12;
   --page-soft: #0b111b;
   --ink: #f2f6fb;
@@ -659,19 +735,20 @@ a {
   justify-content: space-between;
   gap: 4px;
   padding: 12px;
-  border: 0;
-  /* Komari CardX 使用 rounded-xl（12px）。 */
+  /* Komari CardX 使用 rounded-xl（12px），表面为 74% 不透明的浅色块。 */
+  border: 1px solid var(--card-surface-border);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--glass) 50%, transparent);
+  background: var(--card-surface);
+  box-shadow: var(--card-surface-shadow);
   transition: background-color 170ms ease, box-shadow 170ms ease;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
 }
 
 .overview-card:hover {
   z-index: 2;
-  background: var(--glass-hover);
-  box-shadow: var(--shadow-soft);
+  background: var(--card-surface-hover);
+  box-shadow: var(--card-surface-shadow-hover);
 }
 
 .overview-card__head {
@@ -770,19 +847,57 @@ a {
   margin-bottom: 16px;
 }
 
-.dashboard-controls__filters {
-  display: flex;
+/* 与 Komari 的 home-controls-scroll 一致：分组与快捷控制整体横向滚动。 */
+.dashboard-controls__scroll {
   min-width: 0;
   flex: 1 1 auto;
-  align-items: center;
-  gap: 8px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
+  border-radius: 6px;
   scrollbar-width: none;
+  touch-action: pan-x;
 }
 
-.dashboard-controls__filters::-webkit-scrollbar {
+.dashboard-controls__scroll::-webkit-scrollbar {
   display: none;
+}
+
+.dashboard-controls__scroll-inner {
+  display: flex;
+  width: max-content;
+  align-items: center;
+  gap: 8px;
+}
+
+.tool-switch {
+  display: flex;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--glass-soft);
+  backdrop-filter: blur(16px);
+}
+
+.tool-switch button {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+
+.tool-switch button:hover,
+.tool-switch button.is-active {
+  color: var(--selection);
+  background: var(--glass-strong);
 }
 
 .group-tabs,
@@ -825,20 +940,24 @@ a {
 .group-tabs .app-tabs__trigger:hover,
 .quick-controls button:hover,
 .quick-controls button.is-active,
-.view-switch button:hover,
-.view-switch button.is-active {
+.view-switch button:hover {
   color: var(--ink);
   background: var(--glass-strong);
   box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
 }
 
-.group-tabs .app-tabs__trigger[data-state='active'] {
-  color: var(--emerald);
+.view-switch button.is-active {
+  color: var(--selection);
   background: var(--glass-strong);
   box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
 }
 
-.dashboard-controls__filters,
+.group-tabs .app-tabs__trigger[data-state='active'] {
+  color: var(--selection);
+  background: var(--glass-strong);
+  box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
+}
+
 .dashboard-controls__actions,
 .quick-controls {
   display: flex;
@@ -896,9 +1015,7 @@ a {
 }
 
 .search-field,
-.select-field,
-.view-switch,
-.result-count {
+.view-switch {
   border: 1px solid var(--glass-border);
   background: var(--glass-soft);
   backdrop-filter: blur(16px);
@@ -947,40 +1064,6 @@ a {
   color: var(--faint);
 }
 
-.select-field {
-  height: 32px;
-  border: 0;
-  border-radius: 6px;
-}
-
-.select-field select {
-  height: 100%;
-  padding: 0 28px 0 10px;
-  border: 0;
-  outline: 0;
-  color: var(--muted);
-  background: transparent;
-  font-size: 11px;
-  cursor: pointer;
-}
-
-.select-field option {
-  color: var(--ink);
-  background: var(--page-soft);
-}
-
-.result-count {
-  display: grid;
-  min-width: 50px;
-  height: 32px;
-  place-items: center;
-  border: 0;
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-}
-
 .view-switch {
   display: flex;
   height: 32px;
@@ -1001,24 +1084,28 @@ a {
   line-height: 1;
 }
 
+/*
+ * 节点网格对齐 Komari 的 nodeCardGridClass：
+ * 单列起步，640px（sm）以上才按卡片密度 auto-fill；
+ * 宽度 mini 270 / compact 300 / comfortable 360 / large 420，
+ * gap 依次为 12 / 12 / 16 / 20。
+ */
 .server-grid,
 .skeleton-grid {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
 }
 
-.server-grid--card,
-.skeleton-grid {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
+@media (min-width: 640px) {
+  .server-grid--size-mini {
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+  }
 
-.server-grid--compact {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
-.server-grid--mini {
-  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
-  gap: 12px;
+  .server-grid--size-compact,
+  .skeleton-grid {
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  }
 }
 
 
@@ -1036,21 +1123,22 @@ a {
   gap: 12px;
   padding: 14px;
   overflow: hidden;
-  border: 1px solid var(--glass-border);
+  border: 1px solid var(--card-surface-border);
   border-radius: 12px;
-  background: var(--glass);
-  box-shadow: var(--shadow-soft);
+  background: var(--card-surface);
+  box-shadow: var(--card-surface-shadow);
   cursor: pointer;
   transition: box-shadow 200ms ease, background-color 200ms ease, transform 200ms ease;
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
   animation: node-enter 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
   animation-delay: var(--node-item-delay, 0ms);
 }
 
 .node-card:hover,
 .node-card:focus-visible {
-  background: var(--glass-hover);
-  box-shadow: var(--shadow);
-  transform: translateY(-2px);
+  background: var(--card-surface-hover);
+  box-shadow: var(--card-surface-shadow-hover);
 }
 
 .node-card--offline {
@@ -1321,6 +1409,10 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * 与 Komari 一致：柱子满高、等宽，数值由 signal 色阶表达。
+ * hover 时整条面板提亮，单根柱纵向放大，和上游的 scale-y-160 一致。
+ */
 .node-probe__bars {
   display: grid;
   min-width: 0;
@@ -1331,15 +1423,37 @@ a {
   opacity: 0.8;
 }
 
+.node-probe:hover .node-probe__bars {
+  opacity: 1;
+}
+
 .node-probe__bars span {
   display: block;
   width: 100%;
+  height: 100%;
   border-radius: 1px;
-  background: var(--blue);
+  transition: transform 150ms ease;
 }
 
-.node-probe__bars--loss span {
-  background: var(--amber);
+.node-probe__bars span:hover {
+  transform: scaleY(1.6);
+}
+
+.node-probe__bars .is-signal-1 { background: var(--signal-1); }
+.node-probe__bars .is-signal-2 { background: var(--signal-2); }
+.node-probe__bars .is-signal-3 { background: var(--signal-3); }
+.node-probe__bars .is-signal-4 { background: var(--signal-4); }
+.node-probe__bars .is-signal-5 { background: var(--signal-5); }
+
+/* 无采样：与上游的 muted-foreground/10 一致的中性占位。 */
+.node-probe__bars .is-empty {
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-probe__bars span:hover {
+    transform: none;
+  }
 }
 
 .node-tags {
@@ -1976,16 +2090,6 @@ a {
     display: none;
   }
 
-  .server-grid--card,
-  .server-grid--compact,
-  .server-grid--mini,
-  .skeleton-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .server-grid--mini {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 
   .node-card--mini .node-metrics {
     grid-template-columns: 1fr;
@@ -2046,10 +2150,6 @@ a {
   .overview-card {
     min-height: 68px;
     padding: 9px;
-  }
-
-  .server-grid--mini {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .node-list__head {
@@ -2896,13 +2996,21 @@ a {
 }
 
 .server-grid--size-comfortable {
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 16px;
 }
 
 .server-grid--size-large {
-  grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
   gap: 20px;
+}
+
+@media (min-width: 640px) {
+  .server-grid--size-comfortable {
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+
+  .server-grid--size-large {
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+  }
 }
 
 .server-grid--size-large .node-card--card {
@@ -3481,11 +3589,6 @@ a {
 }
 
 @media (max-width: 720px) {
-  .server-grid--size-comfortable,
-  .server-grid--size-large {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .settings-header__inner,
   .settings-page {
     width: min(100% - 22px, 1320px);
@@ -3743,7 +3846,7 @@ a {
 }
 
 .advanced-tools__tabs .app-tabs__trigger[data-state='active'] span {
-  color: var(--emerald);
+  color: var(--selection);
 }
 
 .advanced-tools__tabs .app-tabs__trigger > span {

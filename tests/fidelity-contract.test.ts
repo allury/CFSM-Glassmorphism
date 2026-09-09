@@ -151,6 +151,7 @@ describe('Komari fidelity contracts', () => {
   it('keeps the Komari flat node flow and collapses optional tools by default', () => {
     const home = source('../src/views/HomeView.vue')
     const header = source('../src/components/dashboard/AppHeader.vue')
+    const controls = source('../src/components/dashboard/DashboardControls.vue')
     const viewStore = source('../src/stores/dashboard-view.ts')
 
     // 节点直接进入一层卡片/列表，不恢复 CFSM 中间实现的分组容器。
@@ -159,13 +160,90 @@ describe('Komari fidelity contracts', () => {
     expect(home).not.toContain('groupedServers')
     expect(home).not.toContain('server-group')
 
-    // 第 8 轮高级工具能力保留，但按 Komari 首页层级默认收起，由 Header 显式打开。
+    // 第 8 轮高级工具能力保留，但按 Komari 首页层级默认收起。
+    // 第 11 轮把开关从 Header 移到控制区右侧，与上游 homeTools 的位置一致；
+    // Header 只保留站点身份与全局动作。
     expect(viewStore).toContain('const advancedToolsVisible = ref(false)')
     expect(home).toContain('v-if="showAdvancedTools"')
     expect(home).toContain('@toggle-tools="advancedToolsVisible = !advancedToolsVisible"')
-    expect(header).toContain('v-if="toolsAvailable"')
-    expect(header).toContain('@click="$emit(\'toggleTools\')"')
-    expect(header).toContain('<AppIcon name="tabler:tools"')
+    expect(controls).toContain('tool-switch')
+    expect(controls).toContain('<AppIcon name="tabler:tools"')
+    expect(header).not.toContain('toggleTools')
+  })
+
+  /* 第 11 轮：首页 1:1 复刻。 */
+
+  it('encodes ping bars by Komari signal tone instead of bar height', () => {
+    const card = source('../src/components/dashboard/ServerCard.vue')
+    const stylesheet = source('../src/styles/main.css')
+
+    // 上游用 signal-1..5 的颜色分级表达数值，柱子一律满高。
+    for (const threshold of ['latency <= 60', 'latency <= 100', 'latency <= 160', 'latency <= 200']) {
+      expect(card).toContain(threshold)
+    }
+    for (const threshold of ['loss <= 1', 'loss <= 3', 'loss <= 6', 'loss <= 9']) {
+      expect(card).toContain(threshold)
+    }
+    expect(card).toContain('ping-signal-pattern-2')
+    expect(card).toContain('ping-signal-pattern-4')
+    // 无采样时渲染固定数量的中性占位柱，而不是留白。
+    expect(card).toContain('EMPTY_PING_BAR_COUNT = 20')
+    // 柱子高度不再承载数值。
+    expect(card).not.toContain('barHeights')
+    expect(stylesheet).toMatch(/\.node-probe__bars span\s*\{[^}]*height: 100%/s)
+
+    // signal 色阶按上游原样移植，含亮色、暗色与两套色觉友好变体。
+    expect(stylesheet).toContain('--signal-1: #059669')
+    expect(stylesheet).toContain('--signal-5: #f43f5e')
+    expect(stylesheet).toContain("[data-color-vision='friendly']")
+    expect(stylesheet).toContain('--signal-1: #0072b2')
+  })
+
+  it('keeps the home controls to the upstream shape', () => {
+    const controls = source('../src/components/dashboard/DashboardControls.vue')
+    const stylesheet = source('../src/styles/main.css')
+
+    // 视图切换只有卡片与列表两个按钮，卡片密度是主题设置而非首页控件。
+    expect(controls).toContain('tabler:layout-grid')
+    expect(controls).toContain('tabler:table')
+    expect(controls).not.toContain("'compact'")
+    expect(controls).not.toContain("'mini'")
+    // 上游首页没有排序下拉与结果计数。
+    expect(controls).not.toContain('update:sort')
+    expect(controls).not.toContain('select-field')
+    expect(controls).not.toContain('result-count')
+    // 折叠搜索：默认只有图标宽度，聚焦或有内容才展开，并支持 ESC 清空。
+    expect(controls).toContain('searchExpanded')
+    expect(controls).toContain('@keydown.esc.prevent="clearSearch"')
+    expect(stylesheet).toMatch(/\.search-field\s*\{[^}]*width: 32px/s)
+    // 分组与快捷控制整体横向滚动。
+    expect(controls).toContain('dashboard-controls__scroll')
+  })
+
+  it('matches the upstream node grid widths and gaps', () => {
+    const stylesheet = source('../src/styles/main.css')
+
+    // 单列起步，640px 以上才按密度 auto-fill。
+    expect(stylesheet).toMatch(/\.server-grid,\s*\.skeleton-grid\s*\{[^}]*grid-template-columns: minmax\(0, 1fr\)/s)
+    expect(stylesheet).toMatch(/@media \(min-width: 640px\)[\s\S]*?minmax\(270px/)
+    expect(stylesheet).toMatch(/@media \(min-width: 640px\)[\s\S]*?minmax\(300px/)
+    expect(stylesheet).toMatch(/@media \(min-width: 640px\)[\s\S]*?minmax\(360px/)
+    expect(stylesheet).toMatch(/@media \(min-width: 640px\)[\s\S]*?minmax\(420px/)
+    // gap 依次 12 / 12 / 16 / 20。
+    expect(stylesheet).toMatch(/\.server-grid--size-comfortable\s*\{[^}]*gap: 16px/s)
+    expect(stylesheet).toMatch(/\.server-grid--size-large\s*\{[^}]*gap: 20px/s)
+  })
+
+  it('separates the view mode from the card density like upstream', () => {
+    const types = source('../src/types/glassmorphism.ts')
+    const settings = source('../src/theme/settings.ts')
+    const home = source('../src/views/HomeView.vue')
+
+    expect(types).toContain("export type DashboardViewMode = 'card' | 'list'")
+    // 切换 card/list 不得改写用户选择的卡片密度。
+    expect(settings).toContain("return { defaultViewMode: viewMode === 'list' ? 'list' : 'card' }")
+    expect(home).toContain(':density="theme.runtime.nodeCardSize"')
+    expect(home).toContain('`server-grid--size-${theme.runtime.nodeCardSize}`')
   })
 
   /* 第 9.9 轮：表现层深度收敛。 */

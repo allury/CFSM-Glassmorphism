@@ -4,7 +4,11 @@ import type { ThemeMode } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
 
-withDefaults(defineProps<{
+/**
+ * 与 Komari `Header.vue` 一致：只承载站点身份与全局动作。
+ * 首页的高级工具开关属于控制区，不放在 Header 里。
+ */
+defineProps<{
   title: string
   version: string | null
   loading: boolean
@@ -13,17 +17,11 @@ withDefaults(defineProps<{
   sourceCount: number
   adminUrl: string | null
   themeMode: ThemeMode
-  toolsAvailable?: boolean
-  toolsVisible?: boolean
-}>(), {
-  toolsAvailable: false,
-  toolsVisible: false,
-})
+}>()
 
 defineEmits<{
   refresh: []
   cycleTheme: []
-  toggleTools: []
 }>()
 
 const scrolled = ref(false)
@@ -67,18 +65,6 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
       </div>
 
       <div class="header-actions">
-        <AppTooltip v-if="toolsAvailable" :content="toolsVisible ? '收起首页工具' : '显示首页工具'">
-          <button
-            class="icon-button"
-            :class="{ 'is-active': toolsVisible }"
-            type="button"
-            :aria-label="toolsVisible ? '收起首页工具' : '显示首页工具'"
-            :aria-pressed="toolsVisible"
-            @click="$emit('toggleTools')"
-          >
-            <AppIcon name="tabler:tools" :size="18" />
-          </button>
-        </AppTooltip>
         <AppTooltip :content="`主题：${themeMode === 'beijing' ? '北京时间自动' : themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'}（点击切换）`">
           <button
             class="icon-button"

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { DashboardViewMode, GlassServer } from '@/types/glassmorphism'
+import type { GlassServer } from '@/types/glassmorphism'
+import type { NodeCardSize } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
@@ -31,7 +32,8 @@ import {
 const props = defineProps<{
   server: GlassServer
   showSource: boolean
-  density: Exclude<DashboardViewMode, 'list'>
+  /** 卡片密度直接来自主题设置 `nodeCardSize`，与 Komari 的 NodeCard 一致。 */
+  density: NodeCardSize
   favorite: boolean
   highLoadThreshold: number
   /** 主题级价格隐私（未登录隐藏价格）。每台节点自身的 showPrice 仍单独生效。 */
@@ -87,18 +89,65 @@ const chips = computed(() => {
   return list
 })
 
-/** 延迟与丢包只展示 `/api/servers` 返回的真实稀疏窗口，缺失时不绘制柱状图。 */
-const latencySamples = computed(() => props.server.history.latencySamples)
-const lossSamples = computed(() => props.server.history.packetLossSamples)
+/*
+ * 延迟与丢包柱状图对齐 Komari `useNodePingDisplay`：
+ * 柱子一律满高，数值由 signal-1..5 五级颜色表达，而不是由柱子高度表达；
+ * 色觉友好模式再叠加 ping-signal-pattern 纹理。
+ * 没有采样时渲染 20 根中性占位柱，与上游 EMPTY_PING_BAR_COUNT 一致，
+ * 这样丢包为 0 时面板依然是一条完整的柱带，而不是一片空白。
+ */
+const EMPTY_PING_BAR_COUNT = 20
 
-function barHeights(samples: readonly number[]): string[] {
-  if (samples.length === 0) return []
-  const max = Math.max(...samples, 1)
-  return samples.map((value) => `${Math.max(6, Math.min(100, (value / max) * 100))}%`)
+function latencyToneClass(latency: number): string {
+  if (latency <= 60) return 'is-signal-1'
+  if (latency <= 100) return 'is-signal-2'
+  if (latency <= 160) return 'is-signal-3 ping-signal-pattern-2'
+  if (latency <= 200) return 'is-signal-4 ping-signal-pattern-3'
+  return 'is-signal-5 ping-signal-pattern-4'
 }
 
-const latencyBars = computed(() => barHeights(latencySamples.value))
-const lossBars = computed(() => barHeights(lossSamples.value))
+function lossToneClass(loss: number): string {
+  if (loss <= 1) return 'is-signal-1'
+  if (loss <= 3) return 'is-signal-2'
+  if (loss <= 6) return 'is-signal-3 ping-signal-pattern-2'
+  if (loss <= 9) return 'is-signal-4 ping-signal-pattern-3'
+  return 'is-signal-5 ping-signal-pattern-4'
+}
+
+interface PingBar {
+  key: string
+  className: string
+}
+
+function emptyBars(metric: string): PingBar[] {
+  return Array.from({ length: EMPTY_PING_BAR_COUNT }, (_, index) => ({
+    key: `${metric}-empty-${index}`,
+    className: 'is-empty',
+  }))
+}
+
+function buildBars(
+  metric: string,
+  samples: readonly number[],
+  tone: (value: number) => string,
+): PingBar[] {
+  if (samples.length === 0) return emptyBars(metric)
+  return samples.map((value, index) => ({
+    key: `${metric}-${index}`,
+    className: tone(value),
+  }))
+}
+
+const latencyBars = computed(() => buildBars(
+  'latency',
+  props.server.history.latencySamples,
+  latencyToneClass,
+))
+const lossBars = computed(() => buildBars(
+  'loss',
+  props.server.history.packetLossSamples,
+  lossToneClass,
+))
 
 const primaryProbe = computed(() => props.server.latency[0] ?? null)
 
@@ -276,11 +325,10 @@ function hideMissingImage(event: Event): void {
             <span class="node-probe__value">{{ formatLatency(primaryProbe.latency) }}</span>
           </div>
           <div
-            v-if="latencyBars.length > 0"
             class="node-probe__bars"
             :style="{ gridTemplateColumns: `repeat(${latencyBars.length}, minmax(0, 1fr))` }"
           >
-            <span v-for="(height, index) in latencyBars" :key="index" :style="{ height }" />
+            <span v-for="bar in latencyBars" :key="bar.key" :class="bar.className" />
           </div>
         </div>
         <div class="node-probe">
@@ -289,11 +337,10 @@ function hideMissingImage(event: Event): void {
             <span class="node-probe__value">{{ formatProbePercent(primaryProbe.packetLoss) }}</span>
           </div>
           <div
-            v-if="lossBars.length > 0"
-            class="node-probe__bars node-probe__bars--loss"
+            class="node-probe__bars"
             :style="{ gridTemplateColumns: `repeat(${lossBars.length}, minmax(0, 1fr))` }"
           >
-            <span v-for="(height, index) in lossBars" :key="index" :style="{ height }" />
+            <span v-for="bar in lossBars" :key="bar.key" :class="bar.className" />
           </div>
         </div>
       </div>

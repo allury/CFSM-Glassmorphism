@@ -6,7 +6,7 @@
  * 因此运行时不依赖 api.iconify.design。这是自托管 CFSM 主题必须的交付方式差异：
  * 内网或严格 CSP 环境下不能依赖外部图标 CDN。
  *
- * 本文件由一次性生成器产出；新增上游图标时必须保留同一内联格式与官方路径。
+ * 本文件由一次性生成器产出，请勿手工编辑单个路径。
  */
 export interface InlineIcon {
   readonly viewBox: string
@@ -15,7 +15,7 @@ export interface InlineIcon {
 
 export const ICONS = {
   'icon-park-outline:dashboard-one': {
-    viewBox: '0 0 48 48',
+    viewBox: '0 0 49 48',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"4\"><path d=\"M24.778 7c-11.046 0-20 8.954-20 20c0 5.23 1.713 10.436 5 14h30c3.286-3.564 5-8.77 5-14c0-11.046-8.954-20-20-20\"/><circle cx=\"24.778\" cy=\"30\" r=\"4\"/><path d=\"M24.778 20v6m0-14v2m-15 14h2m2-10l1.414 1.414M37.778 28h2m-5-8.586L36.192 18\"/></g>",
   },
   'icon-park-outline:memory': {
@@ -150,6 +150,10 @@ export const ICONS = {
     viewBox: '0 0 24 24',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M6.5 7h11m-11 10h11M6 20v-2a6 6 0 1 1 12 0v2a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1\"/><path d=\"M6 4v2a6 6 0 1 0 12 0V4a1 1 0 0 0-1-1H7a1 1 0 0 0-1 1\"/></g>",
   },
+  'tabler:layout-grid': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm10 0a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1zM4 15a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1zm10 0a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1z\"/>",
+  },
   'tabler:list-numbers': {
     viewBox: '0 0 24 24',
     body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M11 6h9m-9 6h9m-8 6h8M4 16a2 2 0 1 1 4 0c0 .591-.5 1-1 1.5L4 20h4M6 10V4L4 6\"/>",
@@ -201,6 +205,10 @@ export const ICONS = {
   'tabler:sun': {
     viewBox: '0 0 24 24',
     body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0m-5 0h1m8-9v1m8 8h1m-9 8v1M5.6 5.6l.7.7m12.1-.7l-.7.7m0 11.4l.7.7m-12.1-.7l-.7.7\"/>",
+  },
+  'tabler:table': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zm0 5h18M10 3v18\"/>",
   },
   'tabler:tools': {
     viewBox: '0 0 24 24',

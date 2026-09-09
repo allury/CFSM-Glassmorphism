@@ -558,18 +558,13 @@ export function validateThemeSettingsDraft(value: ThemeSettings): ThemeDraftIssu
   return issues
 }
 
+/** 视图模式与卡片密度互相独立：切换 card/list 不应改写用户选择的 `nodeCardSize`。 */
 export function dashboardViewMode(settings: ThemeSettings): DashboardViewMode {
-  if (settings.defaultViewMode === 'list') return 'list'
-  if (settings.nodeCardSize === 'mini') return 'mini'
-  if (settings.nodeCardSize === 'compact') return 'compact'
-  return 'card'
+  return settings.defaultViewMode === 'list' ? 'list' : 'card'
 }
 
-export function dashboardViewPatch(viewMode: DashboardViewMode): Pick<ThemeSettings, 'defaultViewMode' | 'nodeCardSize'> {
-  if (viewMode === 'list') return { defaultViewMode: 'list', nodeCardSize: 'compact' }
-  if (viewMode === 'mini') return { defaultViewMode: 'card', nodeCardSize: 'mini' }
-  if (viewMode === 'compact') return { defaultViewMode: 'card', nodeCardSize: 'compact' }
-  return { defaultViewMode: 'card', nodeCardSize: 'comfortable' }
+export function dashboardViewPatch(viewMode: DashboardViewMode): Pick<ThemeSettings, 'defaultViewMode'> {
+  return { defaultViewMode: viewMode === 'list' ? 'list' : 'card' }
 }
 
 export function resolveThemeMode(
