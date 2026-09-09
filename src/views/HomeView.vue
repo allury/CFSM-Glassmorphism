@@ -14,7 +14,6 @@ import {
   ALL_GROUPS,
   availableGroups,
   filterServers,
-  groupServers,
   sortServers,
   summarizeServers,
 } from '@/domain/dashboard'
@@ -46,7 +45,7 @@ const glassServerMapper = createGlassServerMapper()
 // 首页浏览状态放在会话级 store 中，保证「首页 → 详情 → 返回首页」后
 // 搜索词、分组、排序与快捷筛选保持不变，不需要刷新或重新筛选。
 const viewState = useDashboardViewStore()
-const { query, selectedGroup, sort, activeQuickFilter } = storeToRefs(viewState)
+const { query, selectedGroup, sort, activeQuickFilter, advancedToolsVisible } = storeToRefs(viewState)
 const refreshing = ref(false)
 const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
   '--node-item-delay': `${index * 34}ms`,
@@ -62,9 +61,10 @@ const visibleAdminUrl = computed(() => (
     ? null
     : app.administrationUrl
 ))
-const showAdvancedTools = computed(() => (
+const advancedToolsAvailable = computed(() => (
   theme.runtime.homeToolsEnabled && app.config?.authorization === true
 ))
+const showAdvancedTools = computed(() => advancedToolsAvailable.value && advancedToolsVisible.value)
 const isDark = computed(() => theme.resolvedTheme === 'dark')
 /** 主题级价格隐私；每台节点自身的 showPrice 仍在卡片与列表内单独生效。 */
 const priceVisible = computed(() => (
@@ -105,7 +105,6 @@ const visibleServers = computed(() => sortServers(
   sort.value,
   theme.runtime.offlineNodesLast,
 ))
-const groupedServers = computed(() => groupServers(visibleServers.value))
 const favoriteCount = computed(() => glassServers.value.reduce(
   (count, server) => count + (preferences.isFavorite(server.key) ? 1 : 0),
   0,
@@ -229,8 +228,11 @@ onUnmounted(() => realtime.stop())
         :source-count="sourceCount"
         :admin-url="visibleAdminUrl"
         :theme-mode="theme.runtime.themeMode"
+        :tools-available="advancedToolsAvailable"
+        :tools-visible="showAdvancedTools"
         @refresh="refresh"
         @cycle-theme="theme.cycleTheme"
+        @toggle-tools="advancedToolsVisible = !advancedToolsVisible"
       />
 
       <main class="dashboard">
@@ -395,7 +397,7 @@ onUnmounted(() => realtime.stop())
             <p>CFSM 返回了空服务器列表。添加节点后，它们会出现在这里。</p>
           </div>
 
-          <template v-else>
+          <div v-else class="dashboard-node-info">
             <DashboardControls
               v-model:query="query"
               v-model:group="selectedGroup"
@@ -426,61 +428,42 @@ onUnmounted(() => realtime.stop())
             </div>
 
             <div
-              v-else
-              class="server-groups"
+              v-else-if="viewMode !== 'list'"
+              :class="[
+                'server-grid',
+                `server-grid--${viewMode}`,
+                `server-grid--size-${theme.runtime.nodeCardSize}`,
+                { 'server-grid--dense': isDenseCollection },
+              ]"
             >
-              <section
-                v-for="group in groupedServers"
-                :key="group.name"
-                class="server-group"
-              >
-                <header class="server-group__header">
-                  <div>
-                    <span class="server-group__mark" aria-hidden="true" />
-                    <h2>{{ group.name }}</h2>
-                  </div>
-                  <span>{{ group.servers.length }} 台</span>
-                </header>
-
-                <div
-                  v-if="viewMode !== 'list'"
-                  :class="[
-                    'server-grid',
-                    `server-grid--${viewMode}`,
-                    `server-grid--size-${theme.runtime.nodeCardSize}`,
-                    { 'server-grid--dense': isDenseCollection },
-                  ]"
-                >
-                  <ServerCard
-                    v-for="(server, index) in group.servers"
-                    :key="server.key"
-                    :server="server"
-                    :show-source="showSource"
-                    :density="viewMode"
-                    :favorite="preferences.isFavorite(server.key)"
-                    :high-load-threshold="theme.runtime.homeHighLoadThreshold"
-                    :price-visible="priceVisible"
-                    :style="cardStyle(index)"
-                    @open="openServer(server)"
-                    @toggle-favorite="preferences.toggleFavorite(server.key)"
-                  />
-                </div>
-                <ServerList
-                  v-else
-                  :servers="group.servers"
-                  :show-source="showSource"
-                  :favorite-keys="preferences.favorites"
-                  :metadata-enabled="theme.runtime.nodeListMetadataEnabled"
-                  :metadata-fields="metadataFields"
-                  :provider-aliases="providerAliases"
-                  :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
-                  :price-visible="priceVisible"
-                  @open="openServer"
-                  @toggle-favorite="preferences.toggleFavorite"
-                />
-              </section>
+              <ServerCard
+                v-for="(server, index) in visibleServers"
+                :key="server.key"
+                :server="server"
+                :show-source="showSource"
+                :density="viewMode"
+                :favorite="preferences.isFavorite(server.key)"
+                :high-load-threshold="theme.runtime.homeHighLoadThreshold"
+                :price-visible="priceVisible"
+                :style="cardStyle(index)"
+                @open="openServer(server)"
+                @toggle-favorite="preferences.toggleFavorite(server.key)"
+              />
             </div>
-          </template>
+            <ServerList
+              v-else
+              :servers="visibleServers"
+              :show-source="showSource"
+              :favorite-keys="preferences.favorites"
+              :metadata-enabled="theme.runtime.nodeListMetadataEnabled"
+              :metadata-fields="metadataFields"
+              :provider-aliases="providerAliases"
+              :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
+              :price-visible="priceVisible"
+              @open="openServer"
+              @toggle-favorite="preferences.toggleFavorite"
+            />
+          </div>
         </template>
       </main>
 

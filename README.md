@@ -2,6 +2,8 @@
 
 CFSM-Glassmorphism is a Vue 3, TypeScript and Vite port of Komari Glassmorphism for the public third-party-theme APIs of CF-Server-Monitor.
 
+Current stable release: **v1.0.0**. Install the versioned `CFSM-Glassmorphism-1.0.0.zip` from the [GitHub Releases page](https://github.com/allury/CFSM-Glassmorphism/releases/latest) through CFSM's official theme installation flow.
+
 The project currently includes the engineering foundation, a visually restored home dashboard, a real `/#/server/:id` detail experience, a centralized `/#/settings` theme editor, three Earth/Map renderers, and authenticated advanced tools. The home page loads `/api/config` and `/api/servers`, while detail uses the owning source's `/api/server`, `/api/history/all` and single-node `/api/ws?subscribe=<id>` connection. Partial `batchUpdate` samples merge without erasing REST state; reconnects use bounded backoff and low-frequency REST fallback. Theme settings resolve defaults, backend `theme_options` and browser overrides in one strict store; authenticated saves use only `POST /api/theme_options`, send a complete snapshot, and re-fetch config without a reload. Earth placement uses only explicit country/region centers, while health, value, snapshot and classification-topology tools consume the same normalized real-data model.
 
 ## Authority and attribution
@@ -31,7 +33,7 @@ Production code must use real CFSM data or a truthful empty/error state. Test fi
 
 ## Formal build
 
-Pushes to main, pull requests and manual workflow dispatch run:
+Pushes to main, version tags, pull requests and manual workflow dispatch run:
 
 ~~~text
 frozen install
@@ -46,6 +48,8 @@ frozen install
 
 The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contains only `index.html` and `assets/`. `bun run validate:dist` also scans for forbidden Komari runtime markers and enforces release size budgets (JavaScript 3328 KiB, CSS 128 KiB, total assets 6656 KiB — sized for the upstream Earth renderers, their textures and the echarts chart family), failing the build when exceeded. Generated dist directories and ZIP files are not committed.
 
+After the matching commit has passed the same gates on `main`, pushing an annotated `v<package version>` tag publishes the already-verified archive under the stable name `CFSM-Glassmorphism-<version>.zip`. The tag and `package.json` version must match or the release job fails.
+
 ## Documentation
 
 - docs/CODEX_SPEC.md: immutable full project specification supplied by the project owner.
@@ -56,6 +60,7 @@ The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contai
 - docs/theme-settings.md: all 48 upstream settings and their CFSM disposition.
 - docs/visual-validation.md: current breakpoint, renderer and interaction verification.
 - docs/fidelity-audit.md: item-by-item comparison against upstream Komari Glassmorphism, with P0/P1/P2 priorities.
+- docs/releases/v1.0.0.md: first stable release notes and supported platform differences.
 
 ## UI authority
 

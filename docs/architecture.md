@@ -93,6 +93,8 @@ UI (render and user intent only)
 - 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
 - 第 8 轮的 Earth 与高级工具领域模型位于 `src/domain/advanced-tools.ts`：`EarthMap` 和 `AdvancedTools` 只接收已经归一化的 `GlassServer`，不新增请求、不读取 wire payload。国家/地区中心、健康规则、月价折算、快照序列化和分类拓扑均为可单测的纯函数。
 - 节点卡片与列表行的主点击直达 `/#/server/:id`（与 Komari 一致），中间不再插入任何快速查看或二次确认层。
+- 首页节点区直接遍历同一份 `visibleServers` 渲染 NodeCard 或 NodeList；分组仍作为真实字段筛选条件，但不再包一层偏离 Komari 的视觉分组容器。高级工具展开状态属于 `dashboard-view` 会话状态，默认关闭，不进入 theme settings 或后端快照。
+- 首页与详情共用 `AppHeader`。详情主层级为顶部节点导航、资源卡、硬件/系统/存储/网络信息卡，再接 CFSM 真实可用的 probe、GPU、磁盘 IO 与 History；共享视觉结构不改变详情只消费 normalized model 的边界。
 - `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。ECharts 折线图按真实时间戳绘制，`connectNulls: false` 使缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
 ## Theme Options
@@ -160,7 +162,8 @@ server click -> its source -> detail/history/ws
 - 单元测试覆盖 apiBase、wire adapter、JWT/Turnstile transport、错误语义和完整 theme_options body。
 - `bun run build` 先 typecheck 再构建。
 - `bun run validate:dist` 验证根目录只有 `index.html` 与 `assets/`、assets 非空，并扫描禁止的 Komari runtime 标记。
-- GitHub Actions 对 push main、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
+- GitHub Actions 对 push main、版本 tag、pull request 和手动触发执行 frozen install、lint、typecheck、test、build、dist validation，并上传根结构正确的 ZIP。
+- `v<package version>` tag 只有通过同一 verify job 后才进入 release job；tag 与 `package.json` 必须一致，正式资产使用稳定名称 `CFSM-Glassmorphism-<version>.zip` 并由 GitHub Actions 发布。
 - `dist/` 是生成物，不进入版本控制。
 
 ## 第 7 轮完成边界
@@ -182,6 +185,14 @@ server click -> its source -> detail/history/ws
 - **历史陈旧响应 / 并发切换**：详情 hours 切换控件在 `historyState === 'loading'` 时禁用，配合 store 内 `revision` 版本号与 AbortController，保证同一节点上不会并发触发历史请求、详情切换会取消在途请求，乱序陈旧响应不会写回。本轮经核验此前已妥善处理，未改动相关代码。
 
 与原 Komari Glassmorphism 的高保真视觉差异如在本轮发现，仅记录、留待第 9.5 轮，不在第 9 轮修改。
+
+## 第 10 轮完成边界
+
+第 10 轮不重写数据/协议层，而是用 Komari 与 CFSM 两套 localhost 浏览器输出完成最终验证并收敛表现层：Header、首页控制条、扁平节点区、四种卡片密度、详情共享 Header/信息卡与响应式断点均按 Komari 真实几何调整。高级工具仍复用 `src/domain/advanced-tools.ts` 和 normalized `GlassServer`，只把会话展开状态默认设为关闭；REST、WebSocket、History、theme settings、多 apiBase 与三态 probe 契约没有变化。
+
+浏览器矩阵覆盖六档视口、三种主题、三种 Earth renderer、四种卡片密度与 list、空/稠密/部分失败/全部离线、详情及 History 401/403/409/503/空/成功状态。实测结果和必要 CFSM 差异分别记录在 `docs/visual-validation.md` 与 `docs/fidelity-audit.md`，相关结构由 fidelity/responsive contract tests 固化。
+
+正式版本为 1.0.0。main 推送通过 CI 后创建 annotated `v1.0.0` tag；tag workflow 重新执行完整质量门并发布 `CFSM-Glassmorphism-1.0.0.zip`。本地与仓库均不保留生成的 dist 或 ZIP。
 
 ## 第 9.95 轮完成边界
 

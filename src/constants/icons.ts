@@ -6,7 +6,7 @@
  * 因此运行时不依赖 api.iconify.design。这是自托管 CFSM 主题必须的交付方式差异：
  * 内网或严格 CSP 环境下不能依赖外部图标 CDN。
  *
- * 本文件由一次性生成器产出，请勿手工编辑单个路径。
+ * 本文件由一次性生成器产出；新增上游图标时必须保留同一内联格式与官方路径。
  */
 export interface InlineIcon {
   readonly viewBox: string
@@ -14,6 +14,10 @@ export interface InlineIcon {
 }
 
 export const ICONS = {
+  'icon-park-outline:dashboard-one': {
+    viewBox: '0 0 48 48',
+    body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"4\"><path d=\"M24.778 7c-11.046 0-20 8.954-20 20c0 5.23 1.713 10.436 5 14h30c3.286-3.564 5-8.77 5-14c0-11.046-8.954-20-20-20\"/><circle cx=\"24.778\" cy=\"30\" r=\"4\"/><path d=\"M24.778 20v6m0-14v2m-15 14h2m2-10l1.414 1.414M37.778 28h2m-5-8.586L36.192 18\"/></g>",
+  },
   'icon-park-outline:memory': {
     viewBox: '0 0 48 48',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\"><path d=\"M8 6v36a2 2 0 0 0 2 2h28a2 2 0 0 0 2-2V13.61a2 2 0 0 0-.605-1.433l-7.813-7.61A2 2 0 0 0 30.187 4H10a2 2 0 0 0-2 2Z\"/><path stroke-linecap=\"round\" stroke-linejoin=\"round\" d=\"M40 21H8m32 8H30m10 7H30m0 8V21M18 44V21m0 12H8\"/></g>",
@@ -197,6 +201,10 @@ export const ICONS = {
   'tabler:sun': {
     viewBox: '0 0 24 24',
     body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M8 12a4 4 0 1 0 8 0a4 4 0 1 0-8 0m-5 0h1m8-9v1m8 8h1m-9 8v1M5.6 5.6l.7.7m12.1-.7l-.7.7m0 11.4l.7.7m-12.1-.7l-.7.7\"/>",
+  },
+  'tabler:tools': {
+    viewBox: '0 0 24 24',
+    body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M3 21h4L20 8a1.5 1.5 0 0 0-4-4L3 17zM14.5 5.5l4 4\"/><path d=\"M12 8L7 3L3 7l5 5M7 8L5.5 9.5M16 12l5 5l-4 4l-5-5m4 1l-1.5 1.5\"/></g>",
   },
   'tabler:upload': {
     viewBox: '0 0 24 24',

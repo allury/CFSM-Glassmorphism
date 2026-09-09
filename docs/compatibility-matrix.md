@@ -1,12 +1,12 @@
 # 功能兼容矩阵
 
-> 本文记录截至 2026-09-08 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不等同于当前实现进度。
+> 本文记录截至 2026-09-09 的上游能力审计结论。状态表示在 CFSM 官方公开主题接口上的最终可行性，不等同于当前实现进度。
 
 ## 审计基线
 
 | 项目 | 分支 | 审计提交 | 审计重点 |
 |---|---|---|---|
-| 目标仓库 allury/CFSM-Glassmorphism | main | 22e545fa85ca129d3351cc3d585e1be847dcef8a | 第 7 轮完成基线；第 8 轮在其上开发 |
+| 目标仓库 allury/CFSM-Glassmorphism | main | d5b4b7f0bd0e45792659d119749a9ee9cf6f10a1 | 第 9.95 轮完成基线；第 10 轮在其上做最终浏览器审计与发布 |
 | huilang-me/CF-Server-Monitor | main | 924e71d32e5a0b5493cb52fdb2c184a9d6bd71e3 | 最新 theme-develop.md Ping/Node 契约与公开 config handler |
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | bf8376587c720de915ac48789a8a180357c762d6 | v3.3.7 manifest、services、stores、router、views、组件与样式 |
 | volcano-1025/CFSM-Theme-LuminaPlus | main | 6ae19289c3788a55fbc18cec9b3c1b2a62ecce34 | CFSM transport、adapter、JWT、Turnstile 与 theme_options |
@@ -34,6 +34,12 @@
 ## 第 9.95 轮实现进度
 
 第 9.95 轮清零剩余 P1，同样不改变任何 CFSM 数据能力，下表状态全部不变。实现方式变化：History 图表由手写 SVG 改为上游同款 `echarts` + `vue-echarts`（三态与不插值规则原样保留）；详情页顶部改为 Komari 的导航条并补上「上一台 / 下一台」（复用首页索引，详情仍只订阅单节点）；Tooltip / Tabs / Badge 改用 `reka-ui`，瞬时提示改用 `vue-sonner`。逐项终态见 `docs/fidelity-audit.md`。
+
+## 第 10 轮实现进度
+
+第 10 轮首次实际并排运行 Komari localhost 与 CFSM 生产构建 localhost，覆盖六档视口以及主题、Earth renderer、卡片密度、list、空/稠密/错误和 History 状态。由浏览器输出发现并修复 Header、首页控制条、视觉分组包装、卡片网格/密度、详情信息层级和 768/1024 断点差异；高级工具保持第 8 轮能力但默认收起。此次修正只改变表现层，不新增或降级任何 API 能力，60 项功能状态统计不变。
+
+CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`，访客/审计仍因缺少公开 API 而隐藏；这些必要差异没有被视觉收敛掩盖。最终版本 1.0.0 的发布资产继续只包含 `index.html` 与 `assets/`，tag workflow 会在完整质量门通过后生成稳定命名 ZIP。
 
 ## 第 9.9 轮实现进度
 

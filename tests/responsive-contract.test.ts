@@ -34,4 +34,20 @@ describe('responsive layout contract', () => {
     expect(stylesheet).not.toContain('.earth-regions')
     expect(stylesheet).not.toContain('.earth-stage')
   })
+
+  it('locks the browser-verified Komari home grid widths', () => {
+    expect(stylesheet).toContain('grid-template-columns: repeat(auto-fill, minmax(300px, 1fr))')
+    expect(stylesheet).toContain('grid-template-columns: repeat(auto-fill, minmax(270px, 1fr))')
+    expect(stylesheet).toContain('grid-template-columns: repeat(auto-fill, minmax(360px, 1fr))')
+    expect(stylesheet).toContain('grid-template-columns: repeat(auto-fill, minmax(420px, 1fr))')
+    expect(stylesheet).toMatch(/\.dashboard\s*\{[^}]*width: min\(100%, 1280px\)/s)
+    expect(stylesheet).toMatch(/\.dashboard-node-info\s*\{[^}]*padding-inline: 16px/s)
+  })
+
+  it('keeps the browser-verified detail breakpoints', () => {
+    expect(stylesheet).toMatch(/\.detail-resource-grid\s*\{[^}]*repeat\(2/s)
+    expect(stylesheet).toMatch(/@media \(min-width: 768px\)[\s\S]*?\.detail-resource-grid\s*\{[^}]*repeat\(3/s)
+    expect(stylesheet).toMatch(/@media \(min-width: 1024px\)[\s\S]*?\.detail-information-grid\s*\{[^}]*repeat\(2/s)
+    expect(stylesheet).toMatch(/@media \(min-width: 1280px\)[\s\S]*?\.detail-resource-grid\s*\{[^}]*repeat\(4/s)
+  })
 })

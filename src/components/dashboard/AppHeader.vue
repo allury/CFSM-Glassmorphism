@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { ThemeMode } from '@/theme/settings'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
 
-defineProps<{
+withDefaults(defineProps<{
   title: string
   version: string | null
   loading: boolean
@@ -12,11 +13,17 @@ defineProps<{
   sourceCount: number
   adminUrl: string | null
   themeMode: ThemeMode
-}>()
+  toolsAvailable?: boolean
+  toolsVisible?: boolean
+}>(), {
+  toolsAvailable: false,
+  toolsVisible: false,
+})
 
 defineEmits<{
   refresh: []
   cycleTheme: []
+  toggleTools: []
 }>()
 
 const scrolled = ref(false)
@@ -60,6 +67,18 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
       </div>
 
       <div class="header-actions">
+        <AppTooltip v-if="toolsAvailable" :content="toolsVisible ? '收起首页工具' : '显示首页工具'">
+          <button
+            class="icon-button"
+            :class="{ 'is-active': toolsVisible }"
+            type="button"
+            :aria-label="toolsVisible ? '收起首页工具' : '显示首页工具'"
+            :aria-pressed="toolsVisible"
+            @click="$emit('toggleTools')"
+          >
+            <AppIcon name="tabler:tools" :size="18" />
+          </button>
+        </AppTooltip>
         <AppTooltip :content="`主题：${themeMode === 'beijing' ? '北京时间自动' : themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'}（点击切换）`">
           <button
             class="icon-button"
@@ -67,9 +86,7 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
             :aria-label="`切换主题，当前${themeMode}`"
             @click="$emit('cycleTheme')"
           >
-            <svg v-if="themeMode === 'light'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-            <svg v-else-if="themeMode === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.8 15.1A9 9 0 0 1 8.9 3.2 9 9 0 1 0 20.8 15.1Z" /></svg>
-            <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 9 9 0 0 0-9-9Z" /><path d="M12 3v18A9 9 0 0 0 12 3Z" /></svg>
+            <AppIcon :name="themeMode === 'light' ? 'tabler:sun' : 'tabler:moon'" :size="18" />
           </button>
         </AppTooltip>
         <AppTooltip content="刷新 REST 数据">
@@ -81,17 +98,17 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
             aria-label="刷新 REST 数据"
             @click="$emit('refresh')"
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5" /><path d="M19 11a7 7 0 1 0 .2 3" /></svg>
+            <AppIcon name="tabler:refresh" :size="18" />
           </button>
         </AppTooltip>
         <AppTooltip content="主题设置">
           <RouterLink class="icon-button" :to="{ name: 'theme-settings' }" aria-label="主题设置">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h2M10 12h10M4 18h7M15 18h5" /><circle cx="16" cy="6" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="13" cy="18" r="2" /></svg>
+            <AppIcon name="tabler:settings" :size="18" />
           </RouterLink>
         </AppTooltip>
         <AppTooltip v-if="adminUrl" content="打开 CFSM 官方管理端">
           <a class="icon-button" :href="adminUrl" aria-label="管理端">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9A1.7 1.7 0 0 0 21 10h.2v4H21a1.7 1.7 0 0 0-1.6 1Z" /></svg>
+            <AppIcon name="tabler:external-link" :size="18" />
           </a>
         </AppTooltip>
       </div>

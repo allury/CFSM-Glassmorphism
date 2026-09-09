@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
+import AppHeader from '@/components/dashboard/AppHeader.vue'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import HistoryChart from '@/components/detail/HistoryChart.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -25,14 +26,11 @@ import { useThemeSettingsStore } from '@/stores/theme-settings'
 import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
   formatBytes,
-  formatCfsmDate,
   formatCount,
   formatLatency,
   formatPercent,
-  formatPrice,
   formatProbePercent,
   formatSpeed,
-  formatTimestamp,
   formatUptime,
 } from '@/utils/format'
 
@@ -53,7 +51,6 @@ const {
   issue,
   historyIssue,
   refreshIssue,
-  socketState,
   fallbackActive,
   timedOut,
   paused,
@@ -78,14 +75,18 @@ const probeTargets = computed(() => (
 const siteTitle = computed(() => sourceConfig.value?.siteTitle ?? app.config?.siteTitle ?? 'CF Server Monitor')
 const pageLoading = computed(() => state.value === 'loading' && server.value === null)
 const refreshing = computed(() => state.value === 'loading' || historyState.value === 'loading')
-const websocketLabel = computed(() => {
-  if (timedOut.value) return '实时连接超时'
-  if (paused.value) return '实时更新已暂停'
-  if (fallbackActive.value) return 'REST fallback'
-  if (socketState.value === 'open') return '单节点实时更新'
-  if (socketState.value === 'connecting' || socketState.value === 'backoff') return '实时连接中'
-  return 'REST 快照'
-})
+const headerTotal = computed(() => serverStore.servers.length || (server.value ? 1 : 0))
+const headerOnline = computed(() => (
+  serverStore.servers.length > 0
+    ? serverStore.servers.filter((item) => item.online).length
+    : server.value?.online ? 1 : 0
+))
+const sourceCount = computed(() => app.apiBases.length || (sourceConfig.value ? 1 : 0))
+const visibleAdminUrl = computed(() => (
+  theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
+    ? null
+    : app.administrationUrl
+))
 const showPrice = computed(() => {
   const current = server.value
   if (!current) return false
@@ -115,6 +116,14 @@ const detailCards = computed(() => {
     if (card.key === 'trafficQuota' && !showTrafficPolicy.value) return false
     return true
   })
+})
+const totalTraffic = computed(() => {
+  const current = server.value
+  if (!current) return null
+  const received = current.networkReceived
+  const transmitted = current.networkTransmitted
+  if (received === null && transmitted === null) return null
+  return (received ?? 0) + (transmitted ?? 0)
 })
 
 const historyLabels: Record<HistoryHours, string> = {
@@ -269,36 +278,18 @@ onUnmounted(() => detail.close())
   <div class="app-root detail-root">
     <DynamicBackground />
     <div class="app-shell">
-      <header class="detail-header">
-        <div class="detail-header__inner">
-          <button class="detail-back" type="button" @click="router.push({ name: 'home' })">
-            <span aria-hidden="true">←</span>
-            <span>节点列表</span>
-          </button>
-          <div class="detail-header__brand">
-            <strong>{{ siteTitle }}</strong>
-            <span>{{ websocketLabel }}</span>
-          </div>
-          <div class="detail-header__actions">
-            <button class="icon-button" type="button" aria-label="切换主题" @click="theme.cycleTheme">
-              <span aria-hidden="true">◐</span>
-            </button>
-            <button class="icon-button" type="button" aria-label="主题设置" @click="router.push({ name: 'theme-settings' })">
-              <span aria-hidden="true">☷</span>
-            </button>
-            <button
-              class="icon-button"
-              :class="{ 'is-spinning': refreshing }"
-              type="button"
-              :disabled="refreshing || !server"
-              aria-label="刷新详情与历史"
-              @click="refresh"
-            >
-              <span aria-hidden="true">↻</span>
-            </button>
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        :title="siteTitle"
+        :version="sourceConfig?.version ?? app.config?.version ?? null"
+        :loading="refreshing"
+        :online="headerOnline"
+        :total="headerTotal"
+        :source-count="sourceCount"
+        :admin-url="visibleAdminUrl"
+        :theme-mode="theme.runtime.themeMode"
+        @refresh="refresh"
+        @cycle-theme="theme.cycleTheme"
+      />
 
       <main class="detail-page">
         <section v-if="pageLoading" class="detail-loading" aria-label="正在加载节点详情">
@@ -435,14 +426,10 @@ onUnmounted(() => detail.close())
             <span>{{ issueCopy(refreshIssue, 'detail').body }}</span>
           </div>
 
-          <section class="detail-section">
-            <header class="detail-section__header">
-              <div><span class="eyebrow">LIVE METRICS</span><h2>详情概览</h2></div>
-              <span>{{ theme.runtime.detailMetricCardPreset }}方案 · 仅显示真实字段</span>
-            </header>
+          <section class="detail-overview" aria-label="节点指标概览">
             <div class="detail-resource-grid">
               <article v-for="card in detailCards" :key="card.key" class="detail-metric-card glass-panel" :class="`detail-metric-card--${card.key}`">
-                <span><AppIcon :name="card.icon" :size="14" />{{ card.label }}</span>
+                <span><span>{{ card.label }}</span><AppIcon :name="card.icon" :size="20" /></span>
                 <strong>{{ card.value }}</strong>
                 <div v-if="card.percentage !== undefined" class="detail-meter">
                   <i :style="{ width: meterWidth(card.percentage ?? null) }" />
@@ -452,31 +439,92 @@ onUnmounted(() => detail.close())
             </div>
           </section>
 
-          <section class="detail-two-column">
-            <article class="detail-info-card glass-panel">
-              <header><span class="eyebrow">NETWORK</span><h2>网络与流量</h2></header>
-              <div class="detail-network-speed">
-                <span><small>实时下载</small><strong class="network-down">↓ {{ formatSpeed(server.networkInSpeed) }}</strong></span>
-                <span><small>实时上传</small><strong class="network-up">↑ {{ formatSpeed(server.networkOutSpeed) }}</strong></span>
+          <section class="detail-information-grid" aria-label="节点基础信息">
+            <article class="detail-info-card detail-info-card--hardware glass-panel">
+              <header><h2>硬件信息</h2></header>
+              <div class="detail-fact-grid">
+                <div class="detail-fact detail-fact--wide">
+                  <span><AppIcon name="tabler:cpu" :size="14" />CPU</span>
+                  <strong>{{ server.cpuInfo ?? '—' }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>核心</span><strong>{{ formatCount(server.cpuCores) }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>架构</span><strong>{{ server.architecture ?? '—' }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>Agent</span><strong>{{ server.agentVersion ?? '—' }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>进程</span><strong>{{ formatCount(server.processes) }}</strong>
+                </div>
               </div>
-              <dl class="detail-list">
-                <div><dt>累计接收</dt><dd>{{ formatBytes(server.networkReceived) }}</dd></div>
-                <div><dt>累计发送</dt><dd>{{ formatBytes(server.networkTransmitted) }}</dd></div>
-                <div><dt>本月接收</dt><dd>{{ formatBytes(server.monthlyNetworkReceived) }}</dd></div>
-                <div><dt>本月发送</dt><dd>{{ formatBytes(server.monthlyNetworkTransmitted) }}</dd></div>
-              </dl>
             </article>
-            <article class="detail-info-card glass-panel">
-              <header><span class="eyebrow">RUNTIME</span><h2>进程与连接</h2></header>
-              <div class="runtime-orbs">
-                <span><strong>{{ formatCount(server.processes) }}</strong><small>Processes</small></span>
-                <span><strong>{{ formatCount(server.tcpConnections) }}</strong><small>TCP</small></span>
-                <span><strong>{{ formatCount(server.udpConnections) }}</strong><small>UDP</small></span>
+
+            <article class="detail-info-card detail-info-card--system glass-panel">
+              <header><h2>系统信息</h2></header>
+              <div class="detail-fact-grid">
+                <div class="detail-fact">
+                  <span>操作系统</span><strong>{{ server.operatingSystem ?? '—' }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>内核</span><strong>{{ server.kernelVersion ?? '—' }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>运行时间</span><strong>{{ formatUptime(server.bootTime) }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>数据源</span><strong>{{ server.source.label }}</strong>
+                </div>
               </div>
-              <dl class="detail-list">
-                <div><dt>报告间隔</dt><dd>{{ server.reportInterval === null ? '—' : `${server.reportInterval} 秒` }}</dd></div>
-                <div><dt>WS 报告间隔</dt><dd>{{ server.websocketReportInterval === null ? '—' : `${server.websocketReportInterval} 秒` }}</dd></div>
-              </dl>
+            </article>
+
+            <article class="detail-info-card detail-info-card--storage glass-panel">
+              <header><h2>存储信息</h2></header>
+              <div class="detail-storage-grid">
+                <div class="detail-fact">
+                  <span>内存</span>
+                  <strong>{{ formatBytes(server.memoryTotal === null ? null : server.memoryTotal * 1024 ** 2) }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>Swap</span>
+                  <strong>{{ formatBytes(server.swapTotal === null ? null : server.swapTotal * 1024 ** 2) }}</strong>
+                </div>
+                <div class="detail-fact">
+                  <span>磁盘</span>
+                  <strong>{{ formatBytes(server.diskTotal === null ? null : server.diskTotal * 1024 ** 2) }}</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="detail-info-card detail-info-card--network glass-panel">
+              <header><h2>网络信息</h2></header>
+              <div class="detail-network-grid">
+                <div class="detail-network-card">
+                  <span class="detail-network-card__head">
+                    <span><AppIcon name="tabler:arrows-transfer-up-down" :size="14" />总流量</span>
+                    <span class="detail-network-card__protocols">
+                      <AppBadge v-if="server.ipV4Reachable === '1'" variant="outline">IPv4</AppBadge>
+                      <AppBadge v-if="server.ipV6Reachable === '1'" variant="outline">IPv6</AppBadge>
+                    </span>
+                    <small>{{ formatBytes(server.networkTransmitted) }} / {{ formatBytes(server.networkReceived) }}</small>
+                  </span>
+                  <strong>
+                    {{ formatBytes(totalTraffic) }} /
+                    {{ showTrafficPolicy && server.trafficLimit ? server.trafficLimit : '∞' }}
+                  </strong>
+                </div>
+                <div class="detail-network-card">
+                  <span class="detail-network-card__head">
+                    <span><AppIcon name="icon-park-outline:dashboard-one" :size="14" />网络速率</span>
+                  </span>
+                  <strong class="detail-network-card__rates">
+                    <span class="network-up">↑ {{ formatSpeed(server.networkOutSpeed) }}</span>
+                    <span class="network-down">↓ {{ formatSpeed(server.networkInSpeed) }}</span>
+                  </strong>
+                </div>
+              </div>
             </article>
           </section>
 
@@ -534,50 +582,6 @@ onUnmounted(() => detail.close())
                 </div>
               </article>
             </div>
-          </section>
-
-          <section class="detail-two-column">
-            <article class="detail-info-card glass-panel">
-              <header><span class="eyebrow">SYSTEM</span><h2>系统信息</h2></header>
-              <dl class="detail-list detail-list--wide">
-                <div><dt>CPU</dt><dd>{{ server.cpuInfo ?? '—' }}</dd></div>
-                <div><dt>核心</dt><dd>{{ formatCount(server.cpuCores) }}</dd></div>
-                <div><dt>操作系统</dt><dd>{{ server.operatingSystem ?? '—' }}</dd></div>
-                <div><dt>内核</dt><dd>{{ server.kernelVersion ?? '—' }}</dd></div>
-                <div><dt>架构</dt><dd>{{ server.architecture ?? '—' }}</dd></div>
-                <div><dt>Agent</dt><dd>{{ server.agentVersion ?? '—' }}</dd></div>
-                <div><dt>IPv4</dt><dd>{{ server.ipV4Reachable === null ? '未知' : server.ipV4Reachable === '1' ? '可达' : '不可达' }}</dd></div>
-                <div><dt>IPv6</dt><dd>{{ server.ipV6Reachable === null ? '未知' : server.ipV6Reachable === '1' ? '可达' : '不可达' }}</dd></div>
-                <div><dt>地区</dt><dd>{{ server.region ?? '—' }}</dd></div>
-                <div><dt>分组</dt><dd>{{ server.group || '未分组' }}</dd></div>
-                <div><dt>数据源</dt><dd>{{ server.source.label }}</dd></div>
-                <div><dt>运行时间</dt><dd>{{ formatUptime(server.bootTime) }}</dd></div>
-                <div><dt>最后更新</dt><dd>{{ formatTimestamp(server.lastUpdated ?? server.timestamp) }}</dd></div>
-              </dl>
-            </article>
-            <article v-if="showPrice || showExpiry || showTrafficPolicy" class="detail-info-card glass-panel">
-              <header><span class="eyebrow">PLAN</span><h2>费用与套餐</h2></header>
-              <dl class="detail-list detail-list--wide">
-                <div v-if="showPrice">
-                  <dt>价格</dt><dd>{{ formatPrice(server.price, server.currency, server.billingCycle) }}</dd>
-                </div>
-                <div v-if="showExpiry && server.expireDate">
-                  <dt>到期日</dt><dd>{{ formatCfsmDate(server.expireDate) }}</dd>
-                </div>
-                <div v-if="showExpiry && server.autoRenewal">
-                  <dt>自动续费</dt><dd>{{ server.autoRenewal === '1' ? '是' : server.autoRenewal === '0' ? '否' : server.autoRenewal }}</dd>
-                </div>
-                <div v-if="server.trafficLimit">
-                  <dt>流量限制</dt><dd>{{ server.trafficLimit }}</dd>
-                </div>
-                <div v-if="server.trafficCalculationType">
-                  <dt>流量计算</dt><dd>{{ server.trafficCalculationType }}</dd>
-                </div>
-                <div v-if="server.resetDay !== null">
-                  <dt>重置日</dt><dd>每月 {{ server.resetDay }} 日</dd>
-                </div>
-              </dl>
-            </article>
           </section>
 
           <section class="detail-section detail-history">

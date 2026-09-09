@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { DashboardSort, DashboardViewMode } from '@/types/glassmorphism'
 import AppTabs from '@/components/ui/AppTabs.vue'
+import AppIcon from '@/components/ui/AppIcon.vue'
 import { ALL_GROUPS } from '@/domain/dashboard'
 import type { QuickControlKey } from '@/domain/theme-presentation'
 
@@ -68,15 +69,15 @@ function sortValue(event: Event): DashboardSort {
 
 <template>
   <section class="dashboard-controls" aria-label="节点筛选与布局">
-    <AppTabs
-      class="group-tabs"
-      list-label="节点分组"
-      :items="groupTabs"
-      :model-value="group"
-      @update:model-value="$emit('update:group', $event)"
-    />
+    <div class="dashboard-controls__filters">
+      <AppTabs
+        class="group-tabs"
+        list-label="节点分组"
+        :items="groupTabs"
+        :model-value="group"
+        @update:model-value="$emit('update:group', $event)"
+      />
 
-    <div class="dashboard-controls__row">
       <div v-if="quickControlsEnabled" class="quick-controls" aria-label="快捷筛选">
         <button
           v-for="key in quickControlKeys"
@@ -91,47 +92,47 @@ function sortValue(event: Event): DashboardSort {
           <small v-if="quickCounts[key] !== undefined">{{ quickCounts[key] }}</small>
         </button>
       </div>
+    </div>
 
-      <div class="dashboard-controls__actions">
-        <label class="search-field">
-          <span class="sr-only">搜索节点</span>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
-          <input
-            type="search"
-            :value="query"
-            placeholder="搜索名称、分组、标签、地区、系统…"
-            @input="$emit('update:query', inputValue($event))"
-          >
-        </label>
+    <div class="dashboard-controls__actions">
+      <label class="search-field" :class="{ 'is-expanded': query.length > 0 }">
+        <span class="sr-only">搜索节点</span>
+        <AppIcon name="tabler:search" :size="14" />
+        <input
+          type="search"
+          :value="query"
+          placeholder="搜索名称、分组、标签、地区、系统…"
+          @input="$emit('update:query', inputValue($event))"
+        >
+      </label>
 
-        <label class="select-field">
-          <span class="sr-only">节点排序</span>
-          <select :value="sort" @change="$emit('update:sort', sortValue($event))">
-            <option value="order">后台顺序</option>
-            <option value="name">名称</option>
-            <option value="status">在线优先</option>
-            <option value="cpu">CPU 从高到低</option>
-            <option value="memory">内存从高到低</option>
-            <option value="network">实时速率从高到低</option>
-          </select>
-        </label>
+      <label class="select-field">
+        <span class="sr-only">节点排序</span>
+        <select :value="sort" @change="$emit('update:sort', sortValue($event))">
+          <option value="order">后台顺序</option>
+          <option value="name">名称</option>
+          <option value="status">在线优先</option>
+          <option value="cpu">CPU 从高到低</option>
+          <option value="memory">内存从高到低</option>
+          <option value="network">实时速率从高到低</option>
+        </select>
+      </label>
 
-        <span class="result-count">{{ resultCount }} 台</span>
+      <span class="result-count">{{ resultCount }} 台</span>
 
-        <div class="view-switch" aria-label="卡片布局">
-          <button
-            v-for="option in viewOptions"
-            :key="option.value"
-            type="button"
-            :class="{ 'is-active': viewMode === option.value }"
-            :aria-pressed="viewMode === option.value"
-            :aria-label="`${option.label}视图`"
-            :title="`${option.label}视图`"
-            @click="$emit('update:viewMode', option.value)"
-          >
-            <span aria-hidden="true">{{ option.icon }}</span>
-          </button>
-        </div>
+      <div class="view-switch" aria-label="卡片布局">
+        <button
+          v-for="option in viewOptions"
+          :key="option.value"
+          type="button"
+          :class="{ 'is-active': viewMode === option.value }"
+          :aria-pressed="viewMode === option.value"
+          :aria-label="`${option.label}视图`"
+          :title="`${option.label}视图`"
+          @click="$emit('update:viewMode', option.value)"
+        >
+          <span aria-hidden="true">{{ option.icon }}</span>
+        </button>
       </div>
     </div>
   </section>

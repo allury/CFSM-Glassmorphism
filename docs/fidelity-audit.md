@@ -9,10 +9,10 @@
 | 项目 | 分支 | 提交 | 用途 |
 |---|---|---|---|
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | `bf83765`（v3.3.7） | UI/UX 唯一权威基准 |
-| allury/CFSM-Glassmorphism | main | `d2915d4`（第 9 轮完成） | 本轮起点 |
+| allury/CFSM-Glassmorphism | main | `d5b4b7f`（第 9.95 轮完成） | 第 10 轮起点 |
 | huilang-me/CF-Server-Monitor | main | `924e71d` | 第三方主题 API 权限与协议上限 |
 
-上游克隆位于被 Git 忽略的 `work/upstreams/`，只读。本审计对照真实源码（`NodeEarthGlobe.vue`、`NodeEarthRealisticGlobe.vue`、`NodeEarthCobeGlobe.vue`、`NodeEarthTiledMap.vue`、`NodeCard.vue`、`NodeList.vue`、`NodeGeneralCards.vue`、`HomeView.vue`、`InstanceDetail.vue` 等），不依赖截图观察。
+上游克隆位于被 Git 忽略的 `work/upstreams/`，只读。第 9.5～9.95 轮的结论主要来自真实源码对照与契约测试；第 10 轮已补做 Komari localhost 与 CFSM 生产构建 localhost 的双版本浏览器对照，以实时视觉观察、计算后几何、交互结果和控制台为最终判据。详细矩阵见 `docs/visual-validation.md`。
 
 ## 优先级定义
 
@@ -54,7 +54,7 @@
 | 13 | NodeCard 内部结构 | 544 行：状态点 + `animate-ping` 脉冲、收藏、tag chips、`grid-cols-[3fr_2fr]` 指标布局、`TrafficProgress`、`NodePingListCell` | 260 行，自有结构与指标排列 | 部分一致 | 否 | 第 9.9 轮：按 Komari 区块顺序重写为 状态点+名称 / 收藏+OS+旗帜 / 运行与价格芯片 / CPU·内存·硬盘·流量四项进度 / 网速·总流量·剩余或负载三列指标盒 / 延迟与丢包双面板 / 自定义标签 / 离线遮罩 | P1 | PASS |
 | 14 | NodeList 结构 | 667 行，含 `NodePingListCell` 等独立单元 | 159 行表格 | 部分一致 | 否 | 第 9.9 轮：改为 Komari 的栅格行与十列契约（状态/系统/节点/信息/运行时间/CPU/内存/硬盘/流量/速率），「信息」列受 `nodeListMetadataEnabled` 控制，保留 `v-memo` | P1 | PASS |
 | 15 | 图表实现 | `echarts` + `vue-echarts`，`MetricSeriesChartCard` / `LoadChart` / `PingChart` 三个组件 | 手写轻量 SVG `HistoryChart.vue` | 不一致 | 否（CFSM 历史数据可满足） | 第 9.95 轮：History 图表改用上游同款 `echarts` + `vue-echarts`，沿用 Komari 的 tooltip(axis) / legend / grid / time 轴 / `autoresize`，并按 `utils/echarts.ts` 只注册用到的组件。`connectNulls: false` 保证缺口保持缺口，超时与缺失不进入数值 series | P1 | PASS |
-| 16 | 详情页结构 | `InstanceDetail.vue` 767 行 | `ServerDetailView.vue` 511 行 | 部分一致 | 部分（路由与字段可用性） | 第 9.95 轮：详情页顶部改为 Komari `InstanceDetail` 的导航条（返回 / 旗帜 + 名称 / 状态徽章 / 自定义标签 / 收藏与上一台·选择·下一台工具条），移除 CFSM 自创 hero 面板；原 hero 中的分组、数据源、运行时间与最后更新并入系统信息区，不丢失真实数据 | P1 | PASS |
+| 16 | 详情页结构 | `InstanceDetail.vue` 的共享 Header、顶部导航、资源卡与 2×2 信息卡层级；768/1024 的信息区分别为 1/2 列 | 第 9.95 轮已有导航条，但 Header 独立实现、信息卡内容和 768px 断点仍与真实浏览器不同 | 部分一致 | 部分（路由、字段与 CFSM 独有真实指标） | 第 10 轮：复用共享 `AppHeader`，按硬件/系统/存储/网络顺序收敛卡片；资源区 2→3→4 列、信息区 1→2 列断点与 Komari 一致；CFSM 独有且有真实数据的 probe/GPU/disk/history 区继续保留 | P1 | PASS |
 | 17 | 图标体系 | `@iconify/vue` 图标 | 文本 / emoji 占位 | 不一致 | 否 | 第 9.9 轮：以同名 Tabler / IconPark 图标替换全部字符占位；图标路径在构建期内联，运行时不访问图标 CDN（自托管与严格 CSP 环境的必要交付方式差异） | P1 | PASS（交付方式为 NECESSARY-CFSM-DIFFERENCE） |
 | 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | 第 9.95 轮：Tooltip / Tabs / Badge 改用上游同源的 `reka-ui` 基元（Portal、碰撞翻转、roving focus、`data-state` 与 aria 均由基元提供），瞬时提示改用 `vue-sonner`。Dialog / Drawer / Popover / Select / Switch / Slider 在上游仅服务于 CFSM 不具备的功能（汇率换算财务弹窗、Ping 监控弹窗）与已按规范移除的 QuickView，因此本主题没有对应弹层面，不制造空壳组件 | P1 | PASS（Dialog 等无对应面为 NECESSARY-CFSM-DIFFERENCE） |
 | 19 | 样式体系 | Tailwind 4 + `tw-animate-css` | 4700+ 行手写 CSS | 部分一致 | 否（属实现方式差异） | 第 9.9 轮已按 Komari 尺度校准主要 token：卡片 `rounded-xl`(12px)、列表行与指标盒 `rounded-lg`(8px)、指标网格 16/10px、芯片 11px、行高 64px。余下细粒度差异（逐处 shadow / blur 强度）接受为 P2 | P2 | P2-ACCEPTED |
@@ -64,12 +64,24 @@
 | 23 | Footer | Komari 品牌页脚 | `Powered by CF-Server-Monitor vX.Y.Z` + Glassmorphism Theme | 不一致 | **是**（§82 要求指向 CFSM） | 保持 CFSM 页脚 | — | NECESSARY-CFSM-DIFFERENCE |
 | 24 | 管理后台入口 | 主题内含登录/管理能力 | 外链 `/admin#admin` | 不一致 | **是**（第三方主题不得实现 CFSM 管理后台） | 保持外链 | — | NECESSARY-CFSM-DIFFERENCE |
 | 25 | 访客信息 / 审计日志 | `VisitorInfo`、`AuditLogPanel` | 关闭并隐藏 | 不一致 | **是**（无对应公开主题 API，禁止私有接口与外部猜测） | 保持隐藏 | — | NECESSARY-CFSM-DIFFERENCE |
-| 26 | 高级工具 | Komari 自有面板族 | 健康 / 性价比 / 快照 / 分类拓扑（登录态） | 部分一致 | 部分 | 高级工具是第 8 轮已落地且用户要求保留的 CFSM 能力，本轮只让其沿用统一视觉 token，不重新设计 Komari 首页结构 | P2 | P2-ACCEPTED |
+| 26 | 高级工具 | Komari 自有面板族 | 健康 / 性价比 / 快照 / 分类拓扑（登录态） | 部分一致 | 部分 | 高级工具是第 8 轮已落地且用户要求保留的 CFSM 能力；第 10 轮改为默认收起并由 Header 工具按钮显式展开，避免改变默认首页层级 | P2 | P2-ACCEPTED |
 | 27 | Light / Dark | `.dark` 类切换 | `:root[data-theme='dark']` | 一致（机制不同） | 否（等价实现） | 渲染器暗色样式已按此适配 | — | PASS |
-| 28 | 响应式断点 | 375 / 430 / 768 / 1024 / 1440 / 1920 无横向溢出 | 已由 `responsive-contract` 锁定 | 一致 | 否 | Earth 新渲染器沿用 Komari 自身断点 | — | PASS |
+| 28 | 响应式断点 | 375 / 430 / 768 / 1024 / 1440 / 1920 无横向溢出 | 第 9.95 轮只有源码契约，尚未做双版本浏览器实测 | 未充分验证 | 否 | 第 10 轮逐档并排实测首页、列表和详情；修复详情 768/1024 列数后六档均无页面级溢出、无控制台错误 | P1 | PASS |
 | 29 | 死代码残留 | — | 旧 SVG 地图 CSS 已清理；`.quick-view*` 样式仍残留（无组件引用，不可见） | — | 否 | 第 9.9 轮：已清除全部 `.quick-view*` 与旧手绘 SVG 地图残留规则，并新增回归断言防止再次进入产物 | P2 | PASS |
+| 30 | Header | 57px 高、32px logo、桌面状态区与紧凑动作按钮；移动端隐藏次要信息 | 第 9.95 轮 Header 高度、logo、状态与动作层级和真实输出有明显差异 | 不一致 | 否 | 第 10 轮按六档 localhost 几何收敛 Header，首页与详情共用同一组件 | P1 | PASS |
+| 31 | 首页节点层级与密度 | 控制区后直接渲染扁平 NodeCard/NodeList；mini/compact/comfortable/large 有固定最小列宽和密度 | 节点按分组再包一层标题/容器，控制区和四种卡片密度与浏览器输出不一致 | 不一致 | 否 | 第 10 轮移除视觉分组包装（分组筛选仍保留），收敛控制区、300/270/360/420px 栅格与 mini/large 卡片尺度 | P1 | PASS |
 
-## 本轮已修复（P0 全部 + 部分 P1）
+## 第 10 轮最终浏览器审计与收敛
+
+本轮首次在同一台机器上同时运行 Komari v3.3.7 localhost 与当前 CFSM 生产构建 localhost，并让两者消费等价的本地监控场景。审计覆盖 375×812、430×932、768×1024、1024×768、1440×900、1920×1080；逐档检查 Header、Earth/总览、筛选控制、卡片/列表、详情、滚动边界、交互状态与控制台。
+
+浏览器实测暴露并修复了此前源码契约没有覆盖的差异：Header 57px/32px logo；1280px 总宽与 16px 内容内边距；首页控制条；扁平节点层级；四种卡片网格和 mini/large 密度；高级工具默认层级；详情页共享 Header、四类信息卡和 768/1024 断点。修复后六档首页宏观几何与列数一致，卡片高度差控制在 0～3px 的 P2 范围；列表保持 Komari 的 64px 行高与十列横向滚动契约；详情资源/信息列数逐档一致。所有验证状态均无页面级横向溢出、无浏览器 console error。
+
+除常规在线数据外，还实际验证 light/dark/beijing、realistic/cobe/tiled、mini/compact/comfortable/large/list、0/10/64 节点、登录态高级工具、partial source failure、全部离线、详情 401/403/503、History 成功/空/401/409/503，以及旧四线路 + Node 1～4 的 `false`/`null`/number 三态。没有发现需要改写 REST、WebSocket、History、theme settings 或 normalized model 的问题。
+
+对应回归护栏已补入 `tests/fidelity-contract.test.ts` 与 `tests/responsive-contract.test.ts`，锁定扁平节点层级、工具默认收起、共享详情 Header、信息卡顺序、首页栅格宽度和详情断点。
+
+## 第 9.5 轮已修复（P0 全部 + 部分 P1）
 
 1. **Earth 三套真实渲染器恢复**（矩阵 1–4，P0）
    - `EarthMap.vue` 重写为与 Komari `NodeEarthGlobe.vue` 一致的懒加载分发器。
@@ -111,7 +123,7 @@
 ## 当前终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 2。**
-29 项审计的终态分布：PASS 23、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 2。
+31 项审计的终态分布：PASS 25、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 2。
 
 ## 数据真实性边界（不因保真而放宽）
 

@@ -21,6 +21,8 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 第 8 轮 Earth/Map、健康、性价比、快照与分类拓扑没有增加端点。它们只消费首页已经通过 `/api/config`、`/api/servers` 和 adapter 得到的 normalized snapshot；健康历史覆盖只来自 `/api/servers` 的真实 Ping/Loss 窗口，不在首页批量请求 `/api/history/all`。CFSM 没有公开 Audit Log 主题端点，因此该工具不渲染，也不回退到管理端私有 API。
 
+第 10 轮 v1.0.0 最终浏览器审计只收敛 UI 结构，没有增加、删除或改写任何请求。localhost 状态复验覆盖 `/api/config`、`/api/servers`、`/api/server`、`/api/history/all` 与 `/api/ws` 的成功、空、部分失败及 401/403/409/503 分支；owning apiBase、server ID 校验、partial merge、History revision/AbortController、旧四线路 + Node 1～4 和 `false`/`null`/number 三态均保持既有契约。高级工具的 Header 展开按钮只控制会话 UI 状态，不发请求，也不进入 `theme_options`。
+
 ## 请求契约
 
 ### GET /api/config

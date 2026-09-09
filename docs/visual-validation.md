@@ -1,8 +1,55 @@
 # 视觉与响应式验证
 
+## 第 10 轮：双版本 localhost 最终验证
+
+第 10 轮补上了此前没有完成的真实双版本浏览器对照：只读 Komari v3.3.7（`bf83765`）运行在 localhost，当前 CFSM 主题以生产 `dist` 运行在另一个 localhost；两者使用等价的本地监控场景。测试 fixture 与服务脚本只在被 Git 忽略的 `work/` 中，不进入源码、测试包或发布 ZIP。审计不是只读源码：每档都实际打开两个页面，观察渲染结果，读取计算后 DOM 几何与列数，操作交互，并检查 console error 与页面级横向溢出。
+
+### 首页六档矩阵
+
+| 视口 | Komari / CFSM 共同终态 | 节点列数 | 控制区 | 结果 |
+|---:|---|---:|---:|---|
+| 375 × 812 | Header 57px；Earth/总览自 y=57 开始；内容左右 16px | 1 | 72px 高 | 无页面溢出、无 console error |
+| 430 × 932 | Header 57px；移动端总览高度随宽度展开 | 1 | 72px 高 | 无页面溢出、无 console error |
+| 768 × 1024 | Header 57px；总览 232px | 2 | 72px 高 | 无页面溢出、无 console error |
+| 1024 × 768 | Header 57px；总览 232px；内容左右 16px | 3 | 72px 高 | 无页面溢出、无 console error |
+| 1440 × 900 | 1280px 总宽居中；总览 232px | 4 | 32px 高 | 无页面溢出、无 console error |
+| 1920 × 1080 | 1280px 总宽居中；总览 232px | 4 | 32px 高 | 无页面溢出、无 console error |
+
+首页实测后收敛了 Header（57px 高、32px logo、桌面状态区和移动端隐藏策略）、1280px 外层与 16px 内容内边距、筛选/搜索/视图控制条、扁平节点层级，以及 mini/compact/comfortable/large 的 270/300/360/420px 最小列宽。四种卡片模式在相同数据下与 Komari 的单卡高度差为 0～3px；这一余量归入已有的细粒度 P2 shadow/blur/排版实现差异。高级工具能力保留，但默认不占首页层级，只有点击 Header 工具按钮后才出现。
+
+列表模式另行在 375 与 1440 验证：行高均为 64px，十列计算宽度契约一致。窄屏横向滚动只发生在列表容器内，文档本身不溢出；桌面首行宽度与 1280px 内容容器对齐。
+
+### 详情页与 History
+
+| 视口 | 资源卡列数（Komari / CFSM） | 信息卡列数（Komari / CFSM） | 结果 |
+|---:|---:|---:|---|
+| 375 × 812 | 2 / 2 | 1 / 1 | 无页面溢出、无 console error |
+| 430 × 932 | 2 / 2 | 1 / 1 | 无页面溢出、无 console error |
+| 768 × 1024 | 3 / 3 | 1 / 1 | 无页面溢出、无 console error |
+| 1024 × 768 | 3 / 3 | 2 / 2 | 无页面溢出、无 console error |
+| 1440 × 900 | 4 / 4 | 2 / 2 | 无页面溢出、无 console error |
+| 1920 × 1080 | 4 / 4 | 2 / 2 | 无页面溢出、无 console error |
+
+详情页复用与首页一致的 Header，顶部仍保持返回 / 旗帜 + 名称 / 状态和标签 / 收藏与上下节点工具条；信息区顺序为硬件、系统、存储、网络。CFSM 真实提供且 Komari 对照场景没有同构位置的 probe、GPU、磁盘 IO 与 History 继续显示在后续区块，这属于真实数据内容扩展，不改变上述主层级。History 成功态实测 4 个 ECharts canvas；旧 CT/CU/CM/BD 和 Node 1～4 同时出现，`number` 显示数值，`null` 显示超时，`false` 隐藏或标记未配置，图表保持缺口。
+
+### 状态与交互矩阵
+
+| 场景 | 实际浏览器结果 |
+|---|---|
+| light / dark / beijing | 三种模式均可见且无 console error；北京时间模式按测试时刻解析到正确明暗主题 |
+| realistic / cobe / tiled | 分别加载 `globe.gl`、cobe canvas 与 tiled SVG/贴图；移动 tiled 无页面级溢出 |
+| advanced tools | 默认隐藏；点击 Header 工具按钮后显示 4 个标签页，按钮 `aria-pressed=true` |
+| 0 / 10 / 64 节点 | 空状态真实；常规和 dense 集合列数稳定，无页面溢出或 console error |
+| partial source / 503 / all offline | 保留可用来源或最后真实快照，并显示明确状态，不伪造成功数据 |
+| 详情 401 / 403 / 503 | 分别显示登录授权、访问拒绝/Turnstile、服务不可用语义，不生成占位节点 |
+| History 空 / 401 / 409 / 503 | 空状态明确不造趋势；鉴权、数据库升级与服务错误分类正确 |
+| 首页 → 详情 → 返回 | 卡片和列表均直达详情；返回恢复会话筛选和浏览器滚动位置 |
+
+最终浏览器审计没有发现需要改写第 4.5～9 轮数据/协议底座的问题。结构回归已同步到 `tests/fidelity-contract.test.ts` 和 `tests/responsive-contract.test.ts`；完整差异终态见 `docs/fidelity-audit.md`。
+
 ## 第 9.95 轮：详情页、History 与 UI 基元
 
-第 9.95 轮清零 `docs/fidelity-audit.md` 中剩余的三个 P1，验证以契约测试锁定，避免后续回退。
+第 9.95 轮当时以源码对照和契约测试清零 `docs/fidelity-audit.md` 中剩余的三个 P1，并未完成 Komari localhost 与 CFSM localhost 的并排浏览器复验。第 10 轮已补做真实浏览器对照，并据此继续修正 Header、详情信息卡和响应式断点；本节仅记录第 9.95 轮当时的验证范围。
 
 - **History 图表**：改用上游同款 `echarts` + `vue-echarts`。契约测试断言使用 `VChart` + `autoresize`、只注册用到的 ECharts 组件、且旧手写 SVG 折线实现（`pathSegments`、固定 `viewBox`）不再存在。数据真实性由 `connectNulls: false` 与「只有真实数值进入 series」两条断言锁定：超时与缺失形成断点，不补 0、不插值；九种 `hours` 与 401 / 409 / 503 / 空 / 网络状态处理保持不变。
 - **详情页层级**：顶部为 Komari 的导航条——返回、地区旗帜 + 名称、在线徽章、标签徽章、收藏与上一台 / 选择 / 下一台。契约测试断言 CFSM 自创的 `detail-hero` 与 "SERVER DETAIL" 文案已消失，且节点导航复用 `serverStore.servers` 并携带 owning `source`。
@@ -18,7 +65,7 @@
 - **节点卡片**：状态点 + 名称 / 收藏 + OS + 旗帜 / 芯片 / 四项进度 / 三列指标盒 / 延迟丢包面板 / 标签 / 离线遮罩，区块顺序由契约测试锁定；mini / compact / comfortable / large 与 dense 集合渲染继续生效。
 - **节点列表**：十列栅格契约（状态 / 系统 / 节点 / 信息 / 运行时间 / CPU / 内存 / 硬盘 / 流量 / 速率），行高 64px；窄屏保留列结构并允许容器横向滚动，不再拆成堆叠卡片。
 - **图标**：全部字符占位替换为同名 Tabler / IconPark 图标；`AppIcon` 不含任何网络请求，契约测试断言不出现 `api.iconify.design`。
-- **响应式**：375 / 430 / 768 / 1024 / 1440 / 1920 六档由 `tests/responsive-contract.test.ts` 锁定；新增断言确保 `.quick-view*` 与旧 SVG 地图样式不再进入产物。
+- **响应式**：第 9.9 轮仅由 `tests/responsive-contract.test.ts` 对 375 / 430 / 768 / 1024 / 1440 / 1920 六档做源码契约锁定，当时没有进行双版本浏览器并排实测；真实复验与随后修正的结论以本文件第 10 轮章节为准。契约同时确保 `.quick-view*` 与旧 SVG 地图样式不再进入产物。
 - **视觉 token**：卡片 12px、列表行与指标盒 8px 圆角，指标网格 16/10px，芯片 11px——按 Komari 的 Tailwind 尺度校准。
 
 第 9.95 轮已把历史图表、详情页信息层级与 UI 基元全部对齐上游，详见下节。

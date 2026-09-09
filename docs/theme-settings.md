@@ -18,6 +18,8 @@
 
 原 `cfsm-glassmorphism.dashboard.v1` 中的主题、视图和离线排序会一次性迁移到 `cfsm-glassmorphism.theme-options.v1`；旧 key 此后只保留 source+id 收藏。本地覆盖使用带 `version: 1` 的独立快照，即使清空也保留空层标记，避免再次迁移旧外观值。
 
+第 10 轮 v1.0.0 没有修改 48 项 schema、默认值、保存 body 或三层合并顺序。双版本浏览器审计中的 light/dark/beijing、realistic/cobe/tiled、四种卡片密度和 list 均通过现有 runtime 即时切换；新增的“高级工具是否展开”仅是 `dashboard-view` 会话状态，默认关闭，明确不属于第 48 项设置，也不写入 localStorage 或后端 `theme_options`。
+
 ## 状态定义
 
 - ✅ 1:1：配置含义和用户体验可以原样保留。

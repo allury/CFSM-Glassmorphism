@@ -29,4 +29,5 @@
 - Before handing off a code change, run `bun run lint`, `bun run typecheck`, `bun run test`, `bun run build`, and `bun run validate:dist`.
 - A development round is complete only after lint, typecheck, test, build, and dist validation all pass and that round's work is committed and pushed to the target repository. Never enter the next round before the current round has been pushed successfully.
 - CI must use a frozen Bun install and validate that the release archive contains only `index.html` plus `assets/` at its root.
+- Release notes under `docs/releases/` must be written in Chinese for v1.0.0 and all subsequent versions.
 - Update the compatibility matrix, API mapping, architecture notes, and settings audit whenever a relevant contract changes.

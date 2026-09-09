@@ -148,6 +148,26 @@ describe('Komari fidelity contracts', () => {
     expect(stylesheet).toMatch(/\.general-stage--tiled \.general-stage__earth\s*\{[^}]*grid-row: 2/s)
   })
 
+  it('keeps the Komari flat node flow and collapses optional tools by default', () => {
+    const home = source('../src/views/HomeView.vue')
+    const header = source('../src/components/dashboard/AppHeader.vue')
+    const viewStore = source('../src/stores/dashboard-view.ts')
+
+    // 节点直接进入一层卡片/列表，不恢复 CFSM 中间实现的分组容器。
+    expect(home).toContain('v-for="(server, index) in visibleServers"')
+    expect(home).toContain(':servers="visibleServers"')
+    expect(home).not.toContain('groupedServers')
+    expect(home).not.toContain('server-group')
+
+    // 第 8 轮高级工具能力保留，但按 Komari 首页层级默认收起，由 Header 显式打开。
+    expect(viewStore).toContain('const advancedToolsVisible = ref(false)')
+    expect(home).toContain('v-if="showAdvancedTools"')
+    expect(home).toContain('@toggle-tools="advancedToolsVisible = !advancedToolsVisible"')
+    expect(header).toContain('v-if="toolsAvailable"')
+    expect(header).toContain('@click="$emit(\'toggleTools\')"')
+    expect(header).toContain('<AppIcon name="tabler:tools"')
+  })
+
   /* 第 9.9 轮：表现层深度收敛。 */
 
   it('builds overview cards with the Komari card anatomy and no invented heading block', () => {
@@ -269,6 +289,24 @@ describe('Komari fidelity contracts', () => {
     // 上一台/下一台只复用首页已加载的索引，详情页仍只订阅单节点。
     expect(detail).toContain('serverStore.servers')
     expect(detail).toContain('query: { source: target.source.base }')
+  })
+
+  it('shares the released header and Komari information-card order on detail pages', () => {
+    const detail = source('../src/views/ServerDetailView.vue')
+
+    expect(detail).toContain("import AppHeader from '@/components/dashboard/AppHeader.vue'")
+    expect(detail).toContain('<AppHeader')
+
+    const hardware = detail.indexOf('detail-info-card--hardware')
+    const system = detail.indexOf('detail-info-card--system')
+    const storage = detail.indexOf('detail-info-card--storage')
+    const network = detail.indexOf('detail-info-card--network')
+    expect(hardware).toBeGreaterThan(-1)
+    expect(hardware).toBeLessThan(system)
+    expect(system).toBeLessThan(storage)
+    expect(storage).toBeLessThan(network)
+    expect(detail).toContain('总流量')
+    expect(detail).toContain('网络速率')
   })
 
   it('builds UI primitives on the upstream reka-ui and vue-sonner stack', () => {
