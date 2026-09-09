@@ -4,7 +4,13 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import HistoryChart from '@/components/detail/HistoryChart.vue'
+import AppBadge from '@/components/ui/AppBadge.vue'
+import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import { resolveRegionCoordinates } from '@/domain/advanced-tools'
+import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
+import { useServersStore } from '@/stores/servers'
+import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import {
   activeProbeTargets,
@@ -35,6 +41,8 @@ const router = useRouter()
 const app = useAppStore()
 const detail = useServerDetailStore()
 const theme = useThemeSettingsStore()
+const preferences = useDashboardPreferencesStore()
+const serverStore = useServersStore()
 const {
   server,
   sourceConfig,
@@ -121,6 +129,49 @@ const historyLabels: Record<HistoryHours, string> = {
   168: '7 天',
 }
 const historyOptions = HISTORY_HOURS.map((value) => ({ value, label: historyLabels[value] }))
+
+/*
+ * 与 Komari 详情页顶部工具条一致：收藏 + 上一台 / 节点选择 / 下一台。
+ * 导航列表复用首页已经加载的轻量索引（CODEX_SPEC §79），
+ * 详情页本身仍只订阅当前单节点，不会为了导航而订阅全量 WebSocket。
+ */
+const detailNodes = computed(() => serverStore.servers)
+const currentNodeIndex = computed(() => detailNodes.value.findIndex(
+  (item) => item.id === server.value?.id && item.source.base === server.value?.source.base,
+))
+const canNavigateNodes = computed(() => detailNodes.value.length > 1 && currentNodeIndex.value >= 0)
+const favoriteKey = computed(() => (
+  server.value ? `${server.value.source.base}::${server.value.id}` : null
+))
+const isFavorite = computed(() => (
+  favoriteKey.value !== null && preferences.isFavorite(favoriteKey.value)
+))
+const regionCode = computed(() => resolveRegionCoordinates(server.value?.region ?? null)?.code ?? null)
+
+function toggleFavorite(): void {
+  if (favoriteKey.value) preferences.toggleFavorite(favoriteKey.value)
+}
+
+function openNode(target: { id: string, source: { base: string } } | undefined): void {
+  if (!target) return
+  void router.push({
+    name: 'server-detail',
+    params: { id: target.id },
+    query: { source: target.source.base },
+  })
+}
+
+function navigateNode(step: number): void {
+  if (!canNavigateNodes.value) return
+  const size = detailNodes.value.length
+  const next = (currentNodeIndex.value + step + size) % size
+  openNode(detailNodes.value[next])
+}
+
+function selectNode(event: Event): void {
+  const value = event.target instanceof HTMLSelectElement ? event.target.value : ''
+  openNode(detailNodes.value.find((item) => `${item.source.base}::${item.id}` === value))
+}
 
 function meterWidth(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '0%'
@@ -256,41 +307,105 @@ onUnmounted(() => detail.close())
         </section>
 
         <section v-else-if="state === 'error'" class="state-panel state-panel--error detail-state" role="alert">
-          <span class="state-panel__icon" aria-hidden="true">!</span>
-          <h1>{{ issueCopy(issue, 'detail').title }}</h1>
-          <p>{{ issueCopy(issue, 'detail').body }}</p>
-          <small v-if="issue?.status">HTTP {{ issue.status }} · {{ issue.message }}</small>
-          <div class="detail-state__actions">
-            <button type="button" @click="loadCurrent">
-              重新加载
-            </button>
-            <button type="button" @click="router.push({ name: 'home' })">
-              返回首页
-            </button>
-          </div>
+          <AppEmpty
+            tone="error"
+            :title="issueCopy(issue, 'detail').title"
+            :description="issueCopy(issue, 'detail').body"
+          >
+            <template #icon>
+              <AppIcon name="lucide:octagon-x" :size="20" />
+            </template>
+            <template #extra>
+              <small v-if="issue?.status">HTTP {{ issue.status }} · {{ issue.message }}</small>
+              <div class="detail-state__actions">
+                <button type="button" @click="loadCurrent">
+                  重新加载
+                </button>
+                <button type="button" @click="router.push({ name: 'home' })">
+                  返回首页
+                </button>
+              </div>
+            </template>
+          </AppEmpty>
         </section>
 
         <template v-else-if="server">
-          <section class="detail-hero glass-panel">
-            <div class="detail-hero__main">
-              <div class="detail-hero__status" :class="server.online ? 'is-online' : 'is-offline'">
-                <span class="node-status" :class="server.online ? 'node-status--online' : 'node-status--offline'" />
-                {{ server.online ? '在线' : '离线' }}
-              </div>
-              <span class="eyebrow">SERVER DETAIL</span>
-              <h1>{{ server.name }}</h1>
-              <p>{{ [server.operatingSystem, server.architecture, server.region].filter(Boolean).join(' · ') || 'CFSM 未返回系统元数据' }}</p>
-              <div v-if="server.tags.length" class="tag-row">
-                <span v-for="tag in server.tags" :key="tag" class="tag">{{ tag }}</span>
-              </div>
+          <div class="detail-topbar">
+            <button
+              type="button"
+              class="icon-button"
+              aria-label="返回首页"
+              title="返回首页"
+              @click="router.push({ name: 'home' })"
+            >
+              <AppIcon name="tabler:arrow-left" :size="16" />
+            </button>
+
+            <div class="detail-topbar__identity">
+              <img
+                v-if="regionCode"
+                class="detail-topbar__flag"
+                :src="flagUrl(regionCode)"
+                :alt="server.region ?? regionCode"
+                @error="hideMissingFlag"
+              >
+              <span class="detail-topbar__name" :title="server.name">{{ server.name }}</span>
             </div>
-            <dl class="detail-hero__facts">
-              <div><dt>分组</dt><dd>{{ server.group || '未分组' }}</dd></div>
-              <div><dt>数据源</dt><dd>{{ server.source.label }}</dd></div>
-              <div><dt>运行时间</dt><dd>{{ formatUptime(server.bootTime) }}</dd></div>
-              <div><dt>最后更新</dt><dd>{{ formatTimestamp(server.lastUpdated ?? server.timestamp) }}</dd></div>
-            </dl>
-          </section>
+
+            <AppBadge :variant="server.online ? 'default' : 'destructive'">
+              {{ server.online ? '在线' : '离线' }}
+            </AppBadge>
+
+            <div v-if="server.tags.length" class="detail-topbar__tags">
+              <AppBadge v-for="tag in server.tags" :key="tag" variant="outline">
+                {{ tag }}
+              </AppBadge>
+            </div>
+
+            <div class="detail-topbar__tools">
+              <button
+                type="button"
+                class="icon-button favorite-button"
+                :class="{ 'is-favorite': isFavorite }"
+                :aria-label="isFavorite ? '取消收藏当前节点' : '收藏当前节点'"
+                :title="isFavorite ? '取消收藏' : '收藏节点'"
+                @click="toggleFavorite"
+              >
+                <AppIcon :name="isFavorite ? 'tabler:star-filled' : 'tabler:star'" :size="14" />
+              </button>
+              <button
+                type="button"
+                class="icon-button"
+                :disabled="!canNavigateNodes"
+                aria-label="上一个节点"
+                title="上一个节点"
+                @click="navigateNode(-1)"
+              >
+                <AppIcon name="tabler:chevron-left" :size="14" />
+              </button>
+              <select
+                v-if="canNavigateNodes"
+                class="detail-topbar__select"
+                :value="favoriteKey ?? undefined"
+                aria-label="切换节点"
+                @change="selectNode"
+              >
+                <option v-for="node in detailNodes" :key="`${node.source.base}::${node.id}`" :value="`${node.source.base}::${node.id}`">
+                  {{ node.name }}
+                </option>
+              </select>
+              <button
+                type="button"
+                class="icon-button"
+                :disabled="!canNavigateNodes"
+                aria-label="下一个节点"
+                title="下一个节点"
+                @click="navigateNode(1)"
+              >
+                <AppIcon name="tabler:chevron-right" :size="14" />
+              </button>
+            </div>
+          </div>
 
           <div v-if="timedOut" class="notice notice--warning notice--choice" role="status">
             <div><strong>单节点实时连接已达到站点时限</strong><span>请选择继续连接，或保留当前真实快照。</span></div>
@@ -433,6 +548,11 @@ onUnmounted(() => detail.close())
                 <div><dt>Agent</dt><dd>{{ server.agentVersion ?? '—' }}</dd></div>
                 <div><dt>IPv4</dt><dd>{{ server.ipV4Reachable === null ? '未知' : server.ipV4Reachable === '1' ? '可达' : '不可达' }}</dd></div>
                 <div><dt>IPv6</dt><dd>{{ server.ipV6Reachable === null ? '未知' : server.ipV6Reachable === '1' ? '可达' : '不可达' }}</dd></div>
+                <div><dt>地区</dt><dd>{{ server.region ?? '—' }}</dd></div>
+                <div><dt>分组</dt><dd>{{ server.group || '未分组' }}</dd></div>
+                <div><dt>数据源</dt><dd>{{ server.source.label }}</dd></div>
+                <div><dt>运行时间</dt><dd>{{ formatUptime(server.bootTime) }}</dd></div>
+                <div><dt>最后更新</dt><dd>{{ formatTimestamp(server.lastUpdated ?? server.timestamp) }}</dd></div>
               </dl>
             </article>
             <article v-if="showPrice || showExpiry || showTrafficPolicy" class="detail-info-card glass-panel">

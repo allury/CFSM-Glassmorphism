@@ -1,5 +1,15 @@
 # 视觉与响应式验证
 
+## 第 9.95 轮：详情页、History 与 UI 基元
+
+第 9.95 轮清零 `docs/fidelity-audit.md` 中剩余的三个 P1，验证以契约测试锁定，避免后续回退。
+
+- **History 图表**：改用上游同款 `echarts` + `vue-echarts`。契约测试断言使用 `VChart` + `autoresize`、只注册用到的 ECharts 组件、且旧手写 SVG 折线实现（`pathSegments`、固定 `viewBox`）不再存在。数据真实性由 `connectNulls: false` 与「只有真实数值进入 series」两条断言锁定：超时与缺失形成断点，不补 0、不插值；九种 `hours` 与 401 / 409 / 503 / 空 / 网络状态处理保持不变。
+- **详情页层级**：顶部为 Komari 的导航条——返回、地区旗帜 + 名称、在线徽章、标签徽章、收藏与上一台 / 选择 / 下一台。契约测试断言 CFSM 自创的 `detail-hero` 与 "SERVER DETAIL" 文案已消失，且节点导航复用 `serverStore.servers` 并携带 owning `source`。
+- **UI 基元与弹层**：Tooltip 走 `reka-ui` 的 `TooltipProvider / Portal`（真实 portal、碰撞翻转、ESC 与焦点行为），Tabs 走 `TabsRoot / List / Trigger`（roving focus 与方向键导航），Badge 走 `Primitive`；瞬时提示走 `vue-sonner`，`AppToaster` 在 `App.vue` 挂载一次。契约测试同时断言两处标签区不再手写 `role="tablist"`，设置页瞬时反馈不再常驻页面。
+- **体积门槛**：引入 ECharts 与 UI 基元后 `validate:dist` 预算上调为 JS 3328 KiB / CSS 128 KiB / 总资源 6656 KiB，仍为硬门槛；ECharts 随详情页分块懒加载，未进入首页初始包。
+- **死代码**：旧 SVG 折线样式、旧 tooltip 定位样式、`detail-hero*` 与 `.settings-save-alert.is-success` 均已删除。
+
 ## 第 9.9 轮：表现层深度收敛
 
 第 9.9 轮继续以 Komari v3.3.7（`bf83765`）源码为权威基准，逐项终态见 `docs/fidelity-audit.md`。
@@ -11,7 +21,7 @@
 - **响应式**：375 / 430 / 768 / 1024 / 1440 / 1920 六档由 `tests/responsive-contract.test.ts` 锁定；新增断言确保 `.quick-view*` 与旧 SVG 地图样式不再进入产物。
 - **视觉 token**：卡片 12px、列表行与指标盒 8px 圆角，指标网格 16/10px，芯片 11px——按 Komari 的 Tailwind 尺度校准。
 
-尚未对齐因而**未做**视觉基线更新的区域：历史图表（仍为手写 SVG）、详情页信息层级、UI 基元与弹层族。
+第 9.95 轮已把历史图表、详情页信息层级与 UI 基元全部对齐上游，详见下节。
 
 ## 第 9.5 轮：1:1 高保真收敛
 

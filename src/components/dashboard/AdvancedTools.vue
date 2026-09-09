@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import AppTabs from '@/components/ui/AppTabs.vue'
 import {
   buildHealthSummary,
   buildSnapshot,
@@ -45,6 +46,7 @@ const tools: ReadonlyArray<{ key: ToolKey, label: string, hint: string }> = [
   { key: 'snapshot', label: '快照导出', hint: '当前已加载数据' },
   { key: 'topology', label: '拓扑', hint: '地区与分组' },
 ]
+const toolTabs = tools.map((tool) => ({ value: tool.key, label: tool.label, hint: tool.hint }))
 const healthTones: readonly HealthTone[] = ['healthy', 'warning', 'critical', 'unknown']
 
 function toneLabel(tone: HealthTone): string {
@@ -92,20 +94,12 @@ function exportSnapshot(format: 'json' | 'csv'): void {
       <span class="advanced-tools__badge">{{ servers.length }} NODES</span>
     </header>
 
-    <div class="advanced-tools__tabs" role="tablist" aria-label="高级工具">
-      <button
-        v-for="tool in tools"
-        :key="tool.key"
-        type="button"
-        role="tab"
-        :aria-selected="activeTool === tool.key"
-        :class="{ 'is-active': activeTool === tool.key }"
-        @click="activeTool = tool.key"
-      >
-        <strong>{{ tool.label }}</strong>
-        <span>{{ tool.hint }}</span>
-      </button>
-    </div>
+    <AppTabs
+      v-model="activeTool"
+      class="advanced-tools__tabs"
+      list-label="高级工具"
+      :items="toolTabs"
+    />
 
     <div v-if="activeTool === 'health'" class="tool-panel" role="tabpanel">
       <div class="health-summary">

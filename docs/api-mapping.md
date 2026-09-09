@@ -13,7 +13,7 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 | Config | `GET /api/config` | `src/frontend/main.js`、`utils/api.js`、`utils/turnstile.js` | `fetchSiteConfig` → `normalizeSiteConfig` | 已用于真实首页并测试 |
 | Servers | `GET /api/servers` | `src/frontend/utils/server.js`、`views/dashboard` | `fetchServers` / `fetchAllServerSources` → `normalizeServerCollection` → `toGlassServer` | 已用于真实首页并测试，支持多来源部分失败 |
 | Detail | `GET /api/server?id=<id>` | `src/frontend/utils/server.js`、`views/ServerDetail.vue` | `fetchServer` / `fetchServerFromSources` → `normalizeServer` → `server-detail` store | 已用于 `/#/server/:id` 并测试 |
-| History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` → 详情 SVG 图表模型 | 已用于真实详情图表并测试 |
+| History | `GET /api/history/all?id=<id>&hours=<hours>` | `src/frontend/utils/api.js`、`views/ServerDetail.vue` | `fetchHistory` → `normalizeHistory` → 详情 ECharts 图表模型 | 已用于真实详情图表并测试 |
 | WebSocket | `GET /api/ws?subscribe=<all\|id>` | Dashboard 与 `utils/api.js` 的订阅逻辑 | `createCfsmSocket` → `normalizeSocketBatch` → `mergeRealtimeSample` | 首页与单节点详情均已实现 |
 | Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `theme-settings` store → `saveThemeOptions` → `normalizeThemeOptionsSave` → `/api/config` 回读 | 已用于设置页完整快照保存并测试 |
 

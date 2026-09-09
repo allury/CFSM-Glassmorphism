@@ -44,7 +44,7 @@ frozen install
 -> artifact upload
 ~~~
 
-The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contains only `index.html` and `assets/`. `bun run validate:dist` also scans for forbidden Komari runtime markers and enforces release size budgets (JavaScript 2816 KiB, CSS 128 KiB, total assets 6144 KiB — sized for the upstream Earth renderers and their textures), failing the build when exceeded. Generated dist directories and ZIP files are not committed.
+The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contains only `index.html` and `assets/`. `bun run validate:dist` also scans for forbidden Komari runtime markers and enforces release size budgets (JavaScript 3328 KiB, CSS 128 KiB, total assets 6656 KiB — sized for the upstream Earth renderers, their textures and the echarts chart family), failing the build when exceeded. Generated dist directories and ZIP files are not committed.
 
 ## Documentation
 
@@ -59,4 +59,4 @@ The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contai
 
 ## UI authority
 
-Komari Glassmorphism is the single source of truth for the released UI and UX. The existing implementation here records which CFSM features already work; it is not the visual truth. Differences are aligned to Komari unless they are required CFSM platform differences, and every audited difference is tracked in docs/fidelity-audit.md. The three Earth renderers are the upstream implementations (globe.gl + three, cobe, and the real tiled earth map) rather than imitations; three and globe.gl load lazily and only for the realistic renderer. Icons use the same Tabler and IconPark names as upstream, with their paths inlined at build time so the theme never calls an icon CDN at runtime. Flags and OS icons come from the CFSM default skin (`/flags/<code>.svg`, `/os-icons/<filename>`) and are not bundled.
+Komari Glassmorphism is the single source of truth for the released UI and UX. The existing implementation here records which CFSM features already work; it is not the visual truth. Differences are aligned to Komari unless they are required CFSM platform differences, and every audited difference is tracked in docs/fidelity-audit.md. The three Earth renderers are the upstream implementations (globe.gl + three, cobe, and the real tiled earth map) rather than imitations; three and globe.gl load lazily and only for the realistic renderer. Icons use the same Tabler and IconPark names as upstream, with their paths inlined at build time so the theme never calls an icon CDN at runtime. Flags and OS icons come from the CFSM default skin (`/flags/<code>.svg`, `/os-icons/<filename>`) and are not bundled. History charts run on the same echarts and vue-echarts stack as upstream, with `connectNulls: false` so timeouts and missing samples stay gaps rather than zeros, and UI primitives (tooltip, tabs, badge, toasts) are built on reka-ui and vue-sonner.

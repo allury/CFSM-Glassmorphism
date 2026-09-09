@@ -31,6 +31,10 @@
 
 第 9 轮不新增功能、不改动上表任何状态，只在既有实现上做性能、稳定性、异常与测试收敛：统一 server ID 白名单校验并在请求前拦截非法 id；错误分类补齐 `forbidden`(403) 与 `server-error`(5xx)；WebSocket 重连退避改为连接稳定 10 秒后才归零，抑制 open→立即断开的重连风暴；首页大规模节点改用 `shallowRef` 与 WeakMap 缓存的 `GlassServer` 映射、列表行 `v-memo`、预计算动画延迟，降低 50+ 节点实时更新的重算开销；dist 校验新增 JS/CSS/总资源体积预算。历史陈旧响应/并发切换经核验由控件禁用 + `revision`/AbortController 保护，未改动代码。上述改动均不影响数据真实性边界与视觉结构。
 
+## 第 9.95 轮实现进度
+
+第 9.95 轮清零剩余 P1，同样不改变任何 CFSM 数据能力，下表状态全部不变。实现方式变化：History 图表由手写 SVG 改为上游同款 `echarts` + `vue-echarts`（三态与不插值规则原样保留）；详情页顶部改为 Komari 的导航条并补上「上一台 / 下一台」（复用首页索引，详情仍只订阅单节点）；Tooltip / Tabs / Badge 改用 `reka-ui`，瞬时提示改用 `vue-sonner`。逐项终态见 `docs/fidelity-audit.md`。
+
 ## 第 9.9 轮实现进度
 
 第 9.9 轮同样只做表现层收敛，不改变任何 CFSM 数据能力，下表功能可行性状态全部不变。实现方式的变化：总览卡片、节点卡片与节点列表的 DOM 结构改为 Komari 解剖；字符占位图标替换为与 Komari 同名的 Tabler / IconPark 图标（路径构建期内联，运行时不访问图标 CDN）；OS 图标改用 CFSM 默认皮肤的 `/os-icons/<filename>`，与旗帜一样不打包进主题。价格可见性新增每台节点的 `showPrice` 门控，与详情页保持一致——这属于更严格地遵守服务端已有的可见性设置，不改变字段可用性。逐项终态见 `docs/fidelity-audit.md`。
@@ -87,7 +91,7 @@
 | 定时刷新间隔 | dataUpdateInterval/RPC | REST + 服务端五秒 WS 批次 | 设置只控制 REST 补偿/前端刷新，不改变服务端节奏 | 🟡 降级实现 |
 | 实时订阅 | `/api/clients` | `/api/ws` | 每个 base 独立连接、订阅其自身 IDs、增量合并 | 🟢 等价实现 |
 | 单节点详情初始数据 | Komari node RPC | `/api/server?id=` | 已实现详情只拉单节点；owning base 已知时不探测其他来源 | 🟢 等价实现 |
-| 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 已实现官方九种周期、稀疏点 SVG 图表与真实空/错误状态 | 🟢 等价实现 |
+| 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 已实现官方九种周期、稀疏点 ECharts 图表与真实空/错误状态 | 🟢 等价实现 |
 | 超过 24 小时历史 | Komari 鉴权历史 | hours 48/96/168 需 JWT | 保留登录门槛并显示 401 | ✅ 1:1 |
 | 磁盘耗尽预测 | 历史回归 | history disk_used/disk_total | 只在足够真实样本时计算 | 🟢 等价实现 |
 | 详情指标面板 | 预设与自定义 keys | 详情/历史公开字段 | 建立指标注册表并按可用性隐藏 | 🟢 等价实现 |

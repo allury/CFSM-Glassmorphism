@@ -217,15 +217,17 @@ a {
   mix-blend-mode: screen;
 }
 
+/*
+ * Round 9.95: UI 基元改用 Komari 同源的 reka-ui / vue-sonner 组件族。
+ * Tooltip 由 reka-ui 通过 Portal 渲染并自行处理定位与碰撞翻转，
+ * 因此这里只描述外观，不再手写 absolute 定位与 hover 显隐。
+ */
 .app-tooltip {
-  position: relative;
   display: inline-flex;
   min-width: 0;
 }
 
 .app-tooltip__bubble {
-  position: absolute;
-  left: 50%;
   z-index: 120;
   width: max-content;
   max-width: min(260px, calc(100vw - 24px));
@@ -239,38 +241,125 @@ a {
   font-weight: 500;
   line-height: 1.45;
   white-space: pre-line;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translate(-50%, 4px) scale(0.98);
-  transition: opacity 130ms ease, transform 130ms ease, visibility 130ms;
   backdrop-filter: blur(18px) saturate(150%);
 }
 
-.app-tooltip__bubble--top {
-  bottom: calc(100% + 8px);
+.app-tooltip__arrow {
+  fill: var(--glass-strong);
 }
 
-.app-tooltip__bubble--bottom {
-  top: calc(100% + 8px);
+.app-tabs__list {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
 
-.app-tooltip:hover > .app-tooltip__bubble,
-.app-tooltip:focus-within > .app-tooltip__bubble {
-  opacity: 1;
-  visibility: visible;
-  transform: translate(-50%, 0) scale(1);
+.app-tabs__list::-webkit-scrollbar {
+  display: none;
 }
 
-.header-actions .app-tooltip:last-child > .app-tooltip__bubble {
-  right: 0;
-  left: auto;
-  transform: translate(0, 4px) scale(0.98);
+.app-tabs__trigger {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  transition: color 150ms ease, background-color 150ms ease;
 }
 
-.header-actions .app-tooltip:last-child:hover > .app-tooltip__bubble,
-.header-actions .app-tooltip:last-child:focus-within > .app-tooltip__bubble {
-  transform: translate(0, 0) scale(1);
+.app-tabs__trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.app-badge {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-badge--default {
+  color: var(--emerald);
+  background: var(--emerald-soft);
+}
+
+.app-badge--secondary {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.app-badge--outline {
+  border-color: color-mix(in srgb, var(--muted) 15%, transparent);
+  color: var(--muted);
+}
+
+.app-badge--destructive {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.app-empty {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  padding: 28px 18px;
+  text-align: center;
+}
+
+.app-empty__icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.app-empty--error .app-empty__icon {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
+.app-empty__title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.app-empty__description {
+  margin: 0;
+  max-width: 46ch;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.app-toaster__spin {
+  animation: app-spin 900ms linear infinite;
+}
+
+@keyframes app-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .app-header {
@@ -679,25 +768,17 @@ a {
   margin-bottom: 16px;
 }
 
-.group-tabs {
-  display: flex;
+.group-tabs .app-tabs__list {
   width: 100%;
   gap: 5px;
   padding: 4px;
-  overflow-x: auto;
   border: 1px solid var(--glass-border);
   border-radius: 11px;
   background: var(--glass-soft);
   box-shadow: var(--shadow-soft);
-  scrollbar-width: none;
   backdrop-filter: blur(18px);
 }
 
-.group-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.group-tabs button,
 .quick-controls button,
 .view-switch button {
   border: 0;
@@ -708,16 +789,17 @@ a {
   transition: color 140ms ease, background-color 140ms ease, box-shadow 140ms ease;
 }
 
-.group-tabs button {
+.group-tabs .app-tabs__trigger {
   min-height: 29px;
+  align-items: center;
   padding: 5px 11px;
   border-radius: 8px;
   font-size: 11px;
   font-weight: 650;
+  white-space: nowrap;
 }
 
-.group-tabs button:hover,
-.group-tabs button.is-active,
+.group-tabs .app-tabs__trigger:hover,
 .quick-controls button:hover,
 .quick-controls button.is-active,
 .view-switch button:hover,
@@ -727,8 +809,10 @@ a {
   box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
 }
 
-.group-tabs button.is-active {
+.group-tabs .app-tabs__trigger[data-state='active'] {
   color: var(--emerald);
+  background: var(--glass-strong);
+  box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
 }
 
 .dashboard-controls__row,
@@ -2108,107 +2192,100 @@ a {
   gap: 10px;
 }
 
-.detail-hero {
-  position: relative;
-  display: grid;
-  overflow: hidden;
-  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.8fr);
-  gap: 30px;
-  padding: 34px;
-  border-radius: 26px;
-}
 
-.detail-hero::after {
-  position: absolute;
-  top: -90px;
-  right: -70px;
-  width: 280px;
-  height: 280px;
-  border-radius: 50%;
-  background: radial-gradient(circle, var(--emerald-soft), transparent 68%);
-  content: '';
-  pointer-events: none;
-}
-
-.detail-hero__main {
-  position: relative;
-  z-index: 1;
-  min-width: 0;
-}
-
-.detail-hero__status {
-  display: inline-flex;
+/*
+ * Round 9.95: 详情页顶部对齐 Komari `InstanceDetail` 的导航条——
+ * 返回 / 旗帜 + 名称 / 状态徽章 / 自定义标签 / 收藏与上下节点工具条，
+ * 取代此前 CFSM 自创的 hero 面板。
+ */
+.detail-topbar {
+  display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 22px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.detail-hero__status.is-online {
-  color: var(--emerald);
-  background: var(--emerald-soft);
-}
-
-.detail-hero__status.is-offline {
-  color: var(--red);
-  background: var(--red-soft);
-}
-
-.detail-hero h1 {
-  overflow-wrap: anywhere;
-  margin: 4px 0 8px;
-  font-size: clamp(30px, 5vw, 58px);
-  font-weight: 850;
-  letter-spacing: -0.045em;
-  line-height: 0.98;
-}
-
-.detail-hero p {
-  margin: 0 0 18px;
-  color: var(--muted);
-}
-
-.detail-hero__facts {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  align-content: center;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin: 0;
-}
-
-.detail-hero__facts > div {
+.detail-topbar__identity {
+  display: flex;
   min-width: 0;
-  padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--glass-soft);
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
-.detail-hero__facts dt,
+.detail-topbar__flag {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 3px;
+  object-fit: cover;
+}
+
+.detail-topbar__name {
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-topbar__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.detail-topbar__tools {
+  display: flex;
+  height: 32px;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 2px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--glass) 50%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.detail-topbar__tools .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.detail-topbar__select {
+  max-width: 136px;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  font-size: 11px;
+  outline: none;
+}
+
+@media (min-width: 640px) {
+  .detail-topbar {
+    gap: 16px;
+  }
+
+  .detail-topbar__select {
+    max-width: 192px;
+  }
+}
+
+.detail-section {
+  margin-top: 34px;
+}
+
 .detail-list dt {
   color: var(--faint);
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.detail-hero__facts dd {
-  overflow: hidden;
-  margin: 5px 0 0;
-  font-size: 13px;
-  font-weight: 760;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-section {
-  margin-top: 34px;
 }
 
 .detail-section__header {
@@ -2525,34 +2602,11 @@ a {
   font-size: 10px;
 }
 
+/* ECharts 需要容器有确定高度；与 Komari 的 h-48 图表区一致。 */
 .history-chart__canvas {
-  margin-top: 10px;
-}
-
-.history-chart__canvas svg {
-  display: block;
   width: 100%;
-  height: auto;
-  overflow: visible;
-}
-
-.history-chart__grid line {
-  stroke: var(--line);
-  stroke-width: 1;
-}
-
-.history-chart__grid text,
-.history-chart__time {
-  fill: var(--faint);
-  font-size: 9px;
-}
-
-.history-chart__line {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2.2;
-  vector-effect: non-scaling-stroke;
+  height: 192px;
+  margin-top: 10px;
 }
 
 .history-chart__legend {
@@ -2656,12 +2710,6 @@ a {
     padding-top: 16px;
   }
 
-  .detail-hero {
-    grid-template-columns: 1fr;
-    gap: 20px;
-    padding: 22px;
-  }
-
   .detail-two-column,
   .detail-two-column {
     grid-template-columns: 1fr;
@@ -2687,7 +2735,6 @@ a {
 }
 
 @media (max-width: 430px) {
-  .detail-hero__facts,
   .detail-network-speed,
   .detail-list,
   .probe-detail-grid,
@@ -3298,12 +3345,6 @@ a {
   background: var(--red-soft);
 }
 
-.settings-save-alert.is-success {
-  color: var(--emerald);
-  border-color: color-mix(in srgb, var(--emerald) 32%, transparent);
-  background: var(--emerald-soft);
-}
-
 .settings-save-alert small {
   opacity: 0.78;
 }
@@ -3570,46 +3611,39 @@ a {
   letter-spacing: 0.08em;
 }
 
-.advanced-tools__tabs {
+.advanced-tools__tabs .app-tabs__list {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   padding: 5px;
+  overflow: visible;
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--glass-soft);
 }
 
-.advanced-tools__tabs button {
-  display: flex;
-  min-width: 0;
-  align-items: flex-start;
-  flex-direction: column;
-  gap: 2px;
+.advanced-tools__tabs .app-tabs__trigger {
   padding: 9px 11px;
-  border: 0;
   border-radius: 10px;
-  color: var(--muted);
-  background: transparent;
-  cursor: pointer;
 }
 
-.advanced-tools__tabs button:hover,
-.advanced-tools__tabs button.is-active {
+.advanced-tools__tabs .app-tabs__trigger:hover,
+.advanced-tools__tabs .app-tabs__trigger[data-state='active'] {
   color: var(--ink);
   background: var(--glass-strong);
   box-shadow: var(--shadow-soft);
 }
 
-.advanced-tools__tabs button.is-active strong {
+.advanced-tools__tabs .app-tabs__trigger[data-state='active'] span {
   color: var(--emerald);
 }
 
-.advanced-tools__tabs strong {
+.advanced-tools__tabs .app-tabs__trigger > span {
   font-size: 11px;
+  font-weight: 700;
 }
 
-.advanced-tools__tabs span {
+.advanced-tools__tabs small {
   overflow: hidden;
   width: 100%;
   color: var(--faint);
@@ -4089,13 +4123,12 @@ a {
     flex-direction: column;
   }
 
-  .advanced-tools__tabs {
+  .advanced-tools__tabs .app-tabs__list {
     display: flex;
     overflow-x: auto;
-    scrollbar-width: none;
   }
 
-  .advanced-tools__tabs button {
+  .advanced-tools__tabs .app-tabs__trigger {
     min-width: 104px;
   }
 

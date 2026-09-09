@@ -5,6 +5,7 @@ import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import { useAppStore } from '@/stores/app'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { THEME_SETTING_KEYS, type ThemeSettings } from '@/theme/settings'
+import { message } from '@/utils/message'
 
 const app = useAppStore()
 const theme = useThemeSettingsStore()
@@ -71,6 +72,29 @@ async function copySnapshot(): Promise<void> {
 }
 
 watch(() => theme.draft, () => theme.previewDraft(), { deep: true })
+
+/*
+ * 与 Komari `utils/message.ts` 一致：瞬时结果反馈走 sonner toast，不再在页面内
+ * 常驻提示条。草稿校验问题仍留在页面里，因为它需要持续可见直到被修正。
+ */
+watch(() => theme.message, (text) => {
+  if (text) message.success(text)
+})
+
+watch(backendSaveCopy, (copy) => {
+  if (!copy) return
+  const failure = theme.saveError
+  const detail = failure?.status ? `HTTP ${failure.status} · ${failure.code ?? 'unknown'}` : undefined
+  message.error(copy, detail)
+})
+
+watch(() => theme.refetchWarning, (warning) => {
+  if (warning) message.info(`配置回读错误：${warning}`)
+})
+
+watch(copyMessage, (text) => {
+  if (text) message.info(text)
+})
 
 onMounted(async () => {
   if (app.state === 'idle' || app.state === 'error') await app.initialize()
@@ -389,16 +413,6 @@ onMounted(async () => {
             <div v-if="theme.draftIssues.length" class="settings-save-alert is-error" role="alert">
               <strong>需要修正 {{ theme.draftIssues.length }} 项</strong>
               <span v-for="issue in theme.draftIssues" :key="issue.key">{{ issue.message }}</span>
-            </div>
-            <div v-if="backendSaveCopy" class="settings-save-alert is-error" role="alert">
-              <strong>后端保存失败</strong>
-              <span>{{ backendSaveCopy }}</span>
-              <small v-if="theme.saveError?.status">HTTP {{ theme.saveError.status }} · {{ theme.saveError.code ?? 'unknown' }}</small>
-            </div>
-            <div v-if="theme.message" class="settings-save-alert is-success" role="status">
-              <strong>{{ theme.saveState === 'success' ? '操作完成' : '设置状态' }}</strong>
-              <span>{{ theme.message }}</span>
-              <small v-if="theme.refetchWarning">回读错误：{{ theme.refetchWarning }}</small>
             </div>
 
             <button class="settings-action settings-action--primary" type="button" :disabled="!theme.canSaveDraft" @click="theme.saveLocal">

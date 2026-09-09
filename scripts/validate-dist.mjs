@@ -15,10 +15,18 @@ const expectedRootEntries = ['assets', 'index.html']
  * 因此预算按真实构成重设，仍保持「只留合理余量」以继续拦截意外膨胀：
  * globe.gl 与 three 只在选用 realistic 渲染器时按需懒加载，不进入首屏包。
  */
+/*
+ * 体积预算按「正式版高保真所需的上游依赖」的真实构成设定，而不是无限放宽：
+ * - globe.gl + three 是 realistic Earth 渲染器本身的实现（懒加载，仅该渲染器加载）；
+ * - echarts + vue-echarts 是 History 图表族的实现（懒加载，随详情页分块加载）；
+ * - 地球贴图是原主题资源，占总资源预算的大头。
+ * 这些都不允许为了缩小包体退回自写仿制版本，因此预算随之上调，但仍是硬门槛：
+ * 超出即让 dist 校验失败，防止无关依赖悄悄进入产物。
+ */
 const sizeBudgets = {
-  javascript: 2816 * 1024,
+  javascript: 3328 * 1024,
   stylesheet: 128 * 1024,
-  allAssets: 6144 * 1024,
+  allAssets: 6656 * 1024,
 }
 const forbiddenRuntimeMarkers = [
   '/api/public',

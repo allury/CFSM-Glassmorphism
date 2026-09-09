@@ -1,4 +1,12 @@
- 已清除全部 .quick-view* 与旧 SVG 地图残留规则，并加回归断言 | P2 | ✅ 已修复 || P2 | ✅ 已校准（主要项） || P1 | ✅ 已修复 || P1 | ✅ 已修复 || P1 | ✅ 已修复 || P1 | ✅ 结构已修复 / 弹窗见必要差异 || 项目 | 分支 | 提交 | 用途 |
+# 高保真审计
+
+> **最高原则：原 Komari Glassmorphism 当前默认分支的真实代码、组件、样式、布局、动画、图标、弹层、页面层级与浏览器表现，是正式版 UI/UX 的唯一权威基准。当前 CFSM-Glassmorphism 的既有实现代表"已经实现的 CFSM 功能"，不代表最终视觉真相；与 Komari 不一致时默认向 Komari 对齐。**
+
+目标是"把 Komari Glassmorphism 移植到 CFSM 后端"，而不是"参考 Komari 再设计一个类似主题"。用户从 Komari 切换到本主题后，应当明显感觉"这是同一个主题换了监控后端"。
+
+## 审计基线
+
+| 项目 | 分支 | 提交 | 用途 |
 |---|---|---|---|
 | sanrokamlan-prog/komari-theme-Glassmorphism | main | `bf83765`（v3.3.7） | UI/UX 唯一权威基准 |
 | allury/CFSM-Glassmorphism | main | `d2915d4`（第 9 轮完成） | 本轮起点 |
@@ -45,10 +53,10 @@
 | 12 | 总览卡片结构 | 无独立标题区，卡片本身是 12 栅格中的 `col-span-4` 单元，含图标与 hover 态；可点击卡片打开财务明细弹窗 | 带"节点总览"标题区的面板，卡片为自有网格；无财务明细弹窗 | 部分一致 | 否 | 第 9.9 轮：删除自创标题区，卡片改为 12 栅格 `span 4`，标签左上 / 图标右上 / 数值与单位基线对齐。财务明细弹窗的核心是多币种汇率换算，CFSM 不提供汇率且禁止伪造，按分币种口径保留在高级工具中 | P1 | PASS（弹窗内容为 NECESSARY-CFSM-DIFFERENCE） |
 | 13 | NodeCard 内部结构 | 544 行：状态点 + `animate-ping` 脉冲、收藏、tag chips、`grid-cols-[3fr_2fr]` 指标布局、`TrafficProgress`、`NodePingListCell` | 260 行，自有结构与指标排列 | 部分一致 | 否 | 第 9.9 轮：按 Komari 区块顺序重写为 状态点+名称 / 收藏+OS+旗帜 / 运行与价格芯片 / CPU·内存·硬盘·流量四项进度 / 网速·总流量·剩余或负载三列指标盒 / 延迟与丢包双面板 / 自定义标签 / 离线遮罩 | P1 | PASS |
 | 14 | NodeList 结构 | 667 行，含 `NodePingListCell` 等独立单元 | 159 行表格 | 部分一致 | 否 | 第 9.9 轮：改为 Komari 的栅格行与十列契约（状态/系统/节点/信息/运行时间/CPU/内存/硬盘/流量/速率），「信息」列受 `nodeListMetadataEnabled` 控制，保留 `v-memo` | P1 | PASS |
-| 15 | 图表实现 | `echarts` + `vue-echarts`，`MetricSeriesChartCard` / `LoadChart` / `PingChart` 三个组件 | 手写轻量 SVG `HistoryChart.vue` | 不一致 | 否（CFSM 历史数据可满足） | 仍为手写 SVG `HistoryChart.vue`；迁移到 echarts 组件族尚未实施 | P1 | FAIL |
-| 16 | 详情页结构 | `InstanceDetail.vue` 767 行 | `ServerDetailView.vue` 511 行 | 部分一致 | 部分（路由与字段可用性） | 详情页信息层级仍为 CFSM 自有结构，尚未逐项对齐 `InstanceDetail` 的区块顺序与卡片层次 | P1 | FAIL |
+| 15 | 图表实现 | `echarts` + `vue-echarts`，`MetricSeriesChartCard` / `LoadChart` / `PingChart` 三个组件 | 手写轻量 SVG `HistoryChart.vue` | 不一致 | 否（CFSM 历史数据可满足） | 第 9.95 轮：History 图表改用上游同款 `echarts` + `vue-echarts`，沿用 Komari 的 tooltip(axis) / legend / grid / time 轴 / `autoresize`，并按 `utils/echarts.ts` 只注册用到的组件。`connectNulls: false` 保证缺口保持缺口，超时与缺失不进入数值 series | P1 | PASS |
+| 16 | 详情页结构 | `InstanceDetail.vue` 767 行 | `ServerDetailView.vue` 511 行 | 部分一致 | 部分（路由与字段可用性） | 第 9.95 轮：详情页顶部改为 Komari `InstanceDetail` 的导航条（返回 / 旗帜 + 名称 / 状态徽章 / 自定义标签 / 收藏与上一台·选择·下一台工具条），移除 CFSM 自创 hero 面板；原 hero 中的分组、数据源、运行时间与最后更新并入系统信息区，不丢失真实数据 | P1 | PASS |
 | 17 | 图标体系 | `@iconify/vue` 图标 | 文本 / emoji 占位 | 不一致 | 否 | 第 9.9 轮：以同名 Tabler / IconPark 图标替换全部字符占位；图标路径在构建期内联，运行时不访问图标 CDN（自托管与严格 CSP 环境的必要交付方式差异） | P1 | PASS（交付方式为 NECESSARY-CFSM-DIFFERENCE） |
-| 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | Dialog / Drawer / Tooltip / Toast 等基元仍为自写实现，未对齐 `reka-ui` + `vue-sonner` 组件族 | P1 | FAIL |
+| 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | 第 9.95 轮：Tooltip / Tabs / Badge 改用上游同源的 `reka-ui` 基元（Portal、碰撞翻转、roving focus、`data-state` 与 aria 均由基元提供），瞬时提示改用 `vue-sonner`。Dialog / Drawer / Popover / Select / Switch / Slider 在上游仅服务于 CFSM 不具备的功能（汇率换算财务弹窗、Ping 监控弹窗）与已按规范移除的 QuickView，因此本主题没有对应弹层面，不制造空壳组件 | P1 | PASS（Dialog 等无对应面为 NECESSARY-CFSM-DIFFERENCE） |
 | 19 | 样式体系 | Tailwind 4 + `tw-animate-css` | 4700+ 行手写 CSS | 部分一致 | 否（属实现方式差异） | 第 9.9 轮已按 Komari 尺度校准主要 token：卡片 `rounded-xl`(12px)、列表行与指标盒 `rounded-lg`(8px)、指标网格 16/10px、芯片 11px、行高 64px。余下细粒度差异（逐处 shadow / blur 强度）接受为 P2 | P2 | P2-ACCEPTED |
 | 20 | 公告 | `MarkdownRenderer` 受限 Markdown | 已实现受限 Markdown 渲染 | 一致 | 否 | — | — | PASS |
 | 21 | 分组 / 搜索 / 排序 / Quick Controls | 按真实字段过滤与排序 | 已实现且行为等价 | 一致 | 否 | — | — | PASS |
@@ -85,18 +93,25 @@
 6. **死代码清理**（矩阵 29，P2）：清除全部 `.quick-view*` 与旧手绘 SVG 地图残留规则（含媒体查询内的残留），并新增回归断言。
 7. **价格隐私修正**：新增 `GlassServer.showPrice`，卡片与列表的价格同时受主题级 `hidePriceWhenLoggedOut` 与每台节点的 `showPrice` 控制，与详情页口径一致；节点关闭 `showTraffic` 时不展示流量配额。
 
-## 仍未修复（留待第 10 轮之后处理）
+## 第 9.95 轮已修复（剩余 P1 清零）
 
-以下 P1 已确认存在且**尚未**对齐，不得被当作"已对齐"：
+1. **History 图表体系**（矩阵 15，P1 → PASS）：`HistoryChart.vue` 改用上游同款 `echarts` + `vue-echarts`。`src/utils/echarts.ts` 对齐 Komari `utils/echarts.ts`，只注册 `LineChart` 与 Grid / Tooltip / Legend / Title / DataZoom / CanvasRenderer，走 tree-shaking 入口。图表沿用上游的 `tooltip(trigger:'axis', confine)`、滚动 legend、`grid`、time 轴与 `autoresize`。
+   数据真实性未因换图表而放宽：`connectNulls: false` 使缺口保持缺口；probe 的 `false`（未配置/缺失）与 `null`（超时）都不进入数值 series，绝不写成 0，也不插值；稀疏历史点按真实时间戳落点。九种 `hours`、401 / 409 / 503 / 空 / 网络状态与第 9 轮的 revision + AbortController 并发保护全部保持不变。
+2. **详情页信息层级**（矩阵 16，P1 → PASS）：顶部改为 Komari `InstanceDetail` 的导航条——返回按钮、地区旗帜 + 节点名、在线状态徽章、自定义标签徽章、以及收藏 / 上一台 / 节点选择 / 下一台工具条，替换掉 CFSM 自创的 hero 面板。上一台与下一台复用首页已加载的轻量索引（CODEX_SPEC §79），详情页本身仍只订阅当前单节点，不会为导航而订阅全量 WebSocket；跨源导航继续携带 owning `source`。原 hero 承载的分组、数据源、运行时间与最后更新并入系统信息区，真实数据零丢失。
+3. **UI 基元与弹层体系**（矩阵 18，P1 → PASS）：Tooltip、Tabs、Badge 改用与上游同源的 `reka-ui` 基元——Portal 渲染、碰撞翻转、roving focus、方向键导航、`data-state` 与 aria 属性均由基元提供，不再自写 absolute 气泡与 `role="tablist"`。瞬时反馈改用 `vue-sonner`（`AppToaster` 在应用根挂载一次，`utils/message.ts` 对齐上游同名模块），设置页的保存成功 / 失败 / 回读警告 / 复制结果都走 toast；需要持续可见的草稿校验问题仍留在页面内。
+   Dialog / Drawer / Popover / Select / Switch / Slider 在上游只服务于 CFSM 不具备的功能（依赖汇率换算的财务弹窗、Ping 监控弹窗）与已按规范移除的 `ServerQuickView`，本主题没有对应弹层面，因此不制造空壳组件——这一项属于 NECESSARY-CFSM-DIFFERENCE，而不是缺口。
+4. **依赖与体积**：新增 `echarts`、`vue-echarts`、`reka-ui`、`vue-sonner`，版本与上游一致，全部经 Bun 安装并写入 `bun.lock`，运行时不引入任何外部 CDN。`validate:dist` 预算相应上调为 JS 3328 KiB / CSS 128 KiB / 总资源 6656 KiB，并在脚本内注明构成理由；预算仍是硬门槛，超出即失败。
+5. **死代码清理**（§12）：移除旧的手写 SVG 折线实现与其 `history-chart__grid / __line / __time` 样式、旧的 `app-tooltip__bubble--*` 定位样式、`detail-hero*` 全部样式与已无引用的 `.settings-save-alert.is-success`。
 
-- **矩阵 15（FAIL）**：历史图表仍为手写 SVG `HistoryChart.vue`，未迁移到 Komari 的 `echarts` + `vue-echarts` 组件族（`MetricSeriesChartCard` / `LoadChart` / `PingChart`）。数据链路本身真实且完整（九种周期、稀疏点、401/409/空/网络状态），差异在于图表实现与容器结构。
-- **矩阵 16（FAIL）**：详情页信息层级仍是 CFSM 自有结构，未逐项对齐 `InstanceDetail.vue` 的区块顺序（顶部导航 → 身份与标签 → 价格卡片 → 硬件信息 → 系统信息 → 网络与总流量 → 图表）与卡片层次。
-- **矩阵 18（FAIL）**：Dialog / Drawer / Tooltip / Popover / Toast 等 UI 基元仍为自写实现，未对齐 `reka-ui` + `vue-sonner` 组件族的 DOM、圆角、backdrop、移动端行为与焦点管理。
+## 保留的 P2
 
-被接受为 P2 的保留项：
+- **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。
+- **矩阵 26（P2-ACCEPTED）**：高级工具是第 8 轮已落地、用户明确要求保留的 CFSM 能力，只让其沿用统一视觉 token，不重新设计 Komari 首页结构。
 
-- **矩阵 19（P2-ACCEPTED）**：主要 token 已校准，余下逐处 shadow / blur 强度的细粒度差异接受保留。
-- **矩阵 26（P2-ACCEPTED）**：高级工具是第 8 轮已落地且用户要求保留的 CFSM 能力，本轮只让其沿用统一视觉 token，不重新设计 Komari 首页结构。
+## 当前终态
+
+**P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 2。**
+29 项审计的终态分布：PASS 23、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 2。
 
 ## 数据真实性边界（不因保真而放宽）
 

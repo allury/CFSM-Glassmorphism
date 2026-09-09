@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { trafficUsage } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
@@ -44,7 +45,7 @@ const emit = defineEmits<{
 
 const isMini = computed(() => props.density === 'mini')
 
-function tone(percentage: number | null): string {
+function tone(percentage: number | null): 'normal' | 'warning' | 'danger' | 'neutral' {
   if (percentage === null) return 'neutral'
   if (percentage >= props.highLoadThreshold) return 'danger'
   if (percentage >= props.highLoadThreshold * 0.8) return 'warning'
@@ -183,13 +184,7 @@ function hideMissingImage(event: Event): void {
             </span>
             <span class="node-metric__value">{{ formatPercent(server.cpu) }}</span>
           </div>
-          <div class="resource-meter__track">
-            <span
-              class="resource-meter__fill"
-              :class="`resource-meter__fill--${tone(server.cpu)}`"
-              :style="{ width: `${server.cpu ?? 0}%` }"
-            />
-          </div>
+          <AppProgressThin :percentage="server.cpu" :status="tone(server.cpu)" />
           <div v-if="!isMini" class="node-metric__hint">
             {{ formatLoad(server.load.one) }}, {{ formatLoad(server.load.five) }}, {{ formatLoad(server.load.fifteen) }}
           </div>
@@ -202,13 +197,7 @@ function hideMissingImage(event: Event): void {
             </span>
             <span class="node-metric__value">{{ formatPercent(memoryPercent) }}</span>
           </div>
-          <div class="resource-meter__track">
-            <span
-              class="resource-meter__fill"
-              :class="`resource-meter__fill--${tone(memoryPercent)}`"
-              :style="{ width: `${memoryPercent ?? 0}%` }"
-            />
-          </div>
+          <AppProgressThin :percentage="memoryPercent" :status="tone(memoryPercent)" />
           <div class="node-metric__hint">
             {{ formatBytes(server.memory.used === null ? null : server.memory.used * 1024 ** 2) }}
             /
@@ -223,13 +212,7 @@ function hideMissingImage(event: Event): void {
             </span>
             <span class="node-metric__value">{{ formatPercent(diskPercent) }}</span>
           </div>
-          <div class="resource-meter__track">
-            <span
-              class="resource-meter__fill"
-              :class="`resource-meter__fill--${tone(diskPercent)}`"
-              :style="{ width: `${diskPercent ?? 0}%` }"
-            />
-          </div>
+          <AppProgressThin :percentage="diskPercent" :status="tone(diskPercent)" />
           <div class="node-metric__hint">
             {{ formatBytes(server.disk.used === null ? null : server.disk.used * 1024 ** 2) }}
             /
@@ -246,13 +229,7 @@ function hideMissingImage(event: Event): void {
               {{ traffic ? formatPercent(traffic.percent) : '∞' }}
             </span>
           </div>
-          <div class="resource-meter__track">
-            <span
-              class="resource-meter__fill"
-              :class="`resource-meter__fill--${tone(traffic ? traffic.percent : null)}`"
-              :style="{ width: `${traffic ? traffic.percent : 0}%` }"
-            />
-          </div>
+          <AppProgressThin :percentage="traffic ? traffic.percent : null" :status="tone(traffic ? traffic.percent : null)" />
           <div class="node-metric__hint">
             {{ formatBytes(traffic ? traffic.used : null) }}
             /

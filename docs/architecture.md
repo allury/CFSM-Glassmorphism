@@ -93,7 +93,7 @@ UI (render and user intent only)
 - 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
 - 第 8 轮的 Earth 与高级工具领域模型位于 `src/domain/advanced-tools.ts`：`EarthMap` 和 `AdvancedTools` 只接收已经归一化的 `GlassServer`，不新增请求、不读取 wire payload。国家/地区中心、健康规则、月价折算、快照序列化和分类拓扑均为可单测的纯函数。
 - 节点卡片与列表行的主点击直达 `/#/server/:id`（与 Komari 一致），中间不再插入任何快速查看或二次确认层。
-- `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。轻量 SVG 图表按真实时间戳绘制，缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
+- `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。ECharts 折线图按真实时间戳绘制，`connectNulls: false` 使缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
 ## Theme Options
 
@@ -182,6 +182,15 @@ server click -> its source -> detail/history/ws
 - **历史陈旧响应 / 并发切换**：详情 hours 切换控件在 `historyState === 'loading'` 时禁用，配合 store 内 `revision` 版本号与 AbortController，保证同一节点上不会并发触发历史请求、详情切换会取消在途请求，乱序陈旧响应不会写回。本轮经核验此前已妥善处理，未改动相关代码。
 
 与原 Komari Glassmorphism 的高保真视觉差异如在本轮发现，仅记录、留待第 9.5 轮，不在第 9 轮修改。
+
+## 第 9.95 轮完成边界
+
+第 9.95 轮清零剩余三个 P1，仍然只动表现层，数据与协议底座（REST、WebSocket partial merge、10 秒稳定后重置退避、History revision 与 AbortController、probe 三态、旧四线路 + Node 1–4、`theme_options`、JWT / Turnstile、多 apiBase 归属、server ID 校验、403 / 5xx 分类、50+ 节点性能优化）保持不变，UI 继续只消费 normalized model。
+
+- **History 图表**：`src/utils/echarts.ts` 对齐 Komari 同名模块，只注册 `LineChart` 与 Grid / Tooltip / Legend / Title / DataZoom / CanvasRenderer；`HistoryChart.vue` 改用 `vue-echarts` 的 `VChart`（`autoresize`），沿用上游的 axis tooltip、滚动 legend、grid 与 time 轴。`connectNulls: false` 保证缺口保持缺口，probe 的 `false` / `null` 不进入数值 series，不补点、不插值。
+- **详情页**：顶部改为 Komari `InstanceDetail` 的导航条（返回 / 旗帜 + 名称 / 状态徽章 / 标签 / 收藏与上一台·选择·下一台）。节点导航复用首页已加载的轻量索引，详情页仍只订阅单节点并携带 owning `source`；原 hero 的分组、数据源、运行时间与最后更新并入系统信息区。
+- **UI 基元**：`src/components/ui/` 下的 `AppTooltip`、`AppTabs`、`AppBadge` 建立在 `reka-ui` 上（Portal、碰撞翻转、roving focus、`data-state`/aria 由基元提供），`AppToaster` + `src/utils/message.ts` 建立在 `vue-sonner` 上并在 `App.vue` 挂载一次。上游的 Dialog / Drawer / Popover / Select / Switch / Slider 只服务于 CFSM 不具备的功能与已移除的 QuickView，本主题没有对应弹层面，因此不创建空壳组件。
+- **发布护栏**：`validate:dist` 预算上调为 JS 3328 KiB / CSS 128 KiB / 总资源 6656 KiB，脚本内注明构成理由；预算仍是硬门槛。
 
 ## 第 9.9 轮完成边界
 

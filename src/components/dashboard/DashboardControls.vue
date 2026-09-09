@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import type { DashboardSort, DashboardViewMode } from '@/types/glassmorphism'
+import AppTabs from '@/components/ui/AppTabs.vue'
 import { ALL_GROUPS } from '@/domain/dashboard'
 import type { QuickControlKey } from '@/domain/theme-presentation'
 
@@ -10,7 +12,7 @@ const viewOptions: ReadonlyArray<{ value: DashboardViewMode, label: string, icon
   { value: 'list', label: '列表', icon: '☷' },
 ]
 
-defineProps<{
+const props = defineProps<{
   query: string
   group: string
   sort: DashboardSort
@@ -30,6 +32,12 @@ defineEmits<{
   'update:viewMode': [value: DashboardViewMode]
   'quickAction': [value: QuickControlKey]
 }>()
+
+// 分组标签沿用 Komari 的 Tabs 基元，"全部节点" 始终排在真实分组之前。
+const groupTabs = computed(() => [
+  { value: ALL_GROUPS, label: '全部节点' },
+  ...props.groups.map((item) => ({ value: item, label: item })),
+])
 
 const quickLabels: Record<QuickControlKey, { icon: string, label: string }> = {
   favorite: { icon: '★', label: '收藏' },
@@ -60,28 +68,13 @@ function sortValue(event: Event): DashboardSort {
 
 <template>
   <section class="dashboard-controls" aria-label="节点筛选与布局">
-    <div class="group-tabs" role="tablist" aria-label="节点分组">
-      <button
-        type="button"
-        role="tab"
-        :aria-selected="group === ALL_GROUPS"
-        :class="{ 'is-active': group === ALL_GROUPS }"
-        @click="$emit('update:group', ALL_GROUPS)"
-      >
-        全部节点
-      </button>
-      <button
-        v-for="item in groups"
-        :key="item"
-        type="button"
-        role="tab"
-        :aria-selected="group === item"
-        :class="{ 'is-active': group === item }"
-        @click="$emit('update:group', item)"
-      >
-        {{ item }}
-      </button>
-    </div>
+    <AppTabs
+      class="group-tabs"
+      list-label="节点分组"
+      :items="groupTabs"
+      :model-value="group"
+      @update:model-value="$emit('update:group', $event)"
+    />
 
     <div class="dashboard-controls__row">
       <div v-if="quickControlsEnabled" class="quick-controls" aria-label="快捷筛选">

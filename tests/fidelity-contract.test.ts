@@ -226,6 +226,95 @@ describe('Komari fidelity contracts', () => {
     expect(card).toContain('AppIcon')
   })
 
+  /* 第 9.95 轮：详情页 / History 图表 / UI 基元。 */
+
+  it('renders history on the upstream echarts stack instead of a hand-written SVG chart', () => {
+    const chart = source('../src/components/detail/HistoryChart.vue')
+    const registry = source('../src/utils/echarts.ts')
+
+    expect(chart).toContain('vue-echarts')
+    expect(chart).toContain('<VChart')
+    expect(chart).toContain('autoresize')
+    // 只注册实际用到的组件，与 Komari utils/echarts.ts 一致。
+    expect(registry).toContain('echarts/core')
+    expect(registry).toContain('LineChart')
+    expect(registry).toContain('CanvasRenderer')
+    // 旧的手写 SVG 折线实现不得残留。
+    expect(chart).not.toContain('pathSegments')
+    expect(chart).not.toContain('viewBox="0 0 800 220"')
+  })
+
+  it('never fabricates history points when charting', () => {
+    const chart = source('../src/components/detail/HistoryChart.vue')
+
+    // 缺口保持缺口：超时(null)与缺失(false)都不进入数值 series，也不连线跨越。
+    expect(chart).toContain('connectNulls: false')
+    expect(chart).toContain('numericValue(point)')
+    expect(chart).not.toMatch(/\?\?\s*0\b/)
+  })
+
+  it('lays the detail page out with the Komari top navigation bar', () => {
+    const detail = source('../src/views/ServerDetailView.vue')
+
+    // 返回 / 旗帜 + 名称 / 状态徽章 / 标签 / 收藏与上下节点工具条。
+    expect(detail).toContain('detail-topbar')
+    expect(detail).toContain('tabler:arrow-left')
+    expect(detail).toContain('detail-topbar__flag')
+    expect(detail).toContain('detail-topbar__tools')
+    expect(detail).toContain('navigateNode(-1)')
+    expect(detail).toContain('navigateNode(1)')
+    // CFSM 自创的 hero 面板已移除。
+    expect(detail).not.toContain('detail-hero')
+    expect(detail).not.toContain('SERVER DETAIL')
+    // 上一台/下一台只复用首页已加载的索引，详情页仍只订阅单节点。
+    expect(detail).toContain('serverStore.servers')
+    expect(detail).toContain('query: { source: target.source.base }')
+  })
+
+  it('builds UI primitives on the upstream reka-ui and vue-sonner stack', () => {
+    const tooltip = source('../src/components/ui/AppTooltip.vue')
+    const tabs = source('../src/components/ui/AppTabs.vue')
+    const badge = source('../src/components/ui/AppBadge.vue')
+    const toaster = source('../src/components/ui/AppToaster.vue')
+    const app = source('../src/App.vue')
+
+    // Tooltip 走 reka-ui 的 Portal + 碰撞处理，而不是自写 absolute 气泡。
+    expect(tooltip).toContain('from \'reka-ui\'')
+    expect(tooltip).toContain('TooltipPortal')
+    expect(tooltip).toContain('TooltipProvider')
+    expect(tooltip).not.toContain('position: absolute')
+
+    expect(tabs).toContain('TabsRoot')
+    expect(tabs).toContain('TabsList')
+    expect(tabs).toContain('TabsTrigger')
+    expect(badge).toContain('Primitive')
+
+    // 提示走 vue-sonner，并在应用根挂载一次。
+    expect(toaster).toContain('vue-sonner')
+    expect(app).toContain('AppToaster')
+  })
+
+  it('routes transient settings feedback through the toast layer', () => {
+    const settings = source('../src/views/ThemeSettingsView.vue')
+
+    expect(settings).toContain('@/utils/message')
+    expect(settings).toContain('message.success')
+    expect(settings).toContain('message.error')
+    // 瞬时结果不再常驻页面。
+    expect(settings).not.toContain('settings-save-alert is-success')
+  })
+
+  it('drives every tab surface through the shared tabs primitive', () => {
+    const tools = source('../src/components/dashboard/AdvancedTools.vue')
+    const controls = source('../src/components/dashboard/DashboardControls.vue')
+
+    expect(tools).toContain('<AppTabs')
+    expect(controls).toContain('<AppTabs')
+    // 不再手写 role="tablist" / role="tab"。
+    expect(tools).not.toContain('role="tablist"')
+    expect(controls).not.toContain('role="tablist"')
+  })
+
   it('keeps price visibility gated by both theme privacy and per-server settings', () => {
     const card = source('../src/components/dashboard/ServerCard.vue')
     const list = source('../src/components/dashboard/ServerList.vue')

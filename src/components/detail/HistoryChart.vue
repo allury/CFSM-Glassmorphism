@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import VChart from 'vue-echarts'
 import type { DetailChartModel, DetailChartPoint } from '@/domain/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import {
@@ -10,20 +11,23 @@ import {
   formatPercent,
   formatProbePercent,
   formatSpeed,
-  formatTimestamp,
 } from '@/utils/format'
+import '@/utils/echarts'
 
+/**
+ * 对齐 Komari `MetricSeriesChartCard`：同一套 `echarts` + `vue-echarts` 折线图，
+ * 保留上游的 tooltip(axis) / legend / grid / time 轴 / `autoresize` 行为。
+ *
+ * CFSM 的数据真实性约束在这里严格保持：
+ * - `connectNulls: false`，缺口保持缺口，不跨越缺失点连线；
+ * - probe 的 `false`（未配置/缺失）与 `null`（超时）都不进入数值 series，
+ *   绝不写成 0，也不插值；
+ * - 稀疏历史点原样按真实时间戳落点。
+ */
 const props = defineProps<{
   chart: DetailChartModel
 }>()
 const theme = useThemeSettingsStore()
-
-const WIDTH = 800
-const HEIGHT = 220
-const LEFT = 54
-const RIGHT = 18
-const TOP = 18
-const BOTTOM = 32
 
 function numericValue(point: DetailChartPoint): number | null {
   return typeof point.value === 'number' && Number.isFinite(point.value) && point.value >= 0
@@ -31,76 +35,9 @@ function numericValue(point: DetailChartPoint): number | null {
     : null
 }
 
-const timeline = computed(() => props.chart.series.flatMap((item) => item.points))
 const sampleCount = computed(() => new Set(
-  timeline.value.map((point) => point.timestamp),
+  props.chart.series.flatMap((item) => item.points).map((point) => point.timestamp),
 ).size)
-const xMin = computed(() => Math.min(...timeline.value.map((point) => point.timestamp)))
-const xMax = computed(() => Math.max(...timeline.value.map((point) => point.timestamp)))
-const numericValues = computed(() => timeline.value.flatMap((point) => {
-  const value = numericValue(point)
-  return value === null ? [] : [value]
-}))
-const yMax = computed(() => {
-  if (props.chart.percentScale) return 100
-  const maximum = Math.max(...numericValues.value, 0)
-  return maximum > 0 ? maximum * 1.08 : 1
-})
-
-function pointX(timestamp: number): number {
-  if (xMax.value === xMin.value) return (LEFT + WIDTH - RIGHT) / 2
-  return LEFT + ((timestamp - xMin.value) / (xMax.value - xMin.value)) * (WIDTH - LEFT - RIGHT)
-}
-
-function pointY(value: number): number {
-  return TOP + (1 - Math.min(value / yMax.value, 1)) * (HEIGHT - TOP - BOTTOM)
-}
-
-function pathSegments(points: DetailChartPoint[]): string[] {
-  const segments: string[] = []
-  let current = ''
-  for (const point of points) {
-    const value = numericValue(point)
-    if (value === null) {
-      if (current) segments.push(current)
-      current = ''
-      continue
-    }
-    const coordinate = `${pointX(point.timestamp).toFixed(2)} ${pointY(value).toFixed(2)}`
-    current += `${current ? ' L' : 'M'}${coordinate}`
-  }
-  if (current) segments.push(current)
-  return segments
-}
-
-function seriesDash(index: number): string | undefined {
-  if (theme.runtime.colorVisionMode !== '色觉友好') return undefined
-  return [undefined, '8 4', '3 3', '10 3 2 3', '2 4'][index % 5]
-}
-
-const renderedSeries = computed(() => props.chart.series.map((item) => {
-  const latestPoint = item.points.at(-1)
-  const latest = latestPoint ? latestPoint.value : false
-  const valid = item.points.filter((point) => numericValue(point) !== null).length
-  const timedOut = item.points.filter((point) => point.value === null).length
-  const missing = item.points.filter((point) => point.value === false).length
-  return {
-    ...item,
-    paths: pathSegments(item.points),
-    dots: valid === 1
-      ? item.points.flatMap((point) => {
-          const value = numericValue(point)
-          return value === null ? [] : [{ x: pointX(point.timestamp), y: pointY(value) }]
-        })
-      : [],
-    latest,
-    valid,
-    timedOut,
-    missing,
-  }
-}))
-
-const ticks = computed(() => [yMax.value, yMax.value / 2, 0])
 
 function formatMetric(value: number | null | false): string {
   if (props.chart.probeStates) {
@@ -115,6 +52,95 @@ function formatMetric(value: number | null | false): string {
   if (props.chart.kind === 'milliseconds') return formatLatency(value)
   return formatCount(value)
 }
+
+/** 色觉友好模式下用线型区分序列，不只依赖颜色。 */
+function seriesDash(index: number): number[] | undefined {
+  if (theme.runtime.colorVisionMode !== '色觉友好') return undefined
+  return [undefined, [8, 4], [3, 3], [10, 3, 2, 3], [2, 4]][index % 5]
+}
+
+const seriesSummary = computed(() => props.chart.series.map((item) => ({
+  key: item.key,
+  label: item.label,
+  color: item.color,
+  latest: item.points.at(-1)?.value ?? false,
+  valid: item.points.filter((point) => numericValue(point) !== null).length,
+  timedOut: item.points.filter((point) => point.value === null).length,
+  missing: item.points.filter((point) => point.value === false).length,
+})))
+
+const chartOption = computed(() => ({
+  animation: false,
+  color: props.chart.series.map((item) => item.color),
+  tooltip: {
+    trigger: 'axis',
+    confine: true,
+    backgroundColor: 'var(--glass-strong)',
+    borderColor: 'var(--glass-border)',
+    borderWidth: 1,
+    textStyle: { color: 'var(--ink)', fontSize: 11 },
+    formatter: (params: unknown) => {
+      const items = params as Array<{
+        axisValueLabel?: string
+        color: string
+        data: [number, number | null]
+        seriesName: string
+      }>
+      if (!items.length) return ''
+      const rows = items.map((item) => (
+        `<div style="display:flex;align-items:center;gap:8px">`
+        + `<span style="width:8px;height:8px;border-radius:2px;background:${item.color};flex:none"></span>`
+        + `<span>${item.seriesName}</span>`
+        + `<strong style="margin-left:auto;padding-left:12px">${formatMetric(item.data?.[1] ?? null)}</strong>`
+        + `</div>`
+      )).join('')
+      return `<div style="margin-bottom:6px;color:var(--muted)">${items[0]?.axisValueLabel ?? ''}</div>`
+        + `<div style="display:flex;flex-direction:column;gap:4px">${rows}</div>`
+    },
+  },
+  legend: {
+    type: 'scroll',
+    bottom: 2,
+    itemWidth: 10,
+    itemHeight: 8,
+    textStyle: { color: 'var(--muted)', fontSize: 10 },
+  },
+  grid: { top: 20, right: 18, bottom: 48, left: 58 },
+  xAxis: {
+    type: 'time',
+    axisLine: { lineStyle: { color: 'var(--line)' } },
+    axisTick: { show: false },
+    axisLabel: { color: 'var(--muted)', fontSize: 10, hideOverlap: true },
+    splitLine: { show: false },
+  },
+  yAxis: {
+    type: 'value',
+    min: props.chart.percentScale ? 0 : undefined,
+    max: props.chart.percentScale ? 100 : undefined,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: {
+      color: 'var(--muted)',
+      fontSize: 10,
+      formatter: (value: number) => formatMetric(value),
+    },
+    splitLine: { lineStyle: { color: 'var(--line)', opacity: 0.45 } },
+  },
+  series: props.chart.series.map((item, index) => ({
+    name: item.label,
+    type: 'line',
+    // 只有真实数值进入 series；超时与缺失留空，由 connectNulls:false 形成断点。
+    data: item.points.map((point) => [point.timestamp, numericValue(point)]),
+    connectNulls: false,
+    showSymbol: false,
+    smooth: false,
+    lineStyle: {
+      width: 1.6,
+      color: item.color,
+      ...(seriesDash(index) ? { type: seriesDash(index) } : {}),
+    },
+  })),
+}))
 </script>
 
 <template>
@@ -129,39 +155,12 @@ function formatMetric(value: number | null | false): string {
     </header>
 
     <div class="history-chart__canvas">
-      <svg viewBox="0 0 800 220" role="img" :aria-label="`${chart.title}历史折线图`">
-        <g class="history-chart__grid">
-          <template v-for="(tick, index) in ticks" :key="tick">
-            <line :x1="LEFT" :x2="WIDTH - RIGHT" :y1="TOP + index * 85" :y2="TOP + index * 85" />
-            <text x="4" :y="TOP + index * 85 + 4">{{ formatMetric(tick) }}</text>
-          </template>
-        </g>
-        <g v-for="(item, seriesIndex) in renderedSeries" :key="item.key">
-          <path
-            v-for="(path, index) in item.paths"
-            :key="index"
-            class="history-chart__line"
-            :d="path"
-            :stroke="item.color"
-            :stroke-dasharray="seriesDash(seriesIndex)"
-          />
-          <circle
-            v-for="(dot, index) in item.dots"
-            :key="`dot-${index}`"
-            :cx="dot.x"
-            :cy="dot.y"
-            r="3.5"
-            :fill="item.color"
-          />
-        </g>
-        <text class="history-chart__time" :x="LEFT" :y="HEIGHT - 7">{{ formatTimestamp(xMin) }}</text>
-        <text class="history-chart__time" :x="WIDTH - RIGHT" :y="HEIGHT - 7" text-anchor="end">{{ formatTimestamp(xMax) }}</text>
-      </svg>
+      <VChart :option="chartOption" autoresize />
     </div>
 
     <div class="history-chart__legend">
       <span
-        v-for="item in renderedSeries"
+        v-for="item in seriesSummary"
         :key="item.key"
         :title="chart.probeStates ? `有效 ${item.valid} · 超时 ${item.timedOut} · 缺失 ${item.missing}` : undefined"
       >

@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { GlassServer } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { matchProvider, trafficUsage, type ProviderAlias } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
@@ -239,45 +240,28 @@ function hideMissingImage(event: Event): void {
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
-            <div class="resource-meter__track">
-              <span class="resource-meter__fill" :style="{ width: `${server.cpu ?? 0}%` }" />
-            </div>
+            <AppProgressThin :percentage="server.cpu" />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
             </span>
-            <div class="resource-meter__track">
-              <span
-                class="resource-meter__fill"
-                :style="{ width: `${ratio(server.memory.used, server.memory.total) ?? 0}%` }"
-              />
-            </div>
+            <AppProgressThin :percentage="ratio(server.memory.used, server.memory.total)" />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
             </span>
-            <div class="resource-meter__track">
-              <span
-                class="resource-meter__fill"
-                :style="{ width: `${ratio(server.disk.used, server.disk.total) ?? 0}%` }"
-              />
-            </div>
+            <AppProgressThin :percentage="ratio(server.disk.used, server.disk.total)" />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ trafficPercent(server) === null ? '∞' : formatPercent(trafficPercent(server)) }}
             </span>
-            <div class="resource-meter__track">
-              <span
-                class="resource-meter__fill"
-                :style="{ width: `${trafficPercent(server) ?? 0}%` }"
-              />
-            </div>
+            <AppProgressThin :percentage="trafficPercent(server)" />
           </div>
 
           <div class="node-list__cell">
