@@ -63,9 +63,70 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  release:
+  # CFSM 主题商店支持「自定义主题 URL」，它把
+  # https://github.com/<owner>/<repo>/tree/<ref> 解析为
+  # https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ 并直接拉取
+  # index.html 与 assets/。因此构建产物必须存在于某个 git ref 中。
+  # 这里只把已通过全部质量门的产物发布到专用的 theme-dist 分支，
+  # 并打一个不可变的 theme-v<version> 标签供用户固定版本；
+  # main 的源码历史依旧不包含 dist。
+  theme-branch:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download verified theme archive
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.verify.outputs.artifact-name }}
+          path: archive
+
+      - name: Publish theme-store branch and immutable tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          theme_tag="theme-${GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --tags origin "$theme_tag" >/dev/null 2>&1; then
+            echo "Theme tag $theme_tag already exists; refusing to overwrite." >&2
+            exit 1
+          fi
+
+          workdir="$(mktemp -d)"
+          unzip -q "archive/${{ needs.verify.outputs.artifact-name }}" -d "$workdir"
+          # 主题包根必须直接是 index.html + assets/，否则主题商店取不到文件。
+          test -f "$workdir/index.html"
+          test -d "$workdir/assets"
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+
+          if git ls-remote --exit-code --heads origin theme-dist >/dev/null 2>&1; then
+            git fetch --depth=1 origin theme-dist
+            git checkout -B theme-dist FETCH_HEAD
+          else
+            git checkout --orphan theme-dist
+          fi
+
+          find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
+          cp -r "$workdir"/. .
+          git add -A
+          git commit -m "chore: publish ${GITHUB_REF_NAME} theme build for the CFSM theme store"
+          git tag "$theme_tag"
+          git push origin theme-dist
+          git push origin "$theme_tag"
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [verify, theme-branch]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

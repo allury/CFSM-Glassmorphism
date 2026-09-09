@@ -50,6 +50,20 @@ The workflow uploads `CFSM-Glassmorphism-build-<short-sha>.zip`. Its root contai
 
 After the matching commit has passed the same gates on `main`, pushing an annotated `v<package version>` tag publishes the already-verified archive under the stable name `CFSM-Glassmorphism-<version>.zip`. The tag and `package.json` version must match or the release job fails.
 
+## Installing the theme
+
+The CFSM admin theme store accepts a custom theme URL of the form
+`https://github.com/<owner>/<repo>/tree/<ref>` and reads `index.html` and `assets/` straight from that ref, so a build has to be reachable through git. The tag job therefore publishes each verified build to a dedicated `theme-dist` branch and stamps an immutable `theme-v<version>` tag; `main` still carries source only and never commits `dist/`.
+
+Paste either of these into **Theme store → Custom theme URL**:
+
+~~~text
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.0.0   # pinned, recommended
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist     # always the latest release
+~~~
+
+Alternatively download `CFSM-Glassmorphism-<version>.zip` from the GitHub Release and install it through the official upload flow. Both paths ship the identical archive.
+
 ## Documentation
 
 - docs/CODEX_SPEC.md: immutable full project specification supplied by the project owner.
