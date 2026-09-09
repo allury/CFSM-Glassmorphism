@@ -105,7 +105,43 @@ export function isHighLoad(server: GlassServer, threshold: number): boolean {
 export function daysUntilExpiry(value: string | null, now = Date.now()): number | null {
   const date = parseCfsmDate(value)
   if (!date) return null
-  return Math.ceil((date.getTime() - now) / 86_400_000)
+  const difference = date.getTime() - now
+  return difference <= 0
+    ? Math.floor(difference / 86_400_000)
+    : Math.ceil(difference / 86_400_000)
+}
+
+const BILLING_CYCLE_DAYS: Readonly<Record<string, number>> = {
+  month: 30,
+  quarter: 90,
+  half_year: 180,
+  year: 365,
+  two_years: 730,
+  three_years: 1095,
+  four_years: 1460,
+  five_years: 1825,
+}
+
+/**
+ * 按 CFSM 官方计费周期计算节点当前剩余价值。
+ *
+ * 未知周期不猜测；无效日期也保持不可用。这样首页可以复刻 Komari 的短金额行，
+ * 又不会把 CFSM 的自由文本 `billing_cycle` 擅自解释成某个周期。
+ */
+export function remainingValue(server: GlassServer, now = Date.now()): number | null {
+  const price = Number(server.price)
+  if (!Number.isFinite(price) || price <= 0) return null
+
+  const expiresAt = parseCfsmDate(server.expireDate)
+  if (!expiresAt) return null
+  const difference = expiresAt.getTime() - now
+  if (difference <= 0) return 0
+  if (difference / (86_400_000 * 365) > 100) return price
+
+  const cycle = server.billingCycle?.trim().toLowerCase() ?? ''
+  const cycleDays = BILLING_CYCLE_DAYS[cycle]
+  if (!cycleDays) return null
+  return Math.min(price, price * difference / (cycleDays * 86_400_000))
 }
 
 export function isExpiring(server: GlassServer, days: number, now = Date.now()): boolean {

@@ -194,6 +194,18 @@ server click -> its source -> detail/history/ws
 
 正式版本为 1.0.0。main 推送通过 CI 后创建 annotated `v1.0.0` tag；tag workflow 重新执行完整质量门并发布 `CFSM-Glassmorphism-1.0.0.zip`。本地与仓库均不保留生成的 dist 或 ZIP。
 
+## 第 11 轮补充收口
+
+截图回归只修正首页两处渲染偏差。Earth 隐藏时，`general-stage--cards-only` 成为与
+Komari 一致的独立 3 / 6 列网格，不再让 `general-stage__cards` 在单列父网格中跨
+12 列并触发隐式列。NodeCard 底部继续是三列；每行由固定图标和可截断文本层组成，
+第三列只显示经严格日期解析得到的剩余状态与金额。剩余价值只识别 CFSM 官方
+`month` / `quarter` / `half_year` / `year` / `two_years` / `three_years` / `four_years` /
+`five_years` 周期；未知周期与无效日期保持不可用，不猜测。
+
+修复只涉及表现层和既有 normalized model 上的纯计算；REST、WebSocket、History、
+probe 三态、多 API Base、主题设置、Earth 三 renderer 与点击路径不变。
+
 ## 第 9.95 轮完成边界
 
 第 9.95 轮清零剩余三个 P1，仍然只动表现层，数据与协议底座（REST、WebSocket partial merge、10 秒稳定后重置退避、History revision 与 AbortController、probe 三态、旧四线路 + Node 1–4、`theme_options`、JWT / Turnstile、多 apiBase 归属、server ID 校验、403 / 5xx 分类、50+ 节点性能优化）保持不变，UI 继续只消费 normalized model。

@@ -86,7 +86,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 服务器真实 IP | ipv4/ipv6 字符串 | 仅 ip_v4/ip_v6 可达性标志 | 不把标志伪装成地址，不显示地址 | 🔴 CFSM API 暂不支持 |
 | ASN/城市/IP 地理信息 | IP Geo 查询 | 公开主题 API 不返回地址、ASN、城市 | 不发外部猜测请求，不造数据 | 🔴 CFSM API 暂不支持 |
 | 厂商识别 | 元数据、IP Geo、别名字典 | name、group、tags、region | 仅对已有文本做可解释匹配，无证据则不显示 | 🟡 降级实现 |
-| 价格与到期 | 财务卡片 | price、billing_cycle、currency、expire_date | 直接映射并遵守 show_price/show_expire | ✅ 1:1 |
+| 价格与到期 | 财务卡片 | price、billing_cycle、currency、expire_date | 遵守 show_price/show_expire；卡片用严格日期显示剩余天数，剩余价值只识别 CFSM 官方周期 | ✅ 1:1 |
 | 流量配额 | 配额数值与使用率 | traffic_limit 为格式化字符串 | 能可靠解析时计算，否则只展示原值 | 🟡 降级实现 |
 | GPU 利用率 | GPU 指标卡 | gpu_info id/name/info | 兼容数组和 JSON 字符串 | ✅ 1:1 |
 | 磁盘 IO | 吞吐、IOPS、await、util | disk 对象 | 缺失或全零时隐藏 | ✅ 1:1 |

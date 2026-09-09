@@ -5,11 +5,12 @@ import type { NodeCardSize } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
-import { trafficUsage } from '@/domain/theme-presentation'
+import { daysUntilExpiry, remainingValue, trafficUsage } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import {
   formatBytes,
+  formatCurrencyValue,
   formatLatency,
   formatLoad,
   formatPercent,
@@ -78,6 +79,28 @@ const priceText = computed(() => {
   return text === '—' ? '' : text
 })
 const expireVisible = computed(() => props.server.showExpire && props.server.expireDate !== null)
+const expiryInfo = computed(() => {
+  const days = daysUntilExpiry(props.server.expireDate)
+  if (days === null) return { text: '—', prefix: '', value: '', unit: '', tone: 'neutral' }
+  if (days <= 0) return { text: '已过期', prefix: '', value: '', unit: '', tone: 'danger' }
+  if (days > 36_500) return { text: '长期', prefix: '', value: '', unit: '', tone: 'neutral' }
+  return {
+    text: '',
+    prefix: '剩余',
+    value: String(days),
+    unit: '天',
+    tone: days <= 5 ? 'danger' : days <= 10 ? 'warning' : 'neutral',
+  }
+})
+const remainingValueText = computed(() => {
+  if (!props.priceVisible || !props.server.showPrice) return ''
+  const rawPrice = props.server.price?.trim()
+  if (!rawPrice) return ''
+  const price = Number(rawPrice)
+  if (!Number.isFinite(price) || (price < 0 && price !== -1)) return ''
+  if (price === 0 || price === -1) return '无'
+  return formatCurrencyValue(remainingValue(props.server), props.server.currency)
+})
 const offlineText = computed(() => (
   props.server.lastUpdated === null ? '尚无上报' : `最后上报 ${formatTimestamp(props.server.lastUpdated)}`
 ))
@@ -290,29 +313,51 @@ function hideMissingImage(event: Event): void {
       <div class="node-boxes">
         <div class="node-box">
           <span class="node-box__row node-box__row--up">
-            <AppIcon name="tabler:chevron-up" :size="11" />{{ formatSpeed(server.network.outSpeed) }}
+            <AppIcon name="tabler:chevron-up" :size="11" />
+            <span class="node-box__text">{{ formatSpeed(server.network.outSpeed) }}</span>
           </span>
           <span class="node-box__row node-box__row--down">
-            <AppIcon name="tabler:chevron-down" :size="11" />{{ formatSpeed(server.network.inSpeed) }}
+            <AppIcon name="tabler:chevron-down" :size="11" />
+            <span class="node-box__text">{{ formatSpeed(server.network.inSpeed) }}</span>
           </span>
         </div>
         <div class="node-box">
           <span class="node-box__row">
-            <AppIcon name="tabler:upload" :size="11" />{{ formatBytes(server.network.transmitted) }}
+            <AppIcon name="tabler:upload" :size="11" />
+            <span class="node-box__text">{{ formatBytes(server.network.transmitted) }}</span>
           </span>
           <span class="node-box__row">
-            <AppIcon name="tabler:download" :size="11" />{{ formatBytes(server.network.received) }}
+            <AppIcon name="tabler:download" :size="11" />
+            <span class="node-box__text">{{ formatBytes(server.network.received) }}</span>
           </span>
         </div>
         <div class="node-box">
           <template v-if="expireVisible">
-            <span class="node-box__row">到期 {{ server.expireDate }}</span>
-            <span class="node-box__row">{{ priceText || '—' }}</span>
+            <span
+              class="node-box__row"
+              :class="`node-box__row--${expiryInfo.tone}`"
+            >
+              <AppIcon name="tabler:calendar-stats" :size="11" />
+              <span v-if="expiryInfo.text" class="node-box__text">{{ expiryInfo.text }}</span>
+              <template v-else>
+                <span class="node-box__fixed-text">{{ expiryInfo.prefix }}</span>
+                <span class="node-box__fixed-text node-box__number">{{ expiryInfo.value }}</span>
+                <span class="node-box__fixed-text">{{ expiryInfo.unit }}</span>
+              </template>
+            </span>
+            <span v-if="remainingValueText" class="node-box__row">
+              <AppIcon name="tabler:coins" :size="11" />
+              <span class="node-box__text">{{ remainingValueText }}</span>
+            </span>
           </template>
           <template v-else>
-            <span class="node-box__row">{{ formatLoad(server.load.one) }}</span>
             <span class="node-box__row">
-              {{ formatLoad(server.load.five) }} / {{ formatLoad(server.load.fifteen) }}
+              <span class="node-box__text">{{ formatLoad(server.load.one) }}</span>
+            </span>
+            <span class="node-box__row">
+              <span class="node-box__text">
+                {{ formatLoad(server.load.five) }} / {{ formatLoad(server.load.fifteen) }}
+              </span>
             </span>
           </template>
         </div>

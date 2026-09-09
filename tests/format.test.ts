@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   formatCfsmDate,
+  formatCurrencyValue,
   formatLatency,
   formatPrice,
   formatProbePercent,
@@ -47,6 +48,9 @@ describe('time formatting', () => {
     expect(formatPrice('-1', '$', 'year')).toBe('免费')
     expect(formatPrice('30.00', '¥', 'month')).toBe('¥30 / month')
     expect(formatPrice('invalid', '$', 'month')).toBe('—')
+    expect(formatPrice('', '$', 'month')).toBe('—')
     expect(formatPrice(null, null, null)).toBe('—')
+    expect(formatCurrencyValue(12.345, '€')).toBe('€12.35')
+    expect(formatCurrencyValue(null, '€')).toBe('—')
   })
 })

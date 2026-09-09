@@ -79,12 +79,14 @@
 | H26 | `--radius: 0.625rem`（10px） | `--radius: 18px` | 全站圆角偏大 8px | P1 | 令牌改为 10px，`--radius-sm` 改为 6px | PASS |
 | H27 | `--font-sans` 以 `system-ui` 优先 | 以 `Inter` 优先 | 字形与字重观感不同 | P1 | 字体栈按上游改为系统字体优先 | PASS |
 | H28 | 激活态使用 `--selection`（亮 `oklch(.55 .15 155)` / 暗 `oklch(.74 .17 162)`） | 用本主题的 `--emerald` | 强调色不同 | P1 | 移植 `--selection` 并接到分组标签、视图切换与工具开关 | PASS |
+| H29 | 隐藏 Earth 时总览区为 `p-4` 独立网格：移动端 3 列、`md` 起 6 列，每卡片 `span 1` | 单列父网格中子区仍跨 12 列，浏览器生成隐式列 | 总览卡片宽度与右侧留白失真 | P1 | 原样移植 3 / 6 列、`span 1`、72 / 112px 最小高度 | PASS |
+| H30 | NodeCard 底部始终保持三列；每行图标与可截断文本独立，第三列显示简短剩余天数与金额 | 直接显示完整 ISO 日期，文本没有独立截断层；mini 窄屏还改为两列 | 手机窄屏文字被硬裁切 | P1 | 移植 `calendar-stats` / `coins`、剩余状态与文本层，恢复全密度三列 | PASS |
 
 ## 终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 2 ｜ KNOWN-BUG = 2**
 
-28 项分布：PASS 21、NECESSARY-CFSM-DIFFERENCE 3、P2-ACCEPTED 2、KNOWN-BUG 2。
+30 项分布：PASS 23、NECESSARY-CFSM-DIFFERENCE 3、P2-ACCEPTED 2、KNOWN-BUG 2。
 
 两条 KNOWN-BUG 均不阻塞首页视觉与交互对标，且已在 `docs/known-bugs.md` 中单独记录，
 不计入 PASS。

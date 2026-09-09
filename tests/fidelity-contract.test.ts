@@ -263,6 +263,10 @@ describe('Komari fidelity contracts', () => {
     expect(overview).toContain('overview-card__unit')
     expect(stylesheet).toMatch(/\.overview-grid\s*\{[^}]*grid-template-columns: repeat\(12/s)
     expect(stylesheet).toMatch(/\.overview-card\s*\{[^}]*grid-column: span 4/s)
+    // Earth 隐藏时上游改为独立的 3 / 6 列等分网格，不得在单列父网格中继续跨 12 列。
+    expect(stylesheet).toMatch(/\.general-stage--cards-only \.general-stage__cards\s*\{[^}]*grid-column: 1;[^}]*repeat\(3/s)
+    expect(stylesheet).toMatch(/\.general-stage--cards-only \.overview-card\s*\{[^}]*min-height: 72px;[^}]*grid-column: span 1/s)
+    expect(stylesheet).toMatch(/@media \(min-width: 768px\)[\s\S]*?\.general-stage--cards-only \.general-stage__cards\s*\{[^}]*repeat\(6/s)
   })
 
   it('builds the node card with the Komari section order', () => {
@@ -288,6 +292,11 @@ describe('Komari fidelity contracts', () => {
     expect(card).toContain('node-metric__label--memory')
     expect(card).toContain('node-metric__label--disk')
     expect(card).toContain('node-metric__label--traffic')
+    // 三列信息框保持上游图标和独立截断层；到期日期不直接塞进窄框。
+    expect(card).toContain('tabler:calendar-stats')
+    expect(card).toContain('tabler:coins')
+    expect(card).toContain('node-box__text')
+    expect(card).not.toContain('到期 {{ server.expireDate }}')
   })
 
   it('builds the node list as a Komari-style grid with its column contract', () => {

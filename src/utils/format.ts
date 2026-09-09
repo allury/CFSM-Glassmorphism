@@ -148,8 +148,9 @@ export function formatPrice(
   currency: string | null,
   billingCycle: string | null,
 ): string {
-  if (price === null) return '—'
-  const amount = Number(price)
+  const normalizedPrice = price?.trim()
+  if (!normalizedPrice) return '—'
+  const amount = Number(normalizedPrice)
   if (!Number.isFinite(amount)) return '—'
   if (amount === 0 || amount === -1) return '免费'
   if (amount < 0) return '—'
@@ -157,4 +158,10 @@ export function formatPrice(
   const prefix = currency?.trim() ?? ''
   const cycle = billingCycle?.trim()
   return `${prefix}${formatted}${cycle ? ` / ${cycle}` : ''}`
+}
+
+export function formatCurrencyValue(value: number | null, currency: string | null): string {
+  if (value === null || !Number.isFinite(value) || value < 0) return '—'
+  const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
+  return `${currency?.trim() ?? ''}${formatted}`
 }

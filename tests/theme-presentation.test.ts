@@ -10,6 +10,7 @@ import {
   matchProvider,
   parseProviderAliases,
   parseTrafficLimitBytes,
+  remainingValue,
   resolveChartFamilies,
   resolveDetailCardKeys,
   resolveGeneralCardKeys,
@@ -76,6 +77,18 @@ describe('round 7 theme presentation contracts', () => {
     expect(daysUntilExpiry(server.expireDate, now)).toBe(10)
     expect(isExpiring(server, 30, now)).toBe(true)
     expect(isHighLoad(server, 80)).toBe(true)
+  })
+
+  it('keeps expiry summaries strict and computes remaining value only for official CFSM cycles', () => {
+    const now = Date.UTC(2026, 0, 1)
+    const annual = glass({ price: '60', currency: '€', billingCycle: 'five_years', expireDate: '2027-01-01T00:00:00Z' })
+
+    expect(daysUntilExpiry('2025-12-31T23:59:59Z', now)).toBe(-1)
+    expect(daysUntilExpiry('invalid', now)).toBeNull()
+    expect(remainingValue(annual, now)).toBe(12)
+    expect(remainingValue({ ...annual, billingCycle: 'custom' }, now)).toBeNull()
+    expect(remainingValue({ ...annual, expireDate: 'invalid' }, now)).toBeNull()
+    expect(remainingValue({ ...annual, expireDate: '2025-12-31T23:59:59Z' }, now)).toBe(0)
   })
 
   it('matches provider aliases only against real node text and builds truthful overview cards', () => {

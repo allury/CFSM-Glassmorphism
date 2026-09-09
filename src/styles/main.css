@@ -715,7 +715,7 @@ a {
  * Round 9.9: 总览卡片对齐 Komari NodeGeneralCards。
  * Komari 的总览区没有独立标题块；卡片是 12 栅格中的 span-4 单元，
  * 标签在左上、图标在右上（淡色、hover 变深），数值与单位基线对齐在卡片底部。
- * CFSM 只替换数据来源，视觉 token 映射到本主题的玻璃层次变量。
+ * CFSM 只替换数据来源，视觉 token 使用上游实际生效值。
  */
 .overview-grid {
   position: relative;
@@ -1350,8 +1350,35 @@ a {
   white-space: nowrap;
 }
 
+.node-box__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-box__fixed-text {
+  flex: none;
+}
+
+.node-box__number {
+  font-variant-numeric: tabular-nums;
+}
+
+.node-box__row--warning {
+  color: var(--amber);
+}
+
+.node-box__row--danger {
+  color: var(--red);
+}
+
 .node-card--mini .node-box {
   padding: 4px;
+}
+
+.node-card--compact .node-box {
+  padding: 6px;
 }
 
 .node-box__row--up {
@@ -2097,10 +2124,6 @@ a {
 
   .node-card--mini .node-card__name {
     font-size: 12px;
-  }
-
-  .node-card--mini .node-boxes {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .latency-grid {
@@ -3665,7 +3688,17 @@ a {
 
 .general-stage--cards-only {
   grid-template-columns: minmax(0, 1fr);
-  padding: 0;
+  padding: 16px;
+}
+
+.general-stage--cards-only .general-stage__cards {
+  grid-column: 1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.general-stage--cards-only .overview-card {
+  min-height: 72px;
+  grid-column: span 1;
 }
 
 .general-stage__earth {
@@ -3714,6 +3747,14 @@ a {
 }
 
 @media (min-width: 768px) {
+  .general-stage--cards-only .general-stage__cards {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .general-stage--cards-only .overview-card {
+    min-height: 112px;
+  }
+
   .general-stage--globe {
     height: 14.5rem;
     grid-template-rows: minmax(0, 1fr);
