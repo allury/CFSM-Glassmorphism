@@ -130,12 +130,17 @@ describe('CFSM wire adapters', () => {
     expect(server.ipV6Reachable).toBe('0')
     expect(server.gpus).toEqual([{ id: '0', name: 'RTX', utilization: 13 }])
     expect(server.diskIo?.readBps).toBe(4096)
+    // 服务端每个窗口点都写入全部 8 个探测目标；缺席的 key 与未配置同义，归一化为 false。
     expect(server.latencyWindow[0]).toEqual({
       timestamp: 999_000,
       ct: 20,
       cu: false,
       cm: null,
       bd: 30,
+      node_1: false,
+      node_2: false,
+      node_3: false,
+      node_4: false,
     })
   })
 

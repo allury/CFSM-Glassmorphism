@@ -86,19 +86,31 @@ describe('Server to Glassmorphism adapter', () => {
     })
     expect(view.latency).toEqual([
       {
-        carrier: 'ct',
+        target: 'ct',
         label: '电信',
         latency: 21,
         packetLoss: 0,
       },
       {
-        carrier: 'cu',
+        target: 'cu',
         label: '联通',
         latency: false,
         packetLoss: null,
       },
     ])
-    expect(view.history).toEqual({ latencySamples: [18, 0], packetLossSamples: [1, 0] })
+    // 窗口按探测目标分组，时间桶原样保留；cm 整段未配置因此不产出序列。
+    expect(view.history).toEqual({
+      latencySeries: {
+        ct: [{ timestamp: 1_700_000_000_000, value: 18 }],
+        cu: [{ timestamp: 1_700_000_000_000, value: null }],
+        bd: [{ timestamp: 1_700_000_000_000, value: 0 }],
+      },
+      packetLossSeries: {
+        ct: [{ timestamp: 1_700_000_000_000, value: 1 }],
+        cu: [{ timestamp: 1_700_000_000_000, value: null }],
+        bd: [{ timestamp: 1_700_000_000_000, value: 0 }],
+      },
+    })
     expect(view.gpus).toEqual([{ id: '0', name: 'GPU 0', utilization: 45 }])
   })
 
@@ -158,7 +170,7 @@ describe('Server to Glassmorphism adapter', () => {
       expireDate: null,
       trafficLimit: null,
       latency: [],
-      history: { latencySamples: [], packetLossSamples: [] },
+      history: { latencySeries: {}, packetLossSeries: {} },
       gpus: [],
     })
   })
@@ -171,7 +183,7 @@ describe('Server to Glassmorphism adapter', () => {
     }, source), null)
 
     expect(view.latency).toEqual([{
-      carrier: 'ct',
+      target: 'ct',
       label: '电信',
       latency: 0,
       packetLoss: 0,

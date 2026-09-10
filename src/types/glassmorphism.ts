@@ -1,4 +1,4 @@
-import type { LatencyCarrier, ProbeValue, Reachability } from './cfsm'
+import type { ProbeTarget, ProbeValue, Reachability } from './cfsm'
 
 export interface GlassResourceMetric {
   used: number | null
@@ -6,7 +6,8 @@ export interface GlassResourceMetric {
   percentage: number | null
 }
 export interface GlassLatencyMetric {
-  carrier: LatencyCarrier
+  /** 八个探测目标之一：旧四线路 ct/cu/cm/bd 与 CFSM 2.8.5 起的 node_1～node_4。 */
+  target: ProbeTarget
   label: string
   latency: ProbeValue
   packetLoss: ProbeValue
@@ -18,9 +19,22 @@ export interface GlassGpuMetric {
   utilization: number | null
 }
 
+/**
+ * 首页延迟 / 丢包小窗口的一个采样点。
+ *
+ * 必须保留 `null`（该时间桶无采样）与 `false`（该探测点未配置），
+ * 因为柱状图是**按时间桶**逐格渲染的：把空洞过滤掉会让后面的柱子整体前移，
+ * 时间轴随之错位——这正是第 14 轮修掉的 BUG-001。
+ */
+export interface GlassLatencySample {
+  timestamp: number
+  value: ProbeValue
+}
+
+/** 按探测目标分组的窗口序列；每个目标各自是一条等长的时间序列。 */
 export interface GlassHistorySummary {
-  latencySamples: number[]
-  packetLossSamples: number[]
+  latencySeries: Partial<Record<ProbeTarget, GlassLatencySample[]>>
+  packetLossSeries: Partial<Record<ProbeTarget, GlassLatencySample[]>>
 }
 
 export interface GlassServer {

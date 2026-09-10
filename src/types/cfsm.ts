@@ -14,7 +14,17 @@ export type LatencyValues = Record<LatencyCarrier, ProbeValue>
 export type ProbeValues = Record<ProbeTarget, ProbeValue>
 export type ProbeLabels = Record<ProbeTarget, string>
 
-export interface LatencyWindowSample extends LatencyValues {
+/**
+ * `/api/servers` 的 `servers[].ping` / `servers[].loss` 单个采样点。
+ *
+ * 服务端 `getDashboardLatencyHistory` 每台节点固定返回
+ * `DASHBOARD_LATENCY_WINDOW_POINTS`(20) 个点，覆盖
+ * `DASHBOARD_LATENCY_WINDOW_HOURS`(2) 小时，`ts` 是毫秒桶时间戳且已按升序排序。
+ * 每个点包含**全部 8 个**探测目标（`LATENCY_NODE_FIELDS`），取值三态：
+ * 数值 / `null`（该桶无采样）/ `false`（该探测点未配置）。
+ * 旧库缺列时对应 key 直接缺席，因此这里按目标逐个解析而不是假定齐全。
+ */
+export interface LatencyWindowSample extends ProbeValues {
   timestamp: number
 }
 

@@ -23,8 +23,11 @@ function server(overrides: Partial<GlassServer> = {}): GlassServer {
     disk: { used: 51200, total: 102400, percentage: 50 },
     network: { inSpeed: 1024, outSpeed: 2048, received: 3000, transmitted: 4000, monthlyReceived: 1000, monthlyTransmitted: 2000 },
     processes: 80, tcpConnections: 20, udpConnections: 5,
-    latency: [{ carrier: 'ct', label: '电信', latency: 20, packetLoss: 0 }],
-    history: { latencySamples: [20, 30], packetLossSamples: [0, 1] },
+    latency: [{ target: 'ct', label: '电信', latency: 20, packetLoss: 0 }],
+    history: {
+      latencySeries: { ct: [{ timestamp: 1, value: 20 }, { timestamp: 2, value: 30 }] },
+      packetLossSeries: { ct: [{ timestamp: 1, value: 0 }, { timestamp: 2, value: 1 }] },
+    },
     gpus: [], connectivity: { ipv4: '1', ipv6: '0' }, operatingSystem: 'Debian', architecture: 'x86_64',
     cpuInfo: 'AMD EPYC', cpuCores: 4, kernelVersion: '6.8', agentVersion: '1.5', bootTime: 1, lastUpdated: 2,
     ...overrides,
@@ -50,8 +53,11 @@ describe('health summary', () => {
     const unhealthy = server({
       cpu: 98,
       expireDate: '2025-01-01',
-      latency: [{ carrier: 'ct', label: '电信', latency: null, packetLoss: null }],
-      history: { latencySamples: [600], packetLossSamples: [25] },
+      latency: [{ target: 'ct', label: '电信', latency: null, packetLoss: null }],
+      history: {
+        latencySeries: { ct: [{ timestamp: 1, value: 600 }] },
+        packetLossSeries: { ct: [{ timestamp: 1, value: 25 }] },
+      },
     })
     const result = evaluateServerHealth(unhealthy, DEFAULT_THEME_SETTINGS, Date.UTC(2026, 0, 1))
     expect(result.tone).toBe('critical')
@@ -64,7 +70,7 @@ describe('health summary', () => {
       cpu: null, load: { one: null, five: null, fifteen: null },
       memory: { used: null, total: null, percentage: null }, swap: { used: null, total: null, percentage: null },
       disk: { used: null, total: null, percentage: null }, trafficLimit: null, expireDate: null,
-      latency: [], history: { latencySamples: [], packetLossSamples: [] }, cpuCores: null,
+      latency: [], history: { latencySeries: {}, packetLossSeries: {} }, cpuCores: null,
     })
     expect(evaluateServerHealth(sparse, DEFAULT_THEME_SETTINGS).tone).toBe('unknown')
     expect(buildHealthSummary([server(), sparse], DEFAULT_THEME_SETTINGS)).toHaveLength(2)
@@ -93,8 +99,8 @@ describe('snapshot and topology', () => {
     const node = server({
       name: '=formula',
       latency: [
-        { carrier: 'ct', label: '电信', latency: false, packetLoss: null },
-        { carrier: 'cu', label: '联通', latency: 0, packetLoss: 0 },
+        { target: 'ct', label: '电信', latency: false, packetLoss: null },
+        { target: 'cu', label: '联通', latency: 0, packetLoss: 0 },
       ],
     })
     const snapshot = buildSnapshot([node], 'Site', new Date('2026-01-01T00:00:00Z'))

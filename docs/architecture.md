@@ -194,6 +194,28 @@ server click -> its source -> detail/history/ws
 
 正式版本为 1.0.0。main 推送通过 CI 后创建 annotated `v1.0.0` tag；tag workflow 重新执行完整质量门并发布 `CFSM-Glassmorphism-1.0.0.zip`。本地与仓库均不保留生成的 dist 或 ZIP。
 
+## 第 14 轮 · v1.1.0-test.5 数据契约与真实 Bug 修复
+
+本轮先读 CF-Server-Monitor `2.8.5 Beta5` 服务端与 Agent `1.3.8` 探针源码，
+建立端到端数据契约（`docs/cfsm-source-audit.md`），再按契约审计并修复当前实现里的真实 Bug
+（`docs/bug-matrix.md`）。架构分层没有变化，改动集中在 adapter 与其下游模型：
+
+- **窗口模型**：`LatencyWindowSample` 由旧四线路扩展为全部 8 个探测目标；
+  `GlassHistorySummary` 由两个扁平数值数组改为**按探测目标分组的时间序列**
+  （`latencySeries` / `packetLossSeries`），`null`（该桶无采样）与 `false`（未配置）都保留。
+  新增 `src/domain/probe-window.ts` 承载读取与聚合工具：柱状图按时间桶逐格取值，
+  健康度这类**聚合统计**才把窗口压成纯数值样本。
+- **探测目标**：`GlassLatencyMetric.carrier` 改名 `target` 并扩展到 `ProbeTarget`，
+  首页不再静默丢掉 `node_1`～`node_4`。
+- **站点级可见性**：`normalizeServerCollection` 把响应顶层 `sysConfig` 的
+  `show_price` / `show_expire` / `show_tf` 下发到每台节点；
+  `useServersStore.siteVisibility(base)` 让详情页按 owning source 取回同一组开关。
+  这三个开关只在 `/api/servers` 顶层出现，`/api/config` 与 `/api/server` 都没有。
+
+REST、WebSocket partial merge、History、`theme_options`、JWT / Turnstile、多 apiBase 归属、
+probe 三态与 50+ 节点性能优化的既有契约全部保持不变；
+本轮没有为解决显示问题去改数据适配层的语义。
+
 ## 第 13 轮 · v1.1.0-test.4 详情页 1:1 收口
 
 本轮同样只动展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、History

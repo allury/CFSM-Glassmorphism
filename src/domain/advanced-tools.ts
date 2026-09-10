@@ -1,3 +1,4 @@
+import { cloneHistorySummary, numericWindowSamples } from '@/domain/probe-window'
 import { daysUntilExpiry, parseTrafficLimitBytes, trafficUsage } from '@/domain/theme-presentation'
 import type { ThemeSettings } from '@/theme/settings'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -157,9 +158,12 @@ export function evaluateServerHealth(server: GlassServer, settings: Pick<ThemeSe
     addThresholdIssue(issues, 'Loss', lossValues.length ? Math.max(...lossValues) : null, 5, 20)
   }
 
-  const historicalLatency = average(server.history.latencySamples)
-  const historicalLoss = average(server.history.packetLossSamples)
-  const historySamples = server.history.latencySamples.length + server.history.packetLossSamples.length
+  // 健康度只做聚合统计，因此把窗口压成纯数值样本；柱状图另走按桶渲染的路径。
+  const latencySamples = numericWindowSamples(server.history.latencySeries)
+  const lossSamples = numericWindowSamples(server.history.packetLossSeries)
+  const historicalLatency = average(latencySamples)
+  const historicalLoss = average(lossSamples)
+  const historySamples = latencySamples.length + lossSamples.length
   if (historySamples > 0) {
     evaluatedSignals += 1
     addThresholdIssue(issues, '历史平均 Ping', historicalLatency, 250, 500, ' ms')
@@ -292,7 +296,7 @@ export function buildSnapshot(servers: readonly GlassServer[], siteTitle: string
       tcpConnections: server.tcpConnections,
       udpConnections: server.udpConnections,
       latency: server.latency.map((probe) => ({ ...probe, latency: probeSnapshot(probe.latency), packetLoss: probeSnapshot(probe.packetLoss) })),
-      history: { latencySamples: [...server.history.latencySamples], packetLossSamples: [...server.history.packetLossSamples] },
+      history: cloneHistorySummary(server.history),
       gpus: server.gpus.map((gpu) => ({ ...gpu })),
       connectivity: { ...server.connectivity },
       operatingSystem: server.operatingSystem,

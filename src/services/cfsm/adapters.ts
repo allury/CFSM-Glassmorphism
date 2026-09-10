@@ -102,21 +102,27 @@ function probeValues(value: Record<string, unknown>, prefix: 'ping' | 'loss'): P
   }
 }
 
+/**
+ * 解析 `/api/servers` 的延迟 / 丢包窗口。
+ *
+ * 服务端会给每个点写入全部 8 个探测目标，因此这里也必须读全 8 个——
+ * 只读旧四线路会静默丢掉 `node_1`～`node_4`，而 CFSM 2.8.5 起这四个是正式功能。
+ * 点顺序服务端已保证升序，这里按 `ts` 再稳一次，避免旧库或缓存返回乱序。
+ */
 function latencyWindow(value: unknown): LatencyWindowSample[] {
   if (!Array.isArray(value)) return []
 
-  return value.flatMap((entry) => {
-    if (!isRecord(entry)) return []
-    const timestamp = numberValue(entry.ts)
-    if (timestamp === null) return []
-    return [{
-      timestamp,
-      ct: probeValue(entry.ct),
-      cu: probeValue(entry.cu),
-      cm: probeValue(entry.cm),
-      bd: probeValue(entry.bd),
-    }]
-  })
+  return value
+    .flatMap((entry) => {
+      if (!isRecord(entry)) return []
+      const timestamp = numberValue(entry.ts)
+      if (timestamp === null) return []
+      return [{
+        timestamp,
+        ...Object.fromEntries(PROBE_TARGETS.map((target) => [target, probeValue(entry[target])])),
+      } as LatencyWindowSample]
+    })
+    .sort((left, right) => left.timestamp - right.timestamp)
 }
 
 function diskIoValue(value: unknown): DiskIoMetrics | undefined {
@@ -323,6 +329,21 @@ export function normalizeServer(
   }
 }
 
+/*
+ * `/api/servers` 把 `show_price` / `show_expire` / `show_tf` 放在**响应顶层**的
+ * `sysConfig` 里，而不是每台节点上（见 CFSM `handleServersAPI`）。
+ * 这里把站点级开关下发到每台节点，节点自身若带同名字段则以节点为准。
+ * 不下发的话这些开关会被解析后直接丢弃，运营方隐藏价格 / 到期 / 流量的设置将完全失效。
+ */
+function withSiteVisibility(
+  server: CfsmServer,
+  site: ServerSystemConfig | undefined,
+): CfsmServer {
+  if (!site) return server
+  const merged: ServerSystemConfig = { ...site, ...server.systemConfig }
+  return { ...server, systemConfig: merged }
+}
+
 export function normalizeServerCollection(
   value: unknown,
   source: ApiSource,
@@ -331,14 +352,16 @@ export function normalizeServerCollection(
   const input = requiredRecord(value, 'Servers')
   if (!Array.isArray(input.servers)) throw new Error('Servers response is missing the servers array')
 
+  const site = systemConfig(input.sysConfig)
+
   return {
     source,
     servers: input.servers.flatMap((server) => {
       if (!isRecord(server) || stringValue(server.id) === null) return []
-      return [normalizeServer(server, source, now)]
+      return [withSiteVisibility(normalizeServer(server, source, now), site)]
     }),
     stats: objectValue(input.stats),
-    systemConfig: systemConfig(input.sysConfig),
+    systemConfig: site,
   }
 }
 

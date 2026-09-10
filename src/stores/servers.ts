@@ -5,6 +5,7 @@ import type {
   CfsmServer,
   ServerCollection,
   ServerSourceFailure,
+  ServerSystemConfig,
 } from '@/types/cfsm'
 import { fetchAllServerSources, getApiBases, mergeRealtimeSample } from '@/services/cfsm'
 import type { LoadState } from './app'
@@ -35,6 +36,15 @@ export const useServersStore = defineStore('servers', () => {
 
   function findServer(base: string, id: string): CfsmServer | undefined {
     return bySourceAndId.value.get(serverKey(base, id))
+  }
+
+  /*
+   * 站点级展示开关（show_price / show_expire / show_tf）只出现在 `/api/servers`
+   * 响应的顶层 `sysConfig` 里，`/api/config` 与 `/api/server` 都不返回它们。
+   * 详情页因此需要按 owning source 回来取，否则运营方隐藏这些字段的设置在详情页失效。
+   */
+  function siteVisibility(base: string): ServerSystemConfig | undefined {
+    return collections.value.find((item) => item.source.base === base)?.systemConfig
   }
 
   async function load(bases = getApiBases()): Promise<void> {
@@ -138,6 +148,7 @@ export const useServersStore = defineStore('servers', () => {
     loadedAt,
     lastRealtimeAt,
     findServer,
+    siteVisibility,
     load,
     applyRealtimeSamples,
     expireStaleServers,

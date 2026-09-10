@@ -1,10 +1,16 @@
-import type { CfsmServer, ProbeValue, SiteConfig } from '@/types/cfsm'
-import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import type {
+  CfsmServer,
+  LatencyWindowSample,
+  ProbeTarget,
+  ProbeValue,
+  SiteConfig,
+} from '@/types/cfsm'
+import { DEFAULT_PROBE_LABELS, PROBE_TARGETS } from '@/constants/probes'
+import type {
+  GlassLatencySample,
   GlassResourceMetric,
   GlassServer,
 } from '@/types/glassmorphism'
-import { latencyCarrierKeys } from './adapters'
 
 function finiteNonNegative(value: number | null): number | null {
   return value !== null && Number.isFinite(value) && value >= 0 ? value : null
@@ -13,6 +19,32 @@ function finiteNonNegative(value: number | null): number | null {
 function probeMetric(value: ProbeValue): ProbeValue {
   if (value === false || value === null) return value
   return finiteNonNegative(value) ?? false
+}
+
+function probeTargetKeys(): readonly ProbeTarget[] {
+  return PROBE_TARGETS
+}
+
+/*
+ * 把 `/api/servers` 的窗口按探测目标拆成等长时间序列。
+ *
+ * 每个目标都保留全部时间桶，`null`（无采样）与 `false`（未配置）原样保留：
+ * 首页柱状图按桶逐格渲染，过滤掉空洞会让后续柱子前移并造成时间轴错位。
+ * 某个目标在整段窗口里都是 `false` 时不产出序列——那表示该探测点没有配置。
+ */
+function probeSeries(
+  window: readonly LatencyWindowSample[],
+): Partial<Record<ProbeTarget, GlassLatencySample[]>> {
+  const series: Partial<Record<ProbeTarget, GlassLatencySample[]>> = {}
+  for (const target of PROBE_TARGETS) {
+    const points = window.map((sample) => ({
+      timestamp: sample.timestamp,
+      value: probeMetric(sample[target]),
+    }))
+    if (points.length === 0 || points.every((point) => point.value === false)) continue
+    series[target] = points
+  }
+  return series
 }
 function boundedPercentage(value: number | null): number | null {
   const metric = finiteNonNegative(value)
@@ -75,33 +107,28 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     processes: finiteNonNegative(server.processes),
     tcpConnections: finiteNonNegative(server.tcpConnections),
     udpConnections: finiteNonNegative(server.udpConnections),
-    latency: latencyCarrierKeys().flatMap((carrier) => {
-      const latency = probeMetric(server.latency[carrier])
-      const packetLossValue = probeMetric(server.packetLoss[carrier])
+    /*
+     * 八个探测目标全部参与，与 CFSM `mergeMetricsIntoServer` 写入的字段集一致。
+     * 只有延迟与丢包都为 `false`（未配置）时才整条略过；`null`（超时）要保留，
+     * 否则会把「探测超时」误报成「没有这个探测点」。
+     */
+    latency: probeTargetKeys().flatMap((target) => {
+      const latency = probeMetric(server.latency[target])
+      const packetLossValue = probeMetric(server.packetLoss[target])
       const packetLoss = typeof packetLossValue === 'number'
         ? Math.min(packetLossValue, 100)
         : packetLossValue
       if (latency === false && packetLoss === false) return []
       return [{
-        carrier,
-        label: labels[carrier],
+        target,
+        label: labels[target],
         latency,
         packetLoss,
       }]
     }),
     history: {
-      latencySamples: server.latencyWindow.flatMap((sample) => (
-        latencyCarrierKeys().flatMap((carrier) => {
-          const value = sample[carrier]
-          return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : []
-        })
-      )),
-      packetLossSamples: server.packetLossWindow.flatMap((sample) => (
-        latencyCarrierKeys().flatMap((carrier) => {
-          const value = sample[carrier]
-          return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? [value] : []
-        })
-      )),
+      latencySeries: probeSeries(server.latencyWindow),
+      packetLossSeries: probeSeries(server.packetLossWindow),
     },
     gpus: server.gpus.map((gpu) => ({
       id: gpu.id,

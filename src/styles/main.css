@@ -798,10 +798,20 @@ a {
   white-space: nowrap;
 }
 
+/*
+ * 上游总览卡片的单位是 `text-[11px] md:text-xs font-medium text-muted-foreground truncate`：
+ * 只有 `truncate`，**没有** `shrink-0`，也没有宽度上限，因此它和主数值一起按内容分配空间。
+ *
+ * 此前这里写了 `flex: none` + `max-width: 60%`，等于把单位钉死并硬性占掉六成宽度，
+ * 主数值只能拿剩下的四成——768px 档实测 `455.0` 被截成 `45…`、`GB / 1.56 TB` 也被截断，
+ * 而同宽度下上游能显示更多位数。这是第 14 轮修掉的 BUG-004。
+ *
+ * 注意详情页指标卡的单位是另一套：上游那边写的是 `shrink-0`，所以
+ * `.detail-metric-card__value > em` 保持 `flex: none`，两者不要互相套用。
+ */
 .overview-card__unit {
   overflow: hidden;
-  max-width: 60%;
-  flex: none;
+  min-width: 0;
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
@@ -1464,9 +1474,19 @@ a {
 .node-probe__bars .is-signal-4 { background: var(--signal-4); }
 .node-probe__bars .is-signal-5 { background: var(--signal-5); }
 
-/* 无采样：与上游的 muted-foreground/10 一致的中性占位。 */
+/*
+ * 上游有两档中性色，不能混用：
+ * `bg-muted-foreground/10` 是整段无数据时的占位柱（`buildEmptyPingBars`），
+ * `bg-muted-foreground/15` 是序列**中间**某个时间桶没有采样时的空洞柱
+ * （`buildPingBars` 里 `value === null` 的分支）。
+ * 空洞必须留在原位，否则后面的柱子会整体前移，时间轴随之错位。
+ */
 .node-probe__bars .is-empty {
   background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.node-probe__bars .is-gap {
+  background: color-mix(in srgb, var(--muted) 15%, transparent);
 }
 
 @media (prefers-reduced-motion: reduce) {

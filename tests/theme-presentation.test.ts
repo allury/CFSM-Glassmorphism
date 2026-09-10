@@ -35,7 +35,7 @@ function glass(overrides: Partial<GlassServer> = {}): GlassServer {
     disk: { used: null, total: null, percentage: null },
     network: { inSpeed: null, outSpeed: null, received: null, transmitted: null, monthlyReceived: null, monthlyTransmitted: null },
     processes: null, tcpConnections: null, udpConnections: null, latency: [],
-    history: { latencySamples: [], packetLossSamples: [] }, gpus: [],
+    history: { latencySeries: {}, packetLossSeries: {} }, gpus: [],
     connectivity: { ipv4: null, ipv6: null }, operatingSystem: null, architecture: null,
     cpuInfo: null, cpuCores: null, kernelVersion: null, agentVersion: null, bootTime: null, lastUpdated: null,
     ...overrides,

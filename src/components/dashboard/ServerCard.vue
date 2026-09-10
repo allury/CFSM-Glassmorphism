@@ -5,6 +5,7 @@ import type { NodeCardSize } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
+import { probeSeriesFor, type ProbeSeriesMap } from '@/domain/probe-window'
 import { daysUntilExpiry, remainingValue, trafficUsage } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
@@ -152,30 +153,44 @@ function emptyBars(metric: string): PingBar[] {
   }))
 }
 
+const primaryProbe = computed(() => props.server.latency[0] ?? null)
+
+/*
+ * 一根柱子 = 一个时间桶，与 Komari `useNodePingDisplay.buildPingBars` 一致
+ * （上游是 `points.map(...)`，逐点渲染）。
+ *
+ * 柱子只画**当前面板所标注的那个探测目标**的序列。此前的实现把
+ * 20 个时间桶 × 4 条线路拍平成一个数组，还顺手过滤掉了空洞，
+ * 结果既不是时间序列、柱数随缺口变化，柱子与标题上的线路也对不上——
+ * 这就是第 14 轮修掉的 BUG-001。
+ *
+ * `null`（该桶无采样）保留为原位的中性柱，对应上游的 `bg-muted-foreground/15`；
+ * 整体无数据时才回落到 20 根更淡的占位柱（`bg-muted-foreground/10`）。
+ */
 function buildBars(
   metric: string,
-  samples: readonly number[],
+  series: ProbeSeriesMap,
   tone: (value: number) => string,
 ): PingBar[] {
-  if (samples.length === 0) return emptyBars(metric)
-  return samples.map((value, index) => ({
-    key: `${metric}-${index}`,
-    className: tone(value),
+  const target = primaryProbe.value?.target
+  const points = target ? probeSeriesFor(series, target) : []
+  if (points.length === 0) return emptyBars(metric)
+  return points.map((point, index) => ({
+    key: `${metric}-${point.timestamp}-${index}`,
+    className: typeof point.value === 'number' ? tone(point.value) : 'is-gap',
   }))
 }
 
 const latencyBars = computed(() => buildBars(
   'latency',
-  props.server.history.latencySamples,
+  props.server.history.latencySeries,
   latencyToneClass,
 ))
 const lossBars = computed(() => buildBars(
   'loss',
-  props.server.history.packetLossSamples,
+  props.server.history.packetLossSeries,
   lossToneClass,
 ))
-
-const primaryProbe = computed(() => props.server.latency[0] ?? null)
 
 function handleKeydown(event: KeyboardEvent): void {
   if (event.key !== 'Enter' && event.key !== ' ') return

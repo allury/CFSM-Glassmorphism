@@ -48,7 +48,7 @@ function makeServer(id: string, overrides: Partial<GlassServer> = {}): GlassServ
     tcpConnections: null,
     udpConnections: null,
     latency: [],
-    history: { latencySamples: [], packetLossSamples: [] },
+    history: { latencySeries: {}, packetLossSeries: {} },
     gpus: [],
     connectivity: { ipv4: null, ipv6: null },
     operatingSystem: null,

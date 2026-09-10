@@ -92,31 +92,44 @@ const visibleAdminUrl = computed(() => (
     ? null
     : app.administrationUrl
 ))
+/*
+ * 站点级展示开关只在 `/api/servers` 的顶层 `sysConfig` 里出现，
+ * `/api/server` 只返回 `long_history_points`。详情页因此按 owning source
+ * 回到 servers store 取站点开关，节点自身若带同名字段仍以节点为准。
+ * 不这样做的话，运营方设置的 show_price / show_expire / show_tf 在详情页会完全失效。
+ */
+const siteVisibility = computed(() => (
+  server.value ? serverStore.siteVisibility(server.value.source.base) : undefined
+))
+function visibilityFlag(flag: 'showPrice' | 'showExpire' | 'showTraffic'): boolean {
+  return (server.value?.systemConfig?.[flag] ?? siteVisibility.value?.[flag]) !== false
+}
 const showPrice = computed(() => {
   const current = server.value
   if (!current) return false
   const authorized = sourceConfig.value?.authorization ?? app.config?.authorization ?? false
   if (theme.runtime.hidePriceWhenLoggedOut && !authorized) return false
-  return current.systemConfig?.showPrice !== false
+  return visibilityFlag('showPrice')
     && (current.price !== null || current.billingCycle !== null || current.currency !== null)
 })
 const showExpiry = computed(() => {
   const current = server.value
   if (!current) return false
-  return current.systemConfig?.showExpire !== false
+  return visibilityFlag('showExpire')
     && (current.expireDate !== null || current.autoRenewal !== null)
 })
 const showTrafficPolicy = computed(() => {
   const current = server.value
   if (!current) return false
-  return current.systemConfig?.showTraffic !== false
+  return visibilityFlag('showTraffic')
     && (current.trafficLimit !== null || current.trafficCalculationType !== null
       || current.resetDay !== null)
 })
 const detailCards = computed(() => {
   if (!server.value) return []
   return buildDetailCards(server.value, theme.runtime).filter((card) => {
-    if ((card.key === 'nodePrice' || card.key === 'monthlyCost') && !showPrice.value) return false
+    // 剩余价值同样由价格推导，必须跟随 show_price 一起隐藏。
+    if ((card.key === 'nodePrice' || card.key === 'monthlyCost' || card.key === 'remainingValue') && !showPrice.value) return false
     if (card.key === 'remainingTime' && !showExpiry.value) return false
     if (card.key === 'trafficQuota' && !showTrafficPolicy.value) return false
     return true

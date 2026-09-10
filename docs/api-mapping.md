@@ -23,6 +23,28 @@ Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `sr
 
 第 10 轮 v1.0.0 最终浏览器审计只收敛 UI 结构，没有增加、删除或改写任何请求。localhost 状态复验覆盖 `/api/config`、`/api/servers`、`/api/server`、`/api/history/all` 与 `/api/ws` 的成功、空、部分失败及 401/403/409/503 分支；owning apiBase、server ID 校验、partial merge、History revision/AbortController、旧四线路 + Node 1～4 和 `false`/`null`/number 三态均保持既有契约。高级工具的 Header 展开按钮只控制会话 UI 状态，不发请求，也不进入 `theme_options`。
 
+## 第 14 轮：按源码与真实响应校准的契约补充
+
+第 14 轮完整审读 CFSM `2.8.5 Beta5` 服务端与 Agent `1.3.8` 探针源码，并用真实部署响应交叉验证。
+完整数据链与字段契约表见 `docs/cfsm-source-audit.md`。与本主题直接相关的三条修正：
+
+1. **`/api/servers` 的 `sysConfig` 在响应顶层，不在每台节点上。**
+   `show_price` / `show_expire` / `show_tf` 只出现在这里：`/api/config` 没有，
+   `/api/server` 的 `sysConfig` 只有 `long_history_points`（真实响应实测 `{"long_history_points":180}`）。
+   主题在 `normalizeServerCollection` 把站点级开关下发到每台节点，
+   详情页通过 `useServersStore.siteVisibility(base)` 按 owning source 取回。
+2. **`servers[].ping` / `servers[].loss` 是时间桶序列，不是一串数值。**
+   服务端 `getDashboardLatencyHistory` 固定输出 `latency_window.points`(20) 个点、
+   覆盖 `latency_window.hours`(2) 小时，`ts` 为毫秒且升序，每个点覆盖全部 8 个探测目标，
+   取值为 数值 / `null`（该桶无采样）/ `false`（未配置）；旧库未迁移时只返回 4 个 key。
+   主题按目标分组保留整段序列，不再拍平或过滤空洞。
+3. **`/api/server` 在 `loss_X === null` 时会连同 `ping_X` 一起删除该字段**
+   （`omitNullLossProbeFields`），列表端点不做这件事。主题把字段缺席视为「未配置 / 无可用样本」。
+
+WebSocket 侧已确认：`latestReportUpdates[].samples[].data` 只含标量探针字段，
+**不含** `ping` / `loss` 数组，因此 partial merge 不会清掉列表窗口
+（真实响应验证 + `tests/cfsm-data-contract.test.ts` 锁定）。
+
 ## 请求契约
 
 ### GET /api/config
