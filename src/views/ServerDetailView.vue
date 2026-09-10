@@ -706,10 +706,10 @@ onUnmounted(() => detail.close())
             </header>
             <div class="detail-stat-grid">
               <article>
-                <span>读取</span><strong>{{ formatSpeed(server.diskIo.readBps) }}</strong>
+                <span>读取</span><strong>{{ formatDisplaySpeed(server.diskIo.readBps) }}</strong>
               </article>
               <article>
-                <span>写入</span><strong>{{ formatSpeed(server.diskIo.writeBps) }}</strong>
+                <span>写入</span><strong>{{ formatDisplaySpeed(server.diskIo.writeBps) }}</strong>
               </article>
               <article>
                 <span>读 IOPS</span><strong>{{ formatCount(server.diskIo.readIops) }}</strong>

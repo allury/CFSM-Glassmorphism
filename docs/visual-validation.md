@@ -14,6 +14,24 @@
 > 只改 hash 不会重新请求 `index.html`，会量到上一版 CSS。
 > 本轮有两次量测因此得出了错误结论。
 
+### 关于 Windows 上的 `bun run typecheck`
+
+本轮还纠正了一个此前被误判的结论。之前几轮把 Windows 上 `vue-tsc` 报的四条
+`Cannot find module './App.vue'` 记为「偶发环境问题、重试即可」。实际上它是
+**稳定复现**的：Bun 在 Windows 下加载不了 Vue language plugin，vue-tsc 在分析任何
+`.vue` 文件之前就停下，于是**所有 SFC 模板类型检查都被跳过**。
+
+本轮据此漏掉了一个真实错误（详情页磁盘 IO 区仍在调用已从 import 中移除的
+`formatSpeed`），本地全绿而 CI 的 Linux typecheck 直接失败。
+
+正确做法：用仓库外的便携 Node 跑同一份检查
+
+```bash
+<portable-node>/node.exe node_modules/vue-tsc/bin/vue-tsc.js --noEmit -p tsconfig.json
+```
+
+它会真正分析模板。修好之后再推。禁止改 `package.json` / `bun.lock` / `tsconfig` / CI 绕过。
+
 ### 详情页六档几何
 
 `nodes=10`、light、`财务` 预设。坐标 `[x, y, w, h]`。
