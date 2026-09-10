@@ -194,7 +194,33 @@ server click -> its source -> detail/history/ws
 
 正式版本为 1.0.0。main 推送通过 CI 后创建 annotated `v1.0.0` tag；tag workflow 重新执行完整质量门并发布 `CFSM-Glassmorphism-1.0.0.zip`。本地与仓库均不保留生成的 dist 或 ZIP。
 
-## 第 11 轮补充收口
+## 第 11 轮 · v1.1.0-test.3 首页 1:1 收口
+
+本轮全部改动都在展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、
+10 秒稳定后重置退避、History revision 与 AbortController、probe 的
+`false` / `null` / 数值三态、`theme_options`、JWT / Turnstile、多 apiBase 归属、
+server ID 校验、403 / 5xx 分类与 50+ 节点性能优化全部原样保留。
+normalized data model 未改动；纯显示问题一律在格式化与样式层解决。
+
+- **首页专用显示格式**：`src/utils/format.ts` 新增 `formatHome*` 一组函数
+  （字节 B/KB/MB/GB/TB/PB，基数 1024，精度 0/0/1/1/2；速度加 `/s`；
+  运行时间只到天；CFSM 官方计费周期本地化，未知自由文本原样保留）。
+  这些函数**只服务首页总览卡片、节点卡片与节点列表**；
+  详情页已于上一轮冻结，继续使用原有的 `formatBytes` / `formatUptime` / `formatPrice`。
+- **总览卡片模型**：`PresentationCard` 增加可选 `unit`。总览走上游的 value + unit
+  两段式，说明文字降级为 tooltip；详情页仍把 `hint` 当可见副文本，结构不变。
+- **预设来源分离**：`ALL_GENERAL_CARD_KEYS` 与 `ALL_QUICK_CONTROL_KEYS` 成为独立常量，
+  不再由「完整」预设推导。这样删掉默认预设里的项，不会连带让自定义模式失去它们。
+- **默认背景**：`src/assets/background/default-background-v2.webp` 是上游同一份资产
+  （32436 bytes，SHA-256 `4237796…c551b`）。放在 `src/assets/` 由 Vite 输出到
+  `dist/assets/`，不放 `public/`——主题 ZIP 根目录只允许 `index.html` 与 `assets/`。
+  自定义图片 / 视频、blur 与 overlay 能力不受影响，替换的只是「无自定义背景时」那一层。
+- **表面令牌按运行时取值**：总览卡片与节点卡片在上游是**两套**表面。
+  前者是 `--background` 的 50%、无边框、`--radius`、无阴影；
+  后者才命中 `[data-slot='card']` 的 `!important`。逐项以浏览器计算值为准，
+  记录在 `docs/homepage-fidelity-audit.md` H31 / H39 与 `docs/visual-validation.md`。
+
+### 第 11 轮前期（v1.1.0-test.2）补充收口
 
 截图回归只修正首页两处渲染偏差。Earth 隐藏时，`general-stage--cards-only` 成为与
 Komari 一致的独立 3 / 6 列网格，不再让 `general-stage__cards` 在单列父网格中跨

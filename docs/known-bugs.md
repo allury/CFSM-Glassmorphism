@@ -27,3 +27,16 @@
 - **是否影响 1:1 对标**：否。上游同样只在面板显示聚合值，明细在详情页。
 - **后续建议修复位置**：`src/components/dashboard/ServerCard.vue` 的 probe 面板，
   可补充 tooltip 区分三态；详情页 `ServerDetailView.vue` 已按目标逐项展示三态。
+
+## 第 11 轮复核（基线 `f63740b` → `v1.1.0-test.3`）
+
+两条 KNOWN-BUG 均在两套 localhost 上重新复核，结论不变，仍不阻塞首页 1:1 对标：
+
+- **BUG-001**：`?sparse=1` 场景确认探测字段整体缺失时面板正确隐藏，不会渲染 0 值柱；
+  正常场景下 0% 丢包渲染为 4 根 `is-signal-1` 满高柱，`is-empty` 数量为 0。
+- **BUG-002**：仍只在面板显示聚合值，未把 `false` / `null` 写成 `0`。
+
+本轮**没有新增** KNOWN-BUG：所有实测到的差异（总览卡片表面、value/unit 结构、字节单位、
+运行天数、计费周期、快捷控制预设、General Card 顺序、默认背景、NodeCard 圆角与边框、
+球体版卡片排布、tiled 版几何、窄屏间距）都已在本轮直接修正，记录在
+`docs/homepage-fidelity-audit.md` 的 H31–H45。

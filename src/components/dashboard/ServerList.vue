@@ -8,10 +8,10 @@ import { matchProvider, trafficUsage, type ProviderAlias } from '@/domain/theme-
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import {
+  formatHomePrice,
+  formatHomeSpeed,
   formatLatency,
   formatPercent,
-  formatPrice,
-  formatSpeed,
   formatUptime,
 } from '@/utils/format'
 
@@ -77,7 +77,7 @@ function regionCode(server: GlassServer): string | null {
 
 function priceText(server: GlassServer): string {
   if (!props.priceVisible || !server.showPrice) return ''
-  const text = formatPrice(server.price, server.currency, server.billingCycle)
+  const text = formatHomePrice(server.price, server.currency, server.billingCycle)
   return text === '—' ? '' : text
 }
 
@@ -265,8 +265,8 @@ function hideMissingImage(event: Event): void {
           </div>
 
           <div class="node-list__cell">
-            <span class="node-list__sub node-list__sub--up">↑ {{ formatSpeed(server.network.outSpeed) }}</span>
-            <span class="node-list__sub node-list__sub--down">↓ {{ formatSpeed(server.network.inSpeed) }}</span>
+            <span class="node-list__sub node-list__sub--up">↑ {{ formatHomeSpeed(server.network.outSpeed) }}</span>
+            <span class="node-list__sub node-list__sub--down">↓ {{ formatHomeSpeed(server.network.inSpeed) }}</span>
           </div>
         </div>
       </div>

@@ -118,9 +118,21 @@ export const ICONS = {
     viewBox: '0 0 24 24',
     body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m6 15l6-6l6 6\"/>",
   },
+  'tabler:chevrons-down': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m7 7l5 5l5-5M7 13l5 5l5-5\"/>",
+  },
+  'tabler:chevrons-up': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"m7 11l5-5l5 5M7 17l5-5l5 5\"/>",
+  },
   'tabler:clock': {
     viewBox: '0 0 24 24',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M3 12a9 9 0 1 0 18 0a9 9 0 0 0-18 0\"/><path d=\"M12 7v5l3 3\"/></g>",
+  },
+  'tabler:coins': {
+    viewBox: '0 0 24 24',
+    body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M9 14c0 1.657 2.686 3 6 3s6-1.343 6-3s-2.686-3-6-3s-6 1.343-6 3\"/><path d=\"M9 14v4c0 1.656 2.686 3 6 3s6-1.344 6-3v-4M3 6c0 1.072 1.144 2.062 3 2.598s4.144.536 6 0S15 7.072 15 6s-1.144-2.062-3-2.598s-4.144-.536-6 0S3 4.928 3 6\"/><path d=\"M3 6v10c0 .888.772 1.45 2 2\"/><path d=\"M3 11c0 .888.772 1.45 2 2\"/></g>",
   },
   'tabler:cpu': {
     viewBox: '0 0 24 24',
@@ -130,10 +142,6 @@ export const ICONS = {
     viewBox: '0 0 24 24',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M5 6a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1z\"/><path d=\"M8 10V8h2m6 6v2h-2m-4 0H8v-2m8-4V8h-2M3 10h2m-2 4h2m5-11v2m4-2v2m7 5h-2m2 4h-2m-5 7v-2m-4 2v-2\"/></g>",
   },
-  'tabler:coins': {
-    viewBox: '0 0 24 24',
-    body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M9 14c0 1.657 2.686 3 6 3s6-1.343 6-3s-2.686-3-6-3s-6 1.343-6 3\"/><path d=\"M9 14v4c0 1.656 2.686 3 6 3s6-1.344 6-3v-4M3 6c0 1.072 1.144 2.062 3 2.598s4.144.536 6 0S15 7.072 15 6s-1.144-2.062-3-2.598s-4.144-.536-6 0S3 4.928 3 6\"/><path d=\"M3 6v10c0 .888.772 1.45 2 2\"/><path d=\"M3 11c0 .888.772 1.45 2 2\"/></g>",
-  },
   'tabler:device-analytics': {
     viewBox: '0 0 24 24',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M3 5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm4 15h10m-8-4v4m6-4v4\"/><path d=\"m8 12l3-3l2 2l3-3\"/></g>",
@@ -141,6 +149,14 @@ export const ICONS = {
   'tabler:device-desktop': {
     viewBox: '0 0 24 24',
     body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm4 15h10m-8-4v4m6-4v4\"/>",
+  },
+  'tabler:device-desktop-analytics': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 5a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm4 15h10m-8-4v4m6-4v4m-6-8V8m3 4v-1m3 1v-2m-3 2v-1\"/>",
+  },
+  'tabler:device-imac': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M3 4a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1zm0 9h18M8 21h8m-6-4l-.5 4m4.5-4l.5 4\"/>",
   },
   'tabler:download': {
     viewBox: '0 0 24 24',
@@ -221,6 +237,10 @@ export const ICONS = {
   'tabler:tools': {
     viewBox: '0 0 24 24',
     body: "<g fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"><path d=\"M3 21h4L20 8a1.5 1.5 0 0 0-4-4L3 17zM14.5 5.5l4 4\"/><path d=\"M12 8L7 3L3 7l5 5M7 8L5.5 9.5M16 12l5 5l-4 4l-5-5m4 1l-1.5 1.5\"/></g>",
+  },
+  'tabler:traffic-cone': {
+    viewBox: '0 0 24 24',
+    body: "<path fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 20h16M9.4 10h5.2m-6.8 5h8.4M6 20l5-15h2l5 15\"/>",
   },
   'tabler:upload': {
     viewBox: '0 0 24 24',

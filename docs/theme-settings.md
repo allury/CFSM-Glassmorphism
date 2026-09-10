@@ -48,7 +48,7 @@
 | 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 1:1 |
 | 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 1:1 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |
-| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 可用 keys 保留；虚拟化、精确配额等缺失项不展示 | 🟡 降级 |
+| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列；remainingValue / monthlyCost / yearlyCost / trafficQuota / 各类 PeakNode / 虚拟化分布因需要跨币种换算或 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
 | 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
 | 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 1:1 |
 | 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段 | ✅ 1:1 |
@@ -57,7 +57,7 @@
 | 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 1:1 |
 | 25 | `homeQuickControlsEnabled` | switch / `true` | 保留快捷控制区 | ✅ 1:1 |
 | 26 | `homeQuickControlPreset` | select / `完整` | 保留基础/流量/运维/完整/自定义 | ✅ 1:1 |
-| 27 | `homeQuickControlKeys` | richtext / favorite、totalTraffic、peak、offline | 保留八个原 keys，按数据可用性禁用无结果项 | ✅ 1:1 |
+| 27 | `homeQuickControlKeys` | richtext / favorite、totalTraffic、peak、offline | 第 11 轮起允许的 key 集合独立于「完整」预设，与上游 `ALL_HOME_QUICK_CONTROL_KEYS` 一致（默认六项 + upload + download）；`monthlyCost` 需跨币种换算，CFSM 不提供 | 🟢 等价 |
 | 28 | `nodeListMetadataEnabled` | switch / `true` | 信息栏保留，但 CFSM 不提供 ASN/城市/实际 IP | 🟡 降级 |
 | 29 | `nodeListMetadataFields` | richtext / provider、region、asn | region/tags/group 可用；provider 仅文本匹配；city/asn 不可用 | 🟡 降级 |
 | 30 | `nodeListCustomTagsVisible` | switch / `true` | 映射 CFSM 逗号分隔 tags | ✅ 1:1 |

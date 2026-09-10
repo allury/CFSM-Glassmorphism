@@ -36,25 +36,47 @@
 }
 
 /*
- * 卡片表面令牌：取自 Komari `[data-slot='card']` 的实际生效值。
- * 上游用一条 !important 规则统一覆盖了 Tailwind 的 bg-background/50，
- * 因此总览卡片与节点卡片实际都是 74% 不透明的浅色块加 1px 边框，
- * 卡片边界清晰可辨——不是接近透明的玻璃。
+ * 卡片表面令牌：取自 Komari 节点卡片（`.node-card` / `[data-slot='card']`）的**运行时**生效值，
+ * 即 `utils/glassTheme.ts` 的默认 `emerald` 预设写入 `--glass-light-*` / `--glass-dark-*`
+ * 之后，main.css 那条 !important 规则真正应用到页面上的颜色。
+ *
+ * 浏览器实测（Komari localhost，亮色，默认预设）：
+ *   background  rgba(241, 245, 249, 0.74)
+ *   border      1px solid rgba(203, 213, 225, 0.6)
+ *   box-shadow  rgba(15, 23, 42, 0.18) 0 8px 28px
+ *   hover 背景  #f8fafccc，hover 阴影与常态相同
+ *     （上游 hover 规则写的是 `var(--glass-light-shadow, 0 12px 38px …)`，
+ *      而 `--glass-light-shadow` 在运行时一定有值，所以那个更大的 fallback 永远不生效）
+ *
+ * 注意：这套表面**只属于节点卡片**。总览卡片在上游走的是另一条路径，见 `.overview-card`。
  */
 :root {
   --card-surface: rgb(241 245 249 / 74%);
   --card-surface-hover: rgb(248 250 252 / 80%);
-  --card-surface-border: rgb(226 232 240 / 68%);
+  --card-surface-border: rgb(203 213 225 / 60%);
   --card-surface-shadow: 0 8px 28px rgb(15 23 42 / 18%);
-  --card-surface-shadow-hover: 0 12px 38px rgb(15 23 42 / 20%);
+  --card-surface-shadow-hover: 0 8px 28px rgb(15 23 42 / 18%);
 }
 
 :root[data-theme='dark'] {
-  --card-surface: rgb(10 14 22 / 82%);
-  --card-surface-hover: rgb(10 14 22 / 90%);
+  --card-surface: rgb(13 17 26 / 85%);
+  --card-surface-hover: rgb(17 24 39 / 91%);
   --card-surface-border: rgb(255 255 255 / 18%);
   --card-surface-shadow: 0 8px 30px rgb(0 0 0 / 48%);
-  --card-surface-shadow-hover: 0 12px 38px rgb(0 0 0 / 52%);
+  --card-surface-shadow-hover: 0 8px 30px rgb(0 0 0 / 48%);
+}
+
+/*
+ * Komari 的 `--background`，逐字移植。总览卡片的表面就是它的 50% 透明版本
+ * （上游类名 `bg-background/50`，hover 变成不透明的 `bg-background`）。
+ * 只服务总览卡片，页面底色仍由 `--page` 与背景层负责。
+ */
+:root {
+  --background: oklch(0.935 0.015 252);
+}
+
+:root[data-theme='dark'] {
+  --background: oklch(0.141 0.005 285.823);
 }
 
 /* 色觉友好模式下叠加纹理，使等级不只靠颜色区分。 */
@@ -225,72 +247,31 @@ a {
     linear-gradient(145deg, var(--page-soft), var(--page));
 }
 
-.dynamic-background__wash,
-.dynamic-background__orb,
-.dynamic-background__grid,
-.dynamic-background__grain {
+/*
+ * 默认背景：Komari `Background.vue` 的 `.default-background`，样式逐条移植。
+ * 图片本身由组件用 Vite 资产 URL 注入 background-image，因此不写死路径。
+ */
+.dynamic-background__default {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background-repeat: no-repeat;
+  background-position: center bottom;
+  background-size: cover;
+  filter: saturate(1.12) contrast(1.02);
+  transform: scale(1.01);
+  transform-origin: center;
 }
 
-.dynamic-background__wash {
-  background:
-    radial-gradient(circle at 12% 22%, rgb(58 181 148 / 22%), transparent 29%),
-    radial-gradient(circle at 88% 17%, rgb(73 127 209 / 19%), transparent 31%),
-    radial-gradient(circle at 72% 82%, rgb(151 111 211 / 13%), transparent 32%);
+:root[data-theme='dark'] .dynamic-background__default {
+  filter: brightness(0.38) saturate(0.82) contrast(1.08);
 }
 
-.dynamic-background__orb {
-  width: 38rem;
-  height: 38rem;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.34;
-  animation: background-drift 22s ease-in-out infinite alternate;
-}
-
-.dynamic-background__orb--one {
-  top: -18rem;
-  left: -10rem;
-  background: #43d3a7;
-}
-
-.dynamic-background__orb--two {
-  top: 12%;
-  right: -21rem;
-  left: auto;
-  background: #659ee4;
-  animation-delay: -7s;
-}
-
-.dynamic-background__orb--three {
-  top: auto;
-  right: 22%;
-  bottom: -27rem;
-  left: auto;
-  background: #a787df;
-  animation-delay: -13s;
-}
-
-.dynamic-background__grid {
-  opacity: 0.18;
-  background-image:
-    linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: 54px 54px;
-  mask-image: linear-gradient(to bottom, black, transparent 78%);
-}
-
-.dynamic-background__grain {
-  opacity: 0.22;
-  background-image: radial-gradient(rgb(46 66 88 / 24%) 0.6px, transparent 0.7px);
-  background-size: 5px 5px;
-  mix-blend-mode: multiply;
-}
-
-:root[data-theme='dark'] .dynamic-background__grain {
-  opacity: 0.12;
-  mix-blend-mode: screen;
+@media (max-width: 768px) {
+  .dynamic-background__default {
+    background-position: 50% 78%;
+    transform: scale(1.02);
+  }
 }
 
 /*
@@ -724,31 +705,47 @@ a {
   gap: 8px;
 }
 
+/*
+ * 总览卡片表面与节点卡片**不同**，这一点此前搞错过。
+ *
+ * 上游 CardX 的根类是 `cn('bg-card … rounded-lg', bordered && 'border', props.class)`，
+ * 而 NodeGeneralCards 传进来的 `props.class` 含 `bg-background/50` 与 `border-none`；
+ * `cn()` 是 tailwind-merge，会把 `bg-card` 和 `border` 合并掉。
+ * 于是总览卡片根本不匹配 `.node-card / .bg-card / [data-slot='card']` 那条 !important 规则。
+ *
+ * 浏览器实测（Komari localhost，1440×900 干净加载）：
+ *   background       --background 的 50%
+ *   border           0px none
+ *   border-radius    10px（rounded-lg = --radius）
+ *   box-shadow       none
+ *   backdrop-filter  桌面 none；<768px 为 blur(8px)（backdrop-blur-sm）
+ *   hover            背景变成不透明的 --background
+ *
+ * 量测提醒：改窗口宽度后不要立刻读 backdrop-filter。上游卡片带 transition-all，
+ * resize 之后计算值会停在旧的 blur(8px)，必须在目标宽度下重新加载再量。
+ */
 .overview-card {
   position: relative;
   display: flex;
   min-width: 0;
   height: 100%;
-  min-height: 88px;
   grid-column: span 4;
   flex-direction: column;
   justify-content: space-between;
   gap: 4px;
   padding: 12px;
-  /* Komari CardX 使用 rounded-xl（12px），表面为 74% 不透明的浅色块。 */
-  border: 1px solid var(--card-surface-border);
-  border-radius: 12px;
-  background: var(--card-surface);
-  box-shadow: var(--card-surface-shadow);
-  transition: background-color 170ms ease, box-shadow 170ms ease;
-  backdrop-filter: blur(14px) saturate(145%);
-  -webkit-backdrop-filter: blur(14px) saturate(145%);
+  border: none;
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  box-shadow: none;
+  transition: background-color 170ms ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
 .overview-card:hover {
   z-index: 2;
-  background: var(--card-surface-hover);
-  box-shadow: var(--card-surface-shadow-hover);
+  background: var(--background);
 }
 
 .overview-card__head {
@@ -820,17 +817,6 @@ a {
   .overview-card__unit {
     font-size: 12px;
   }
-}
-
-.overview-card strong,
-.overview-card .app-tooltip > strong {
-  display: block;
-  overflow: hidden;
-  font-size: clamp(17px, 1.7vw, 23px);
-  line-height: 1.05;
-  letter-spacing: -0.035em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .settings-field small,
@@ -1124,7 +1110,8 @@ a {
   padding: 14px;
   overflow: hidden;
   border: 1px solid var(--card-surface-border);
-  border-radius: 12px;
+  /* Komari NodeCard 用 rounded-xl，即 --radius + 4px = 14px。 */
+  border-radius: 14px;
   background: var(--card-surface);
   box-shadow: var(--card-surface-shadow);
   cursor: pointer;
@@ -1978,11 +1965,6 @@ a {
   text-align: right;
 }
 
-@keyframes background-drift {
-  from { transform: translate3d(-3%, -2%, 0) scale(0.96); }
-  to { transform: translate3d(6%, 5%, 0) scale(1.08); }
-}
-
 @keyframes node-enter {
   from { opacity: 0; filter: blur(3px); transform: translateY(10px) scale(0.988); }
   to { opacity: 1; filter: blur(0); transform: translateY(0) scale(1); }
@@ -2039,11 +2021,6 @@ a {
     display: none;
   }
 
-  .overview-card {
-    min-height: 78px;
-    padding: 11px;
-  }
-
   .dashboard-controls__actions {
     flex-wrap: wrap;
   }
@@ -2073,14 +2050,6 @@ a {
 @media (max-width: 520px) {
   .header-actions {
     gap: 1px;
-  }
-
-  .overview-card {
-    min-height: 72px;
-  }
-
-  .overview-card__number {
-    font-size: 17px;
   }
 
   .notice {
@@ -2164,15 +2133,6 @@ a {
   .icon-button {
     width: 31px;
     height: 31px;
-  }
-
-  .overview-grid {
-    gap: 6px;
-  }
-
-  .overview-card {
-    min-height: 68px;
-    padding: 9px;
   }
 
   .node-list__head {
@@ -3717,32 +3677,101 @@ a {
   grid-row: 1;
 }
 
+/*
+ * 窄屏行高对齐上游：Komari 的球体版是 `h-42 -mt-42 … grid-rows-2`，
+ * 卡片多于六张时改为 `auto-rows-[5rem]`；两种写法算出来都是 80px 一行，
+ * 因此这里统一用 grid-auto-rows: 5rem，卡片本身不再另设 min-height。
+ */
 .general-stage--globe .general-stage__cards {
   grid-row: 3;
   margin-top: -10.5rem;
+  grid-auto-rows: 5rem;
 }
 
-.general-stage--tiled {
-  min-height: 40rem;
-}
-
-.general-stage--tiled .general-stage__cards {
+/*
+ * 球体版前六张卡片按**列**排布，逐条对应上游 `cardPositionClasses`：
+ * col-start 1/1/5/5/9/9，row-start 1/2/1/2/1/2。
+ * 也就是说第 1、2 张上下叠在最左列，而不是并排在第一行。
+ * 第七张起上游退回 `col-span-4 row-span-1` 的自动排布，这里同样交给自动流。
+ */
+.general-stage--globe .overview-card:nth-child(1) {
+  grid-column: 1 / span 4;
   grid-row: 1;
 }
 
-.general-stage--tiled .general-stage__earth {
+.general-stage--globe .overview-card:nth-child(2) {
+  grid-column: 1 / span 4;
   grid-row: 2;
-  height: 18rem;
+}
+
+.general-stage--globe .overview-card:nth-child(3) {
+  grid-column: 5 / span 4;
+  grid-row: 1;
+}
+
+.general-stage--globe .overview-card:nth-child(4) {
+  grid-column: 5 / span 4;
+  grid-row: 2;
+}
+
+.general-stage--globe .overview-card:nth-child(5) {
+  grid-column: 9 / span 4;
+  grid-row: 1;
+}
+
+.general-stage--globe .overview-card:nth-child(6) {
+  grid-column: 9 / span 4;
+  grid-row: 2;
+}
+
+.general-stage--globe:has(.overview-card:nth-child(7)) .overview-card {
+  grid-column: span 4;
+  grid-row: auto;
+}
+
+/*
+ * 上游 tiled 版外框是 `p-3 sm:p-4 … gap-2 sm:gap-3`，
+ * 高度由内容决定，`min-h-[40rem] sm:min-h-[30rem] md:min-h-[36rem] lg:min-h-[40rem]` 只是下限。
+ */
+.general-stage--tiled {
+  min-height: 40rem;
+  padding: 12px;
+}
+
+/* 上游 tiled 版是 `auto-rows-[4.75rem] sm:auto-rows-[5rem] md:auto-rows-[5.8rem]`。 */
+.general-stage--tiled .general-stage__cards {
+  grid-row: 1;
+  grid-auto-rows: 4.75rem;
+}
+
+/* 上游 tiled 卡片是 `col-span-6 sm:col-span-3`：窄屏两张一行，640px 起四张一行。 */
+.general-stage--tiled .overview-card {
+  grid-column: span 6;
+}
+
+.general-stage.general-stage--tiled .general-stage__earth {
+  grid-row: 2;
   min-height: 18rem;
 }
 
 @media (min-width: 640px) {
   .general-stage--tiled {
     min-height: 30rem;
+    padding: 16px;
+    gap: 12px;
   }
 
-  .general-stage--tiled .general-stage__earth {
-    height: 20rem;
+  .general-stage--tiled .general-stage__cards {
+    gap: 12px;
+    grid-auto-rows: 5rem;
+  }
+
+  .general-stage.general-stage--tiled .general-stage__earth {
+    min-height: 20rem;
+  }
+
+  .general-stage--tiled .overview-card {
+    grid-column: span 3;
   }
 }
 
@@ -3787,8 +3816,12 @@ a {
     min-height: 36rem;
   }
 
-  .general-stage--tiled .general-stage__earth {
-    height: 24rem;
+  .general-stage.general-stage--tiled .general-stage__earth {
+    min-height: 24rem;
+  }
+
+  .general-stage--tiled .general-stage__cards {
+    grid-auto-rows: 5.8rem;
   }
 }
 
@@ -3797,8 +3830,8 @@ a {
     min-height: 40rem;
   }
 
-  .general-stage--tiled .general-stage__earth {
-    height: 28rem;
+  .general-stage.general-stage--tiled .general-stage__earth {
+    min-height: 28rem;
   }
 }
 

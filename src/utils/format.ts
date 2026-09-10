@@ -143,10 +143,10 @@ export function formatCfsmDate(value: string | null): string {
   }).format(date)
 }
 
-export function formatPrice(
+function priceWithCycleLabel(
   price: string | null,
   currency: string | null,
-  billingCycle: string | null,
+  cycleLabel: string,
 ): string {
   const normalizedPrice = price?.trim()
   if (!normalizedPrice) return '—'
@@ -156,12 +156,126 @@ export function formatPrice(
   if (amount < 0) return '—'
   const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(amount)
   const prefix = currency?.trim() ?? ''
-  const cycle = billingCycle?.trim()
-  return `${prefix}${formatted}${cycle ? ` / ${cycle}` : ''}`
+  return `${prefix}${formatted}${cycleLabel ? ` / ${cycleLabel}` : ''}`
+}
+
+export function formatPrice(
+  price: string | null,
+  currency: string | null,
+  billingCycle: string | null,
+): string {
+  return priceWithCycleLabel(price, currency, billingCycle?.trim() ?? '')
 }
 
 export function formatCurrencyValue(value: number | null, currency: string | null): string {
   if (value === null || !Number.isFinite(value) || value < 0) return '—'
   const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
   return `${currency?.trim() ?? ''}${formatted}`
+}
+
+/*
+ * ===== 首页显示格式 =====
+ *
+ * Komari 首页用的是 KB / MB / GB / TB（换算基数仍是 1024），
+ * 精度 B 0、KB 0、MB 1、GB 1、TB 2，速度在单位后加 `/s`；
+ * 节点卡片的运行时间只显示整天数，计费周期显示为中文。
+ *
+ * 这一组函数只服务首页总览卡片、节点卡片与节点列表。详情页结构与格式已冻结，
+ * 继续使用上面的 `formatBytes` / `formatUptime` / `formatPrice`，
+ * 所以这里另起一组显示函数，而不是就地改写既有格式化器。
+ * normalized data model 不受影响：改动只发生在展示层。
+ */
+
+const HOME_BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const
+const HOME_BYTE_DECIMALS: Readonly<Record<string, number>> = {
+  B: 0,
+  KB: 0,
+  MB: 1,
+  GB: 1,
+  TB: 2,
+  PB: 2,
+}
+
+/** 数值与单位分离，对应 Komari `formatBytesSplit`；总览卡片的 value / unit 两段就来自它。 */
+export interface SplitAmount {
+  readonly value: string
+  readonly unit: string
+}
+
+export function formatHomeBytesSplit(value: number | null): SplitAmount {
+  const bytes = normalizedNumber(value)
+  if (bytes === null) return { value: '—', unit: '' }
+  if (bytes === 0) return { value: '0', unit: 'B' }
+
+  const unitIndex = Math.min(
+    Math.floor(Math.log(bytes) / Math.log(1024)),
+    HOME_BYTE_UNITS.length - 1,
+  )
+  const unit = HOME_BYTE_UNITS[unitIndex] ?? 'PB'
+  return { value: (bytes / 1024 ** unitIndex).toFixed(HOME_BYTE_DECIMALS[unit] ?? 1), unit }
+}
+
+export function formatHomeSpeedSplit(value: number | null): SplitAmount {
+  const split = formatHomeBytesSplit(value)
+  return split.unit === '' ? split : { value: split.value, unit: `${split.unit}/s` }
+}
+
+function joinSplit(split: SplitAmount): string {
+  return split.unit === '' ? split.value : `${split.value} ${split.unit}`
+}
+
+export function formatHomeBytes(value: number | null): string {
+  return joinSplit(formatHomeBytesSplit(value))
+}
+
+export function formatHomeSpeed(value: number | null): string {
+  return joinSplit(formatHomeSpeedSplit(value))
+}
+
+/** CFSM 的内存 / 硬盘用量以 MiB 上报，首页仍按 Komari 的显示规则渲染。 */
+export function formatHomeMebibytesSplit(value: number | null): SplitAmount {
+  const mebibytes = normalizedNumber(value)
+  return mebibytes === null
+    ? { value: '—', unit: '' }
+    : formatHomeBytesSplit(mebibytes * 1024 * 1024)
+}
+
+export function formatHomeMebibytes(value: number | null): string {
+  return joinSplit(formatHomeMebibytesSplit(value))
+}
+
+/** Komari NodeCard 的运行时间只显示整天数（`在线 N 天`），不显示小时。 */
+export function formatHomeUptimeDays(bootTime: number | null, now = Date.now()): string {
+  const startedAt = normalizeTimestampMilliseconds(bootTime)
+  if (startedAt === null || startedAt > now) return '—'
+  return `在线 ${Math.floor((now - startedAt) / 86_400_000)} 天`
+}
+
+/*
+ * CFSM 的 `billing_cycle` 是自由文本。官方枚举值可以安全本地化；
+ * 其它取值原样保留，不猜测它代表哪个周期。
+ */
+const HOME_BILLING_CYCLE_LABELS: Readonly<Record<string, string>> = {
+  month: '月',
+  quarter: '季',
+  half_year: '半年',
+  year: '年',
+  two_years: '两年',
+  three_years: '三年',
+  four_years: '四年',
+  five_years: '五年',
+}
+
+export function formatHomeBillingCycle(billingCycle: string | null): string {
+  const cycle = billingCycle?.trim()
+  if (!cycle) return ''
+  return HOME_BILLING_CYCLE_LABELS[cycle.toLowerCase()] ?? cycle
+}
+
+export function formatHomePrice(
+  price: string | null,
+  currency: string | null,
+  billingCycle: string | null,
+): string {
+  return priceWithCycleLabel(price, currency, formatHomeBillingCycle(billingCycle))
 }

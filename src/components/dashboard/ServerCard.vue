@@ -9,16 +9,17 @@ import { daysUntilExpiry, remainingValue, trafficUsage } from '@/domain/theme-pr
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import {
-  formatBytes,
   formatCurrencyValue,
+  formatHomeBytes,
+  formatHomeMebibytes,
+  formatHomePrice,
+  formatHomeSpeed,
+  formatHomeUptimeDays,
   formatLatency,
   formatLoad,
   formatPercent,
-  formatPrice,
   formatProbePercent,
-  formatSpeed,
   formatTimestamp,
-  formatUptime,
 } from '@/utils/format'
 
 /**
@@ -68,14 +69,16 @@ const traffic = computed(() => (props.server.showTraffic ? trafficUsage(props.se
 const osName = computed(() => osDisplayName(props.server.operatingSystem))
 const regionCode = computed(() => resolveRegionCoordinates(props.server.region)?.code ?? null)
 
-const uptimeText = computed(() => `运行 ${formatUptime(props.server.bootTime)}`)
+/** Komari NodeCard 的运行芯片只显示整天数（`在线 N 天`），不显示小时。 */
+const uptimeText = computed(() => formatHomeUptimeDays(props.server.bootTime))
 /**
  * 价格受两层控制：主题级 `hidePriceWhenLoggedOut` 与该节点自身的 `showPrice`。
- * 缺失或无法解析时 formatPrice 返回占位符，此时不生成价格芯片，避免空标签。
+ * 缺失或无法解析时返回占位符，此时不生成价格芯片，避免空标签。
+ * 计费周期按 CFSM 官方枚举本地化；未知自由文本原样保留。
  */
 const priceText = computed(() => {
   if (!props.priceVisible || !props.server.showPrice) return ''
-  const text = formatPrice(props.server.price, props.server.currency, props.server.billingCycle)
+  const text = formatHomePrice(props.server.price, props.server.currency, props.server.billingCycle)
   return text === '—' ? '' : text
 })
 const expireVisible = computed(() => props.server.showExpire && props.server.expireDate !== null)
@@ -271,9 +274,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="memoryPercent" :status="tone(memoryPercent)" />
           <div class="node-metric__hint">
-            {{ formatBytes(server.memory.used === null ? null : server.memory.used * 1024 ** 2) }}
+            {{ formatHomeMebibytes(server.memory.used) }}
             /
-            {{ formatBytes(server.memory.total === null ? null : server.memory.total * 1024 ** 2) }}
+            {{ formatHomeMebibytes(server.memory.total) }}
           </div>
         </div>
 
@@ -286,9 +289,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="diskPercent" :status="tone(diskPercent)" />
           <div class="node-metric__hint">
-            {{ formatBytes(server.disk.used === null ? null : server.disk.used * 1024 ** 2) }}
+            {{ formatHomeMebibytes(server.disk.used) }}
             /
-            {{ formatBytes(server.disk.total === null ? null : server.disk.total * 1024 ** 2) }}
+            {{ formatHomeMebibytes(server.disk.total) }}
           </div>
         </div>
 
@@ -303,9 +306,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="traffic ? traffic.percent : null" :status="tone(traffic ? traffic.percent : null)" />
           <div class="node-metric__hint">
-            {{ formatBytes(traffic ? traffic.used : null) }}
+            {{ formatHomeBytes(traffic ? traffic.used : null) }}
             /
-            {{ traffic ? formatBytes(traffic.limit) : '∞' }}
+            {{ traffic ? formatHomeBytes(traffic.limit) : '∞' }}
           </div>
         </div>
       </div>
@@ -314,21 +317,21 @@ function hideMissingImage(event: Event): void {
         <div class="node-box">
           <span class="node-box__row node-box__row--up">
             <AppIcon name="tabler:chevron-up" :size="11" />
-            <span class="node-box__text">{{ formatSpeed(server.network.outSpeed) }}</span>
+            <span class="node-box__text">{{ formatHomeSpeed(server.network.outSpeed) }}</span>
           </span>
           <span class="node-box__row node-box__row--down">
             <AppIcon name="tabler:chevron-down" :size="11" />
-            <span class="node-box__text">{{ formatSpeed(server.network.inSpeed) }}</span>
+            <span class="node-box__text">{{ formatHomeSpeed(server.network.inSpeed) }}</span>
           </span>
         </div>
         <div class="node-box">
           <span class="node-box__row">
             <AppIcon name="tabler:upload" :size="11" />
-            <span class="node-box__text">{{ formatBytes(server.network.transmitted) }}</span>
+            <span class="node-box__text">{{ formatHomeBytes(server.network.transmitted) }}</span>
           </span>
           <span class="node-box__row">
             <AppIcon name="tabler:download" :size="11" />
-            <span class="node-box__text">{{ formatBytes(server.network.received) }}</span>
+            <span class="node-box__text">{{ formatHomeBytes(server.network.received) }}</span>
           </span>
         </div>
         <div class="node-box">

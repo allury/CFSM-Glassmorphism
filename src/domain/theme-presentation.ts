@@ -6,6 +6,11 @@ import type { GlassServer } from '@/types/glassmorphism'
 import {
   formatBytes,
   formatCount,
+  formatHomeBytes,
+  formatHomeBytesSplit,
+  formatHomeMebibytesSplit,
+  formatHomeSpeed,
+  formatHomeSpeedSplit,
   formatLoad,
   formatPercent,
   formatPrice,
@@ -14,11 +19,18 @@ import {
   parseCfsmDate,
 } from '@/utils/format'
 
+/*
+ * 总览卡片的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_GENERAL_CARD_KEYS`，
+ * 只保留 CFSM 能够真实计算的项目。上游的 remainingValue / monthlyCost / yearlyCost
+ * 需要跨币种换算，trafficQuota 需要站点级配额，*PeakNode 与 virtualizationDistribution
+ * 需要 CFSM 未提供的字段——它们一律不出现，而不是用估算值凑满六张卡。
+ */
 export type GeneralCardKey =
-  | 'currentTime' | 'onlineNodes' | 'offlineNodes' | 'avgCpu' | 'avgGpu' | 'avgLoad'
-  | 'memory' | 'disk' | 'swap' | 'processes' | 'connections' | 'cpuCores' | 'gpuNodes'
-  | 'totalTraffic' | 'uploadSpeed' | 'downloadSpeed' | 'trafficPeak'
-  | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings'
+  | 'currentTime' | 'memory' | 'disk'
+  | 'totalTraffic' | 'uploadSpeed' | 'downloadSpeed'
+  | 'onlineNodes' | 'offlineNodes' | 'avgCpu' | 'avgGpu' | 'avgLoad'
+  | 'swap' | 'processes' | 'connections' | 'cpuCores' | 'gpuNodes'
+  | 'trafficPeak' | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings'
   | 'regionDistribution' | 'systemDistribution'
 
 export type QuickControlKey = 'favorite' | 'totalTraffic' | 'upload' | 'download' | 'peak' | 'offline' | 'highLoad' | 'expiring'
@@ -28,26 +40,57 @@ export type DetailCardKey =
   | 'uptime' | 'uploadSpeed' | 'downloadSpeed' | 'totalTraffic' | 'trafficQuota'
 export type ChartFamily = 'cpu' | 'memory' | 'disk' | 'network' | 'traffic' | 'gpu' | 'ping' | 'pingLoss'
 
+/** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
+const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
+  'currentTime', 'memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed',
+  'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
+  'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
+  'highLoadNodes', 'expiringNodes', 'trafficWarnings',
+  'regionDistribution', 'systemDistribution',
+]
+
+/*
+ * 逐项对应 Komari `GENERAL_CARD_PRESETS`（official / basic / ops / resource /
+ * finance / traffic / gpu / asset / full / custom），保持同一顺序，
+ * 只删去 CFSM 无法真实计算的条目。因此「基础」是 5 张而不是 6 张：
+ * 上游第三张是需要跨币种换算的剩余价值总额。
+ */
 const GENERAL_PRESETS: Record<ThemeSettings['generalCardPreset'], readonly GeneralCardKey[]> = {
-  官方: ['onlineNodes', 'avgCpu', 'memory', 'disk', 'uploadSpeed', 'downloadSpeed'],
-  基础: ['onlineNodes', 'offlineNodes', 'avgCpu', 'memory', 'disk', 'totalTraffic'],
-  运维: ['onlineNodes', 'offlineNodes', 'avgCpu', 'avgLoad', 'highLoadNodes', 'processes', 'connections'],
-  资源: ['avgCpu', 'avgGpu', 'memory', 'swap', 'disk', 'cpuCores', 'gpuNodes'],
-  财务: ['expiringNodes', 'trafficWarnings', 'totalTraffic'],
+  官方: ['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
+  基础: ['memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
+  运维: ['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'],
+  资源: ['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'],
+  财务: ['expiringNodes', 'totalTraffic'],
   流量: ['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'],
-  GPU: ['gpuNodes', 'avgGpu', 'avgCpu', 'memory'],
-  资产: ['onlineNodes', 'offlineNodes', 'cpuCores', 'regionDistribution', 'systemDistribution'],
-  完整: ['onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'memory', 'swap', 'disk', 'processes', 'connections', 'cpuCores', 'gpuNodes', 'totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'highLoadNodes', 'expiringNodes', 'trafficWarnings', 'regionDistribution', 'systemDistribution'],
+  GPU: ['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'],
+  资产: ['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'],
+  完整: ALL_GENERAL_CARD_KEYS,
   自定义: [],
 }
 
+/*
+ * 快捷控制预设对应 Komari `HOME_QUICK_CONTROL_PRESETS`，去掉 CFSM 没有的
+ * `monthlyCost`（跨币种月费用估算）。上游的「完整」是 7 项，因此 CFSM 是 6 项，
+ * 而不是此前把上行/下行也塞进去的 8 项。
+ */
 const QUICK_PRESETS: Record<ThemeSettings['homeQuickControlPreset'], readonly QuickControlKey[]> = {
-  基础: ['favorite', 'offline'],
-  流量: ['totalTraffic', 'upload', 'download', 'peak'],
-  运维: ['offline', 'highLoad', 'expiring'],
-  完整: ['favorite', 'totalTraffic', 'upload', 'download', 'peak', 'offline', 'highLoad', 'expiring'],
+  基础: ['favorite', 'peak', 'offline'],
+  流量: ['favorite', 'totalTraffic', 'peak'],
+  运维: ['favorite', 'offline', 'highLoad', 'expiring'],
+  完整: ['favorite', 'totalTraffic', 'peak', 'offline', 'highLoad', 'expiring'],
   自定义: [],
 }
+
+/*
+ * 允许出现在自定义列表里的全部 key，对应 Komari `ALL_HOME_QUICK_CONTROL_KEYS`
+ * （默认顺序 + upload + download）。这一份必须独立于「完整」预设：
+ * 上游的默认预设里同样没有 upload / download，但自定义模式仍可选中它们。
+ */
+const ALL_QUICK_CONTROL_KEYS: readonly QuickControlKey[] = [
+  ...QUICK_PRESETS.完整,
+  'upload',
+  'download',
+]
 
 const DETAIL_PRESETS: Record<ThemeSettings['detailMetricCardPreset'], readonly DetailCardKey[]> = {
   财务: ['nodePrice', 'monthlyCost', 'remainingTime', 'totalTraffic', 'trafficQuota', 'uptime', 'connections'],
@@ -76,8 +119,8 @@ function selectedKeys<T extends string>(preset: readonly T[], custom: string, al
   return requested.filter((key): key is T => allowed.has(key))
 }
 
-const GENERAL_KEYS = new Set<string>(GENERAL_PRESETS.完整)
-const QUICK_KEYS = new Set<string>(QUICK_PRESETS.完整)
+const GENERAL_KEYS = new Set<string>(ALL_GENERAL_CARD_KEYS)
+const QUICK_KEYS = new Set<string>(ALL_QUICK_CONTROL_KEYS)
 const DETAIL_KEYS = new Set<string>(DETAIL_PRESETS.综合)
 const CHART_KEYS = new Set<string>(CHART_PRESETS.完整)
 
@@ -207,55 +250,140 @@ function sum(values: Array<number | null>): number | null {
   return samples.length ? samples.reduce((total, value) => total + value, 0) : null
 }
 
-/** `icon` 使用与 Komari 一致的图标名（见 `@/constants/icons`），由 `AppIcon` 渲染。 */
-export interface PresentationCard { key: string, icon: IconName, label: string, value: string, hint: string, percentage?: number | null }
+/**
+ * `icon` 使用与 Komari 一致的图标名（见 `@/constants/icons`），由 `AppIcon` 渲染。
+ *
+ * 总览卡片使用 `value` + `unit`，与上游 `GeneralMetricCard` 的两段式一致：
+ * 主数值大字，单位小字并与主数值基线对齐；`hint` 此时是 tooltip 文本。
+ * 详情页卡片结构已冻结，仍然把 `hint` 当作可见副文本。
+ */
+export interface PresentationCard {
+  key: string
+  icon: IconName
+  label: string
+  value: string
+  hint: string
+  unit?: string
+  percentage?: number | null
+}
 
+/** 取用量最高的一台节点，用于「实时峰值」卡片的 tooltip 说明。 */
+function peakSpeedNode(servers: GlassServer[]): { name: string, value: number } | null {
+  let best: { name: string, value: number } | null = null
+  for (const server of servers) {
+    for (const speed of [server.network.inSpeed, server.network.outSpeed]) {
+      if (speed === null) continue
+      if (best === null || speed > best.value) best = { name: server.name, value: speed }
+    }
+  }
+  return best
+}
+
+/** 出现次数最多的取值，对应 Komari `getDistribution` 的首项。 */
+function topDistribution(values: Array<string | null>): { label: string, count: number } | null {
+  const counters = new Map<string, number>()
+  for (const value of values) {
+    const label = value?.trim()
+    if (!label) continue
+    counters.set(label, (counters.get(label) ?? 0) + 1)
+  }
+  let best: { label: string, count: number } | null = null
+  for (const [label, count] of counters) {
+    if (best === null || count > best.count) best = { label, count }
+  }
+  return best
+}
+
+/*
+ * 总览卡片。value / unit 的拆分方式与 Komari `NodeGeneralCards` 完全一致：
+ * 内存与硬盘是「已用数值 + 已用单位 / 总量」，流量与速率是「数值 + 单位」，
+ * 计数类是「数值 + / 总数」或「数值 + 台 / 个」。
+ * 单位一栏只放真正的单位，不再塞「接收 + 发送」「在线节点合计」这类说明文字，
+ * 那些说明改由 tooltip（`hint`）承担，手机端因此不会再被长文本挤到省略。
+ */
 export function buildGeneralCards(servers: GlassServer[], settings: ThemeSettings, now = Date.now()): PresentationCard[] {
   const online = servers.filter((server) => server.online)
+  const offlineCount = servers.length - online.length
   const resources = (selector: (server: GlassServer) => { used: number | null, total: number | null }) => {
     const used = sum(servers.map((server) => selector(server).used))
     const total = sum(servers.map((server) => selector(server).total))
     return { used, total, percentage: used !== null && total !== null && total > 0 ? used / total * 100 : null }
   }
+  /** 内存 / 硬盘 / 交换内存：`已用值` + `已用单位 / 总量 单位`。 */
+  const usageCard = (
+    key: 'memory' | 'disk' | 'swap',
+    icon: IconName,
+    label: string,
+    metric: { used: number | null, total: number | null, percentage: number | null },
+  ): PresentationCard | null => {
+    if (metric.percentage === null) return null
+    const used = formatHomeMebibytesSplit(metric.used)
+    const total = formatHomeMebibytesSplit(metric.total)
+    return {
+      key,
+      icon,
+      label,
+      value: used.value,
+      unit: `${used.unit} / ${total.value} ${total.unit}`,
+      hint: formatPercent(metric.percentage),
+      percentage: metric.percentage,
+    }
+  }
+
   const memory = resources((server) => server.memory)
   const disk = resources((server) => server.disk)
   const swap = resources((server) => server.swap)
-  const totalTraffic = sum(servers.map((server) => server.network.received === null && server.network.transmitted === null ? null : (server.network.received ?? 0) + (server.network.transmitted ?? 0)))
+  const trafficUp = sum(servers.map((server) => server.network.transmitted))
+  const trafficDown = sum(servers.map((server) => server.network.received))
+  const totalTraffic = trafficUp === null && trafficDown === null ? null : (trafficUp ?? 0) + (trafficDown ?? 0)
   const upload = sum(online.map((server) => server.network.outSpeed))
   const download = sum(online.map((server) => server.network.inSpeed))
-  const speedSamples = online.flatMap((server) => [server.network.inSpeed, server.network.outSpeed]).filter((value): value is number => value !== null)
-  const peak = speedSamples.length ? Math.max(...speedSamples) : null
+  const peak = peakSpeedNode(online)
   const avgCpu = average(online.map((server) => server.cpu))
   const avgGpu = average(online.flatMap((server) => server.gpus.map((gpu) => gpu.utilization)))
   const avgLoad = average(online.map((server) => server.load.one))
+  const avgLoad5 = average(online.map((server) => server.load.five))
+  const avgLoad15 = average(online.map((server) => server.load.fifteen))
   const processCount = sum(online.map((server) => server.processes))
-  const connectionCount = sum(online.map((server) => server.tcpConnections === null && server.udpConnections === null ? null : (server.tcpConnections ?? 0) + (server.udpConnections ?? 0)))
+  const tcpCount = sum(online.map((server) => server.tcpConnections))
+  const udpCount = sum(online.map((server) => server.udpConnections))
+  const connectionCount = tcpCount === null && udpCount === null ? null : (tcpCount ?? 0) + (udpCount ?? 0)
   const coreCount = sum(servers.map((server) => server.cpuCores))
-  const regions = new Set(servers.map((server) => server.region).filter(Boolean)).size
-  const systems = new Set(servers.map((server) => server.operatingSystem).filter(Boolean)).size
+  const gpuNodeCount = servers.filter((server) => server.gpus.length > 0).length
+  const regions = new Set(servers.map((server) => server.region?.trim()).filter(Boolean)).size
+  const topSystem = topDistribution(servers.map((server) => server.operatingSystem))
+  const highLoadCount = servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length
+  const expiringCount = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length
+  const trafficWarningCount = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length
+  const totalTrafficSplit = formatHomeBytesSplit(totalTraffic)
+  const uploadSplit = formatHomeSpeedSplit(upload)
+  const downloadSplit = formatHomeSpeedSplit(download)
+  const peakSplit = formatHomeSpeedSplit(peak?.value ?? null)
+
   const values: Record<GeneralCardKey, PresentationCard | null> = {
-    currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now), hint: '浏览器本地时间' },
-    onlineNodes: { key: 'onlineNodes', icon: 'tabler:plug-connected', label: '在线节点', value: `${online.length} / ${servers.length}`, hint: `${servers.length - online.length} 台离线` },
-    offlineNodes: { key: 'offlineNodes', icon: 'tabler:plug-connected-x', label: '离线节点', value: String(servers.length - online.length), hint: '五分钟统一判定' },
-    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: 'tabler:cpu', label: '在线平均 CPU', value: formatPercent(avgCpu), hint: '有采样的在线节点' },
-    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: 'tabler:cpu-2', label: '平均 GPU', value: formatPercent(avgGpu), hint: '有 GPU 采样的在线节点' },
-    avgLoad: avgLoad === null ? null : { key: 'avgLoad', icon: 'tabler:gauge', label: '平均负载', value: formatLoad(avgLoad), hint: '在线节点 1 分钟负载' },
-    memory: memory.percentage === null ? null : { key: 'memory', icon: 'icon-park-outline:memory', label: '内存', value: formatPercent(memory.percentage), hint: `${formatBytes(memory.used === null ? null : memory.used * 1024 ** 2)} / ${formatBytes(memory.total === null ? null : memory.total * 1024 ** 2)}`, percentage: memory.percentage },
-    disk: disk.percentage === null ? null : { key: 'disk', icon: 'tabler:server-2', label: '磁盘', value: formatPercent(disk.percentage), hint: `${formatBytes(disk.used === null ? null : disk.used * 1024 ** 2)} / ${formatBytes(disk.total === null ? null : disk.total * 1024 ** 2)}`, percentage: disk.percentage },
-    swap: swap.percentage === null ? null : { key: 'swap', icon: 'icon-park-outline:switch', label: '交换内存', value: formatPercent(swap.percentage), hint: `${formatBytes(swap.used === null ? null : swap.used * 1024 ** 2)} / ${formatBytes(swap.total === null ? null : swap.total * 1024 ** 2)}`, percentage: swap.percentage },
+    currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now), hint: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(now) },
+    memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
+    disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
+    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatHomeBytes(trafficUp)}\n↓ ${formatHomeBytes(trafficDown)}` },
+    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
+    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
+    onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },
+    offlineNodes: { key: 'offlineNodes', icon: 'tabler:plug-connected-x', label: '离线节点', value: formatCount(offlineCount), unit: `/ ${formatCount(servers.length)}`, hint: '五分钟统一判定' },
+    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: 'tabler:cpu', label: '平均 CPU', value: avgCpu.toFixed(1), unit: '%', hint: '有采样的在线节点' },
+    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: 'tabler:device-desktop-analytics', label: '平均 GPU', value: avgGpu.toFixed(1), unit: '%', hint: '有 GPU 采样的在线节点' },
+    avgLoad: avgLoad === null ? null : { key: 'avgLoad', icon: 'tabler:chart-line', label: '平均负载', value: formatLoad(avgLoad), hint: `1m ${formatLoad(avgLoad)}\n5m ${formatLoad(avgLoad5)}\n15m ${formatLoad(avgLoad15)}` },
+    swap: usageCard('swap', 'icon-park-outline:switch', '交换内存', swap),
     processes: processCount === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程总数', value: formatCount(processCount), hint: '在线节点合计' },
-    connections: connectionCount === null ? null : { key: 'connections', icon: 'tabler:activity', label: '连接总数', value: formatCount(connectionCount), hint: 'TCP + UDP' },
-    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), hint: '有数据节点合计' },
-    gpuNodes: { key: 'gpuNodes', icon: 'tabler:cpu-2', label: 'GPU 节点', value: String(servers.filter((server) => server.gpus.length > 0).length), hint: '包含真实 gpu_info' },
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:chart-histogram', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
-    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:arrow-big-up-lines', label: '实时上传', value: formatSpeed(upload), hint: '在线节点合计' },
-    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:arrow-big-down-lines', label: '实时下载', value: formatSpeed(download), hint: '在线节点合计' },
-    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:chart-line', label: '实时峰值', value: formatSpeed(peak), hint: '单节点单方向最大值' },
-    highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:activity-heartbeat', label: '高负载节点', value: String(servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length), hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
-    expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: String(servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length), hint: `${settings.homeExpiringDays} 天内` },
-    trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:alert-triangle', label: '流量预警', value: String(servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length), hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
-    regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: String(regions), hint: '有真实 region 的地区数' },
-    systemDistribution: { key: 'systemDistribution', icon: 'tabler:device-desktop', label: '系统分布', value: String(systems), hint: '有真实 OS 的系统数' },
+    connections: connectionCount === null ? null : { key: 'connections', icon: 'tabler:plug-connected', label: '连接数', value: formatCount(connectionCount), hint: `TCP ${formatCount(tcpCount)}\nUDP ${formatCount(udpCount)}` },
+    // 上游用 `tabler:chip`，该名称已不在 Iconify Tabler 集内，改用同族的 `tabler:cpu`。
+    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), unit: 'Core', hint: '有数据节点合计' },
+    gpuNodes: { key: 'gpuNodes', icon: 'tabler:device-imac', label: 'GPU 节点', value: formatCount(gpuNodeCount), unit: `/ ${formatCount(servers.length)}`, hint: '包含真实 gpu_info' },
+    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.name}\n${formatHomeSpeed(peak.value)}` },
+    highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadCount), unit: `/ ${formatCount(online.length)}`, hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
+    expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringCount), unit: '台', hint: `${settings.homeExpiringDays} 天内` },
+    trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningCount), unit: '台', hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
+    regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: formatCount(regions), unit: '个', hint: '有真实 region 的地区数' },
+    systemDistribution: { key: 'systemDistribution', icon: 'tabler:device-desktop', label: '系统分布', value: topSystem?.label ?? '-', unit: topSystem ? `${formatCount(topSystem.count)} 台` : undefined, hint: '有真实 OS 的节点中占比最高的系统' },
   }
   return resolveGeneralCardKeys(settings).flatMap((key) => values[key] ? [values[key] as PresentationCard] : [])
 }
