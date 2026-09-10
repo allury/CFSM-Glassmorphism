@@ -8,7 +8,11 @@ import HistoryChart from '@/components/detail/HistoryChart.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
+import AppTabs, { type AppTabItem } from '@/components/ui/AppTabs.vue'
+import type { IconName } from '@/constants/icons'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
+import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
+import { osIconUrl } from '@/utils/os-icon'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
@@ -18,20 +22,21 @@ import {
   buildMetricHistoryCharts,
   buildProbeHistoryCharts,
 } from '@/domain/server-detail'
-import { buildDetailCards, filterChartsBySettings } from '@/domain/theme-presentation'
+import { buildDetailCards, filterChartsBySettings, parseTrafficLimitBytes } from '@/domain/theme-presentation'
 import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useServerDetailStore } from '@/stores/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
-  formatBytes,
   formatCount,
+  formatDetailUptime,
+  formatDisplayBytes,
+  formatDisplayMebibytes,
+  formatDisplaySpeed,
   formatLatency,
   formatPercent,
   formatProbePercent,
-  formatSpeed,
-  formatUptime,
 } from '@/utils/format'
 
 const route = useRoute()
@@ -117,15 +122,6 @@ const detailCards = computed(() => {
     return true
   })
 })
-const totalTraffic = computed(() => {
-  const current = server.value
-  if (!current) return null
-  const received = current.networkReceived
-  const transmitted = current.networkTransmitted
-  if (received === null && transmitted === null) return null
-  return (received ?? 0) + (transmitted ?? 0)
-})
-
 const historyLabels: Record<HistoryHours, string> = {
   0.167: '10 分钟',
   0.5: '30 分钟',
@@ -182,10 +178,140 @@ function selectNode(event: Event): void {
   openNode(detailNodes.value.find((item) => `${item.source.base}::${item.id}` === value))
 }
 
+function hideMissingImage(event: Event): void {
+  const target = event.target
+  if (target instanceof HTMLImageElement) target.style.display = 'none'
+}
+
 function meterWidth(value: number | null): string {
   if (value === null || !Number.isFinite(value)) return '0%'
   return `${Math.min(Math.max(value, 0), 100)}%`
 }
+
+/*
+ * 详情分区 Tab。上游 `InstanceDetail` 在 `nodeDetailSectionTabsEnabled` 打开时
+ * 把页面切成 概览 / 负载 / 延迟 三段：概览是指标卡与四张信息卡，
+ * 负载是 LoadChart，延迟是 PingChart。关闭时全部堆叠显示（上游默认关闭）。
+ * CFSM 的历史区同时承载指标图与探针图，因此按图表 key 拆分到对应分区，
+ * 探针当前值卡片跟随「延迟」，磁盘 IO 与 GPU 属于「概览」。
+ */
+const DETAIL_SECTIONS: readonly AppTabItem[] = [
+  { value: 'overview', label: '概览', icon: 'tabler:layout-dashboard' },
+  { value: 'load', label: '负载', icon: 'tabler:activity' },
+  { value: 'ping', label: '延迟', icon: 'tabler:timeline' },
+]
+const detailSections = DETAIL_SECTIONS
+const activeSection = ref('overview')
+const sectionTabs = computed(() => theme.runtime.nodeDetailSectionTabsEnabled)
+const overviewVisible = computed(() => !sectionTabs.value || activeSection.value === 'overview')
+const pingVisible = computed(() => !sectionTabs.value || activeSection.value === 'ping')
+const PROBE_CHART_KEYS = new Set(['ping', 'loss'])
+const loadCharts = computed(() => historyCharts.value.filter((chart) => !PROBE_CHART_KEYS.has(chart.key)))
+const pingCharts = computed(() => historyCharts.value.filter((chart) => PROBE_CHART_KEYS.has(chart.key)))
+const visibleHistoryCharts = computed(() => {
+  if (!sectionTabs.value) return historyCharts.value
+  return activeSection.value === 'ping' ? pingCharts.value : loadCharts.value
+})
+const historyVisible = computed(() => !sectionTabs.value || activeSection.value !== 'overview')
+
+watch(() => server.value?.id, () => {
+  activeSection.value = 'overview'
+})
+
+/*
+ * 硬件卡的 CPU 块，逐项对应上游：型号 + vCPU 数、PassMark 外链、近似分级条。
+ * 分级只读取 CPU 型号字符串，不引入 CFSM 之外的数据。
+ */
+const cpuName = computed(() => server.value?.cpuInfo?.trim() ?? '')
+const cpuText = computed(() => {
+  const name = cpuName.value || '—'
+  const cores = server.value?.cpuCores
+  return cores === null || cores === undefined ? name : `${name} (${formatCount(cores)} vCPU)`
+})
+const cpuBenchmarkUrl = computed(() => getPassMarkCpuLookupUrl(cpuName.value))
+const cpuBenchmarkRating = computed(() => getCpuBenchmarkRating(cpuName.value))
+const CPU_TIER_PERCENT: Record<string, number> = { S: 92, A: 76, B: 58, C: 38, D: 20, '?': 0 }
+const cpuTierPercent = computed(() => CPU_TIER_PERCENT[cpuBenchmarkRating.value.tier] ?? 0)
+const cpuTierTitle = computed(() => (
+  `参考公开天梯与型号代际的本地近似分级，不代表当前 ${formatCount(server.value?.cpuCores ?? null)} vCPU 的实测性能。${cpuBenchmarkRating.value.description}`
+))
+
+interface InfoItem {
+  label: string
+  value: string
+  icon: IconName
+}
+
+/*
+ * 上游硬件小格共四项：IP（或架构）、物理核心数、虚拟机类型、GPU。
+ * CFSM 的 `ip_v4` / `ip_v6` 只是可达性标志，也不提供物理核心数与虚拟机类型字段，
+ * 因此前三项里只保留架构；补上 CFSM 真实提供的 Agent 版本，GPU 仍按存在与否显示。
+ */
+const hardwareItems = computed<InfoItem[]>(() => {
+  const current = server.value
+  if (!current) return []
+  const items: InfoItem[] = [
+    { label: '架构', value: current.architecture ?? '-', icon: 'icon-park-outline:application-two' },
+    { label: 'Agent', value: current.agentVersion ?? '-', icon: 'icon-park-outline:server' },
+  ]
+  const gpuNames = current.gpus.map((gpu) => gpu.name.trim()).filter(Boolean)
+  if (gpuNames.length > 0) {
+    items.push({ label: 'GPU', value: gpuNames.join(' / '), icon: 'icon-park-outline:video-one' })
+  }
+  return items
+})
+
+const systemItems = computed<InfoItem[]>(() => {
+  const current = server.value
+  if (!current) return []
+  return [
+    { label: '操作系统', value: current.operatingSystem ?? '-', icon: 'icon-park-outline:computer' },
+    { label: '内核版本', value: current.kernelVersion ?? '-', icon: 'icon-park-outline:code' },
+    { label: '运行时间', value: formatDetailUptime(current.bootTime), icon: 'icon-park-outline:timer' },
+    { label: '数据源', value: current.source.label, icon: 'icon-park-outline:server' },
+  ]
+})
+
+const storageItems = computed<InfoItem[]>(() => {
+  const current = server.value
+  if (!current) return []
+  return [
+    { label: '内存', value: formatDisplayMebibytes(current.memoryTotal), icon: 'icon-park-outline:memory' },
+    { label: '内存交换', value: formatDisplayMebibytes(current.swapTotal), icon: 'icon-park-outline:switch' },
+    { label: '硬盘', value: formatDisplayMebibytes(current.diskTotal), icon: 'icon-park-outline:hard-disk' },
+  ]
+})
+
+/*
+ * 网络卡的总流量块。上游按 `traffic_limit_type` 选口径并把使用率画成背景进度条；
+ * CFSM 的口径字段是 `traffic_calculation_type`，含义相同。
+ * 没有可靠配额时显示「无限流量」，不猜一个上限。
+ */
+const trafficQuota = computed<{ used: number, limit: number, percent: number } | null>(() => {
+  const current = server.value
+  if (!current || !showTrafficPolicy.value) return null
+  const limit = parseTrafficLimitBytes(current.trafficLimit)
+  const received = current.monthlyNetworkReceived
+  const transmitted = current.monthlyNetworkTransmitted
+  if (limit === null || (received === null && transmitted === null)) return null
+  const calculation = current.trafficCalculationType?.toLowerCase()
+  const used = calculation === 'dl' ? (received ?? 0)
+    : calculation === 'ul' ? (transmitted ?? 0)
+      : calculation === 'max' ? Math.max(received ?? 0, transmitted ?? 0)
+        : (received ?? 0) + (transmitted ?? 0)
+  return { used, limit, percent: Math.min(100, (used / limit) * 100) }
+})
+const trafficUsageText = computed(() => {
+  const quota = trafficQuota.value
+  if (!quota) return '无限流量'
+  return `${formatDisplayBytes(quota.used)} / ${formatDisplayBytes(quota.limit)}`
+})
+const trafficProgressTone = computed(() => {
+  const percent = trafficQuota.value?.percent ?? 0
+  if (percent >= 80) return 'is-danger'
+  if (percent >= 60) return 'is-warning'
+  return 'is-ok'
+})
 
 function issueCopy(current: CfsmRequestIssue | null, context: 'detail' | 'history'): {
   title: string
@@ -426,115 +552,145 @@ onUnmounted(() => detail.close())
             <span>{{ issueCopy(refreshIssue, 'detail').body }}</span>
           </div>
 
-          <section class="detail-overview" aria-label="节点指标概览">
+          <div v-if="theme.runtime.nodeDetailSectionTabsEnabled" class="detail-tabs-bar">
+            <AppTabs
+              v-model="activeSection"
+              list-label="详情分区"
+              :items="detailSections"
+            />
+          </div>
+
+          <section v-if="overviewVisible" class="detail-overview" aria-label="节点指标概览">
             <div class="detail-resource-grid">
-              <article v-for="card in detailCards" :key="card.key" class="detail-metric-card glass-panel" :class="`detail-metric-card--${card.key}`">
-                <span><span>{{ card.label }}</span><AppIcon :name="card.icon" :size="20" /></span>
-                <strong>{{ card.value }}</strong>
-                <div v-if="card.percentage !== undefined" class="detail-meter">
-                  <i :style="{ width: meterWidth(card.percentage ?? null) }" />
-                </div>
-                <small>{{ card.hint }}</small>
+              <article
+                v-for="card in detailCards"
+                :key="card.key"
+                class="detail-metric-card"
+                :class="`detail-metric-card--${card.key}`"
+                :title="card.hint || undefined"
+              >
+                <span class="detail-metric-card__head">
+                  <span class="detail-metric-card__label">{{ card.label }}</span>
+                  <AppIcon :name="card.icon" :size="20" />
+                </span>
+                <span class="detail-metric-card__value" :class="card.tone ? `is-${card.tone}` : undefined">
+                  <strong>{{ card.value }}</strong>
+                  <em v-if="card.unit">{{ card.unit }}</em>
+                </span>
               </article>
             </div>
           </section>
 
-          <section class="detail-information-grid" aria-label="节点基础信息">
-            <article class="detail-info-card detail-info-card--hardware glass-panel">
+          <section v-if="overviewVisible" class="detail-information-grid" aria-label="节点基础信息">
+            <article class="detail-info-card detail-info-card--hardware">
               <header><h2>硬件信息</h2></header>
-              <div class="detail-fact-grid">
-                <div class="detail-fact detail-fact--wide">
-                  <span><AppIcon name="tabler:cpu" :size="14" />CPU</span>
-                  <strong>{{ server.cpuInfo ?? '—' }}</strong>
+              <div class="detail-info-card__body">
+                <div class="detail-fact detail-fact--cpu">
+                  <span class="detail-fact__head">
+                    <span><AppIcon name="icon-park-outline:cpu" :size="14" />CPU</span>
+                    <a
+                      class="detail-cpu-link"
+                      :href="cpuBenchmarkUrl"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title="在 PassMark 查看该 CPU 的公开 CPU Mark 跑分与排行"
+                    >
+                      <AppIcon name="tabler:chart-bar" :size="13" />
+                      <span class="detail-cpu-link__long">CPU Mark 排行</span>
+                      <span class="detail-cpu-link__short">CPU Mark</span>
+                      <AppIcon name="tabler:external-link" :size="11" />
+                    </a>
+                  </span>
+                  <strong>{{ cpuText }}</strong>
+                  <div class="detail-cpu-tier" :title="cpuTierTitle">
+                    <span class="detail-cpu-tier__letter" :class="`is-tier-${cpuBenchmarkRating.tier}`">
+                      {{ cpuBenchmarkRating.tier }}
+                    </span>
+                    <div class="detail-cpu-tier__bar">
+                      <i :class="`is-tier-${cpuBenchmarkRating.tier}`" :style="{ width: `${cpuTierPercent}%` }" />
+                    </div>
+                    <span class="detail-cpu-tier__label">{{ cpuBenchmarkRating.label }}</span>
+                  </div>
                 </div>
-                <div class="detail-fact">
-                  <span>核心</span><strong>{{ formatCount(server.cpuCores) }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>架构</span><strong>{{ server.architecture ?? '—' }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>Agent</span><strong>{{ server.agentVersion ?? '—' }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>进程</span><strong>{{ formatCount(server.processes) }}</strong>
+                <div class="detail-fact-grid" :class="hardwareItems.length <= 2 ? 'is-two' : 'is-three'">
+                  <div v-for="item in hardwareItems" :key="item.label" class="detail-fact">
+                    <span><AppIcon :name="item.icon" :size="14" />{{ item.label }}</span>
+                    <strong>{{ item.value }}</strong>
+                  </div>
                 </div>
               </div>
             </article>
 
-            <article class="detail-info-card detail-info-card--system glass-panel">
+            <article class="detail-info-card detail-info-card--system">
               <header><h2>系统信息</h2></header>
               <div class="detail-fact-grid">
-                <div class="detail-fact">
-                  <span>操作系统</span><strong>{{ server.operatingSystem ?? '—' }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>内核</span><strong>{{ server.kernelVersion ?? '—' }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>运行时间</span><strong>{{ formatUptime(server.bootTime) }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>数据源</span><strong>{{ server.source.label }}</strong>
+                <div v-for="item in systemItems" :key="item.label" class="detail-fact">
+                  <span><AppIcon :name="item.icon" :size="14" />{{ item.label }}</span>
+                  <strong>
+                    <img
+                      v-if="item.label === '操作系统'"
+                      class="detail-fact__os"
+                      :src="osIconUrl(server.operatingSystem)"
+                      :alt="server.operatingSystem ?? '操作系统'"
+                      @error="hideMissingImage"
+                    >
+                    <span>{{ item.value }}</span>
+                  </strong>
                 </div>
               </div>
             </article>
 
-            <article class="detail-info-card detail-info-card--storage glass-panel">
+            <article class="detail-info-card detail-info-card--storage">
               <header><h2>存储信息</h2></header>
               <div class="detail-storage-grid">
-                <div class="detail-fact">
-                  <span>内存</span>
-                  <strong>{{ formatBytes(server.memoryTotal === null ? null : server.memoryTotal * 1024 ** 2) }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>Swap</span>
-                  <strong>{{ formatBytes(server.swapTotal === null ? null : server.swapTotal * 1024 ** 2) }}</strong>
-                </div>
-                <div class="detail-fact">
-                  <span>磁盘</span>
-                  <strong>{{ formatBytes(server.diskTotal === null ? null : server.diskTotal * 1024 ** 2) }}</strong>
+                <div v-for="item in storageItems" :key="item.label" class="detail-fact">
+                  <span><AppIcon :name="item.icon" :size="14" />{{ item.label }}</span>
+                  <strong>{{ item.value }}</strong>
                 </div>
               </div>
             </article>
 
-            <article class="detail-info-card detail-info-card--network glass-panel">
+            <article class="detail-info-card detail-info-card--network">
               <header><h2>网络信息</h2></header>
               <div class="detail-network-grid">
                 <div class="detail-network-card">
+                  <i
+                    v-if="trafficQuota"
+                    class="detail-network-card__progress"
+                    :class="trafficProgressTone"
+                    :style="{ width: meterWidth(trafficQuota.percent) }"
+                    aria-hidden="true"
+                  />
                   <span class="detail-network-card__head">
-                    <span><AppIcon name="tabler:arrows-transfer-up-down" :size="14" />总流量</span>
+                    <span><AppIcon name="icon-park-outline:transfer-data" :size="14" />总流量</span>
                     <span class="detail-network-card__protocols">
                       <AppBadge v-if="server.ipV4Reachable === '1'" variant="outline">IPv4</AppBadge>
                       <AppBadge v-if="server.ipV6Reachable === '1'" variant="outline">IPv6</AppBadge>
                     </span>
-                    <small>{{ formatBytes(server.networkTransmitted) }} / {{ formatBytes(server.networkReceived) }}</small>
+                    <small>{{ formatDisplayBytes(server.networkTransmitted) }} / {{ formatDisplayBytes(server.networkReceived) }}</small>
                   </span>
-                  <strong>
-                    {{ formatBytes(totalTraffic) }} /
-                    {{ showTrafficPolicy && server.trafficLimit ? server.trafficLimit : '∞' }}
-                  </strong>
+                  <strong>{{ trafficUsageText }}</strong>
                 </div>
                 <div class="detail-network-card">
                   <span class="detail-network-card__head">
                     <span><AppIcon name="icon-park-outline:dashboard-one" :size="14" />网络速率</span>
                   </span>
                   <strong class="detail-network-card__rates">
-                    <span class="network-up">↑ {{ formatSpeed(server.networkOutSpeed) }}</span>
-                    <span class="network-down">↓ {{ formatSpeed(server.networkInSpeed) }}</span>
+                    <span class="network-up"><AppIcon name="tabler:chevron-up" :size="12" />{{ formatDisplaySpeed(server.networkOutSpeed) }}</span>
+                    <span class="network-down"><AppIcon name="tabler:chevron-down" :size="12" />{{ formatDisplaySpeed(server.networkInSpeed) }}</span>
                   </strong>
                 </div>
               </div>
             </article>
           </section>
 
-          <section v-if="probeTargets.length" class="detail-section">
+          <section v-if="pingVisible && probeTargets.length" class="detail-section">
             <header class="detail-section__header">
               <div><span class="eyebrow">PROBES</span><h2>Ping / Loss</h2></div>
               <span>旧四线路与 Node 1–4</span>
             </header>
             <div class="probe-detail-grid">
-              <article v-for="target in probeTargets" :key="target" class="probe-detail-card glass-panel">
+              <article v-for="target in probeTargets" :key="target" class="probe-detail-card">
                 <span>{{ probeLabel(target) }}</span>
                 <strong>{{ formatLatency(server.latency[target]) }}</strong>
                 <small>Loss {{ formatProbePercent(server.packetLoss[target]) }}</small>
@@ -544,38 +700,38 @@ onUnmounted(() => detail.close())
             </div>
           </section>
 
-          <section v-if="server.diskIo" class="detail-section">
+          <section v-if="overviewVisible && server.diskIo" class="detail-section">
             <header class="detail-section__header">
               <div><span class="eyebrow">DISK IO</span><h2>磁盘 IO</h2></div><span>仅在真实 disk 存在时显示</span>
             </header>
             <div class="detail-stat-grid">
-              <article class="glass-panel">
+              <article>
                 <span>读取</span><strong>{{ formatSpeed(server.diskIo.readBps) }}</strong>
               </article>
-              <article class="glass-panel">
+              <article>
                 <span>写入</span><strong>{{ formatSpeed(server.diskIo.writeBps) }}</strong>
               </article>
-              <article class="glass-panel">
+              <article>
                 <span>读 IOPS</span><strong>{{ formatCount(server.diskIo.readIops) }}</strong>
               </article>
-              <article class="glass-panel">
+              <article>
                 <span>写 IOPS</span><strong>{{ formatCount(server.diskIo.writeIops) }}</strong>
               </article>
-              <article class="glass-panel">
+              <article>
                 <span>Await</span><strong>{{ server.diskIo.awaitMs.toFixed(1) }} ms</strong>
               </article>
-              <article class="glass-panel">
+              <article>
                 <span>Util</span><strong>{{ formatPercent(server.diskIo.utilization) }}</strong>
               </article>
             </div>
           </section>
 
-          <section v-if="server.gpus.length" class="detail-section">
+          <section v-if="overviewVisible && server.gpus.length" class="detail-section">
             <header class="detail-section__header">
               <div><span class="eyebrow">GPU</span><h2>图形加速器</h2></div><span>来自 gpu_info</span>
             </header>
             <div class="gpu-detail-grid">
-              <article v-for="gpu in server.gpus" :key="gpu.id" class="gpu-detail-card glass-panel">
+              <article v-for="gpu in server.gpus" :key="gpu.id" class="gpu-detail-card">
                 <span>{{ gpu.name }}</span><strong>{{ formatPercent(gpu.utilization) }}</strong>
                 <div class="detail-meter">
                   <i :style="{ width: meterWidth(gpu.utilization) }" />
@@ -584,7 +740,7 @@ onUnmounted(() => detail.close())
             </div>
           </section>
 
-          <section class="detail-section detail-history">
+          <section v-if="historyVisible" class="detail-section detail-history">
             <header class="detail-section__header detail-history__header">
               <div><span class="eyebrow">HISTORY</span><h2>历史趋势</h2><p>只展示 /api/history/all 返回的真实采样。</p></div>
               <div class="history-range" aria-label="历史时间范围">
@@ -604,7 +760,7 @@ onUnmounted(() => detail.close())
             <div v-if="historyState === 'loading'" class="history-loading">
               <span v-for="index in 4" :key="index" class="skeleton" />
             </div>
-            <div v-else-if="historyState === 'error'" class="history-state glass-panel" role="alert">
+            <div v-else-if="historyState === 'error'" class="history-state" role="alert">
               <strong>{{ issueCopy(historyIssue, 'history').title }}</strong>
               <p>{{ issueCopy(historyIssue, 'history').body }}</p>
               <small v-if="historyIssue?.status">HTTP {{ historyIssue.status }} · {{ historyIssue.message }}</small>
@@ -612,16 +768,16 @@ onUnmounted(() => detail.close())
                 重试历史请求
               </button>
             </div>
-            <div v-else-if="historyState === 'empty'" class="history-state glass-panel">
+            <div v-else-if="historyState === 'empty'" class="history-state">
               <strong>暂无历史数据</strong>
               <p>CFSM 返回了空数组。页面不会复制当前指标生成伪造趋势。</p>
             </div>
-            <div v-else-if="historyState === 'ready' && historyCharts.length === 0" class="history-state glass-panel">
+            <div v-else-if="historyState === 'ready' && visibleHistoryCharts.length === 0" class="history-state">
               <strong>没有可绘制的数值</strong>
               <p>后端返回了历史行，但其中没有有效的数值序列。</p>
             </div>
             <div v-else class="history-chart-grid">
-              <HistoryChart v-for="chart in historyCharts" :key="chart.key" :chart="chart" />
+              <HistoryChart v-for="chart in visibleHistoryCharts" :key="chart.key" :chart="chart" />
             </div>
           </section>
         </template>

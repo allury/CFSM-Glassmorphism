@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui'
+import AppIcon from '@/components/ui/AppIcon.vue'
+import type { IconName } from '@/constants/icons'
 
 /**
  * 对齐 Komari `components/ui/tabs` 的 reka-ui 组件族。
@@ -15,6 +17,8 @@ export interface AppTabItem {
   label: string
   hint?: string
   disabled?: boolean
+  /** 上游详情分区 Tab 带图标；其它调用点不传即可。 */
+  icon?: IconName
 }
 
 defineProps<{
@@ -37,6 +41,7 @@ const model = defineModel<string>({ required: true })
         :value="item.value"
         :disabled="item.disabled"
       >
+        <AppIcon v-if="item.icon" :name="item.icon" :size="12" />
         <span>{{ item.label }}</span>
         <small v-if="item.hint">{{ item.hint }}</small>
       </TabsTrigger>

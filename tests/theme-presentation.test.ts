@@ -50,7 +50,7 @@ describe('round 7 theme presentation contracts', () => {
     settings.homeQuickControlPreset = '自定义'
     settings.homeQuickControlKeys = 'offline,peak,fake'
     settings.detailMetricCardPreset = '自定义'
-    settings.detailMetricCardKeys = 'cpuUsage\nremainingValue\nconnections'
+    settings.detailMetricCardKeys = 'cpuUsage\ntemperature\nconnections'
     settings.chartDashboardPreset = '自定义'
     settings.chartDashboardTemplate = '{"pingLoss":true,"connections":true,"cpu":true}'
 
@@ -117,7 +117,7 @@ describe('round 7 theme presentation contracts', () => {
     const cards = buildDetailCards(server, settings, Date.UTC(2026, 8, 8))
     const charts = filterChartsBySettings(buildMetricHistoryCharts(points), buildProbeHistoryCharts(points), settings)
 
-    expect(cards.find((card) => card.key === 'monthlyCost')?.value).toBe('¥10 / month')
+    expect(cards.find((card) => card.key === 'monthlyCost')).toMatchObject({ value: '¥10.00', unit: '/ 月' })
     expect(cards.some((card) => card.key === 'memoryUsage')).toBe(true)
     expect(cards.some((card) => card.key === 'trafficQuota')).toBe(false)
     expect(charts.map((chart) => chart.key)).toEqual(['cpu', 'loss'])

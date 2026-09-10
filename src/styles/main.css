@@ -120,9 +120,14 @@
   --red: #dc4c5a;
   --red-soft: rgb(220 76 90 / 12%);
   --violet: #8467d7;
-  /* Komari `--radius: 0.625rem`；此前本主题用的 18px 让所有面板明显更圆。 */
+  /*
+   * Komari `--radius: 0.625rem`（10px），派生 `--radius-sm: calc(--radius - 4px)` = 6px、
+   * `--radius-md: calc(--radius - 2px)` = 8px、`--radius-xl: calc(--radius + 4px)` = 14px。
+   * 详情页的指标卡与信息卡用 `rounded-md`，节点卡用 `rounded-xl`，总览卡用 `rounded-lg`。
+   */
   --radius: 10px;
   --radius-sm: 6px;
+  --radius-md: 8px;
   /* Komari 的 --selection：激活态强调色（分组标签、视图切换等）。 */
   --selection: oklch(0.55 0.15 155);
 }
@@ -2277,6 +2282,10 @@ a {
   gap: 4px;
 }
 
+/*
+ * 上游工具条是 `ml-auto flex h-8 items-center gap-1 rounded-md bg-background/50 p-0.5 backdrop-blur-xs`，
+ * 按钮 `size-7 rounded-sm`；返回按钮是 `size-icon-sm`（32px）加同样的 `bg-background/50`。
+ */
 .detail-topbar__tools {
   display: flex;
   height: 32px;
@@ -2285,15 +2294,36 @@ a {
   gap: 4px;
   margin-left: auto;
   padding: 2px;
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--glass) 50%, transparent);
-  backdrop-filter: blur(8px);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  backdrop-filter: blur(4px);
 }
 
 .detail-topbar__tools .icon-button {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  box-shadow: none;
+}
+
+.detail-topbar__tools .icon-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.detail-topbar > .icon-button {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  box-shadow: none;
+}
+
+.detail-topbar > .icon-button:hover {
+  background: var(--background);
 }
 
 .detail-topbar__select {
@@ -2341,11 +2371,38 @@ a {
 }
 
 .detail-section__header h2,
-.detail-info-card h2,
 .history-chart h3 {
   margin: 0;
   font-size: 16px;
   letter-spacing: -0.025em;
+}
+
+/* CardX 头部标题是 `font-medium`，16px，不加负字距。 */
+.detail-info-card h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* 上游详情分区 Tab 条：`w-max h-8 bg-background/50 rounded-md`。 */
+.detail-tabs-bar {
+  margin-top: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.detail-tabs-bar::-webkit-scrollbar {
+  display: none;
+}
+
+.detail-tabs-bar .app-tabs__list {
+  width: max-content;
+  height: 32px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  backdrop-filter: blur(18px);
 }
 
 .detail-section__header > span,
@@ -2361,26 +2418,52 @@ a {
   gap: 16px;
 }
 
+/*
+ * 详情卡片表面：与总览卡片同源，但圆角是 `rounded-md`。
+ *
+ * 浏览器实测（Komari localhost，1440×900，亮色）：
+ *   background       --background 的 50%（hover 变不透明）
+ *   border           0px none
+ *   border-radius    8px
+ *   box-shadow       none
+ *   backdrop-filter  none（所有断点，指标卡与信息卡都没有 backdrop-blur）
+ *   内容 padding     12px（CardX 的 `!p-3`）
+ * 指标卡内容区高度为 `min-h-10 md:min-h-18`，加上 12px 上下内边距，
+ * 因此整卡窄屏 64px、≥768px 96px。上游指标卡**没有**进度条，
+ * 说明文字走原生 `title` tooltip，不占可见行。
+ */
+.detail-metric-card,
+.detail-info-card,
+.probe-detail-card,
+.gpu-detail-card,
+.detail-stat-grid > article,
+.history-state {
+  border: none;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  box-shadow: none;
+  transition: background-color 170ms ease;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.detail-metric-card:hover,
+.detail-info-card:hover,
+.probe-detail-card:hover,
+.gpu-detail-card:hover,
+.detail-stat-grid > article:hover {
+  background: var(--background);
+}
+
 .detail-metric-card {
   display: flex;
-  height: 80px;
-  min-height: 80px;
+  min-height: 64px;
   flex-direction: column;
   justify-content: space-between;
-  gap: 6px;
+  gap: 12px;
   padding: 12px;
-  border: 0;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--glass) 50%, transparent);
-  transition: background-color 170ms ease;
-  backdrop-filter: blur(8px);
 }
 
-.detail-metric-card:hover {
-  background: var(--glass-hover);
-}
-
-.detail-metric-card > span,
 .detail-stat-grid span {
   color: var(--muted);
   font-size: 11px;
@@ -2388,36 +2471,90 @@ a {
   text-transform: uppercase;
 }
 
-.detail-metric-card > span {
+.detail-metric-card__head {
   display: flex;
-  align-items: flex-start;
+  min-width: 0;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-  text-transform: none;
 }
 
-.detail-metric-card > span .app-icon {
-  color: color-mix(in srgb, var(--muted) 28%, transparent);
-}
-
-.detail-metric-card > strong {
-  display: block;
+.detail-metric-card__label {
   overflow: hidden;
-  margin: 0;
-  font-size: 22px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-metric-card__head .app-icon {
+  flex: none;
+  color: color-mix(in srgb, var(--muted) 25%, transparent);
+  transition: color 160ms ease;
+}
+
+.detail-metric-card:hover .detail-metric-card__head .app-icon {
+  color: var(--muted);
+}
+
+.detail-metric-card__value {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.detail-metric-card__value > strong {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-metric-card__value > em {
+  flex: none;
+  color: var(--muted);
+  font-size: 11px;
   line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-style: normal;
+  font-weight: 500;
 }
 
-.detail-metric-card small {
-  display: block;
-  overflow: hidden;
-  margin-top: 0;
-  color: var(--faint);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.detail-metric-card__value.is-danger > strong {
+  color: var(--red);
+}
+
+.detail-metric-card__value.is-warning > strong {
+  color: var(--amber);
+}
+
+.detail-metric-card__value.is-muted > strong {
+  color: var(--muted);
+}
+
+.detail-metric-card__value.is-ok > strong {
+  color: var(--emerald);
+}
+
+@media (min-width: 640px) {
+  .detail-metric-card__value > strong {
+    font-size: 24px;
+    line-height: 32px;
+  }
+
+  .detail-metric-card__value > em {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 768px) {
+  .detail-metric-card {
+    min-height: 96px;
+  }
 }
 
 .detail-meter {
@@ -2459,23 +2596,23 @@ a {
   min-width: 0;
   flex-direction: column;
   padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: color-mix(in srgb, var(--glass) 50%, transparent);
-  transition: background-color 170ms ease;
-  backdrop-filter: blur(8px);
 }
 
-.detail-info-card:hover {
-  background: var(--glass-hover);
-}
-
+/* CardX 的头部是 `px-3 py-2`、标题 16px/500。 */
 .detail-info-card header {
   display: flex;
-  min-height: 40px;
   align-items: center;
+  gap: 8px;
   margin: 0;
   padding: 8px 12px;
+}
+
+.detail-info-card__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 12px 12px;
 }
 
 .detail-fact-grid,
@@ -2487,67 +2624,195 @@ a {
   padding: 0 12px 12px;
 }
 
-.detail-info-card--hardware .detail-fact-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.detail-info-card__body .detail-fact-grid {
+  padding: 0;
 }
 
-.detail-info-card--hardware .detail-fact--wide {
-  grid-column: 1 / -1;
-  min-height: 97px;
+/* 上游硬件小格是 `hardwareSmallItems.length <= 2 ? 'grid-cols-2' : 'grid-cols-3'`。 */
+.detail-fact-grid.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.detail-info-card--hardware .detail-fact:not(.detail-fact--wide) {
-  min-height: 60px;
+.detail-fact-grid.is-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .detail-info-card--system .detail-fact-grid {
-  grid-auto-rows: 1fr;
-}
-
-.detail-info-card--hardware,
-.detail-info-card--system {
-  min-height: 221px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .detail-storage-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.detail-storage-grid .detail-fact {
-  min-height: 62px;
-}
-
+/*
+ * 小格表面取自上游对 `.bg-slate-500/5` 的覆盖规则：
+ * 亮色 rgb(255 255 255 / 15%)、暗色 rgb(255 255 255 / 5%)，
+ * 圆角 `rounded-sm`（6px），内边距 8px，行距 8px。
+ */
 .detail-fact {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--muted) 6%, transparent);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 15%);
 }
 
-.detail-fact--wide {
-  grid-column: 1 / -1;
+:root[data-theme='dark'] .detail-fact {
+  background: rgb(255 255 255 / 5%);
 }
 
-.detail-fact > span {
+.detail-fact--cpu {
+  gap: 8px;
+}
+
+.detail-fact__head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.detail-network-card__head > span,
+.detail-fact > span,
+.detail-fact__head > span:first-child {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   gap: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.detail-network-card > strong,
+.detail-fact > strong {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+
+.detail-fact__os {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.detail-cpu-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  font-size: 11px;
+  text-decoration: none;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.detail-cpu-link:hover {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--muted) 12%, transparent);
+}
+
+.detail-cpu-link__short {
+  display: none;
+}
+
+.detail-cpu-tier {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.detail-cpu-tier__letter {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.detail-cpu-tier__bar {
+  overflow: hidden;
+  height: 6px;
+  flex: 1;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 10%, transparent);
+}
+
+.detail-cpu-tier__bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width 700ms ease;
+}
+
+.detail-cpu-tier__label {
+  flex: none;
   color: var(--muted);
   font-size: 11px;
 }
 
-.detail-fact > strong {
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  font-weight: 600;
+.detail-cpu-tier__letter.is-tier-S { color: #eab308; }
+.detail-cpu-tier__letter.is-tier-A { color: #3b82f6; }
+.detail-cpu-tier__letter.is-tier-B { color: #22c55e; }
+.detail-cpu-tier__letter.is-tier-C { color: #f97316; }
+.detail-cpu-tier__letter.is-tier-D { color: #f87171; }
+.detail-cpu-tier__letter.is-tier-\? { color: var(--muted); }
+.detail-cpu-tier__bar i.is-tier-S { background: #eab308; }
+.detail-cpu-tier__bar i.is-tier-A { background: #3b82f6; }
+.detail-cpu-tier__bar i.is-tier-B { background: #22c55e; }
+.detail-cpu-tier__bar i.is-tier-C { background: #f97316; }
+.detail-cpu-tier__bar i.is-tier-D { background: #f87171; }
+.detail-cpu-tier__bar i.is-tier-\? { background: #94a3b8; }
+
+/* 上游信息格文本是 `text-xs sm:text-sm`：12px 起，640px 以上 14px。 */
+@media (min-width: 640px) {
+  .detail-info-card--system .detail-fact-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 1fr;
+  }
+
+  .detail-fact > span,
+  .detail-fact__head > span:first-child,
+  .detail-fact > strong,
+  .detail-network-card__head > span,
+  .detail-network-card > strong {
+    font-size: 14px;
+    line-height: 20px;
+  }
+
+  /* 上游总流量格右侧的上下行总量是 `hidden sm:block`。 */
+  .detail-network-card small {
+    display: block;
+  }
+
+  .detail-cpu-link__long {
+    display: inline;
+  }
+
+  .detail-cpu-link__short {
+    display: none;
+  }
 }
 
-.detail-fact > small {
-  color: var(--faint);
-  font-size: 10px;
+@media (max-width: 639px) {
+  .detail-cpu-link__long {
+    display: none;
+  }
+
+  .detail-cpu-link__short {
+    display: inline;
+  }
 }
 
 .detail-network-grid {
@@ -2557,17 +2822,53 @@ a {
   padding: 0 12px 12px;
 }
 
+/*
+ * 网络卡的两个小格与其它信息格同源（`.bg-slate-500/5` 覆盖值）。
+ * 总流量格额外有一层配额进度背景，对应上游按使用率分级着色的绝对定位条。
+ */
 .detail-network-card {
   display: flex;
+  position: relative;
   min-width: 0;
-  min-height: 62px;
   flex-direction: column;
-  justify-content: center;
-  gap: 4px;
+  gap: 6px;
   padding: 8px;
+  overflow: hidden;
   border: 0;
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--muted) 6%, transparent);
+  border-radius: var(--radius-sm);
+  background: rgb(255 255 255 / 15%);
+}
+
+:root[data-theme='dark'] .detail-network-card {
+  background: rgb(255 255 255 / 5%);
+}
+
+.detail-network-card__progress {
+  position: absolute;
+  z-index: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: width 300ms ease-out, background-color 300ms ease-out;
+}
+
+.detail-network-card__progress.is-ok {
+  background: rgb(16 185 129 / 20%);
+}
+
+.detail-network-card__progress.is-warning {
+  background: rgb(245 158 11 / 25%);
+}
+
+.detail-network-card__progress.is-danger {
+  background: rgb(239 68 68 / 30%);
+}
+
+.detail-network-card > *:not(.detail-network-card__progress) {
+  position: relative;
+  z-index: 1;
 }
 
 .detail-network-card__head,
@@ -2590,9 +2891,22 @@ a {
   gap: 4px;
 }
 
+/* 上游速率行是 `flex flex-row flex-wrap items-center gap-1`，两组箭头+数值不换行。 */
+.detail-network-card__rates {
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.detail-network-card__rates > span {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
+}
+
 .detail-network-card__head > span {
   color: var(--muted);
-  font-size: 12px;
 }
 
 .detail-network-card__protocols .app-badge {
@@ -2602,21 +2916,18 @@ a {
   font-size: 10px;
 }
 
+/* 上游这段上下行总量没有 nowrap，窄容器里会自然折行。 */
 .detail-network-card small {
-  overflow: hidden;
+  display: none;
   margin-left: auto;
   color: var(--faint);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 11px;
+  text-align: right;
 }
 
 .detail-network-card > strong {
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 600;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-weight: 400;
+  overflow-wrap: anywhere;
 }
 
 .detail-list {
@@ -2656,7 +2967,7 @@ a {
 .gpu-detail-card,
 .detail-stat-grid article {
   padding: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
 }
 
 .probe-detail-card > span,
@@ -2714,28 +3025,32 @@ a {
   align-items: center;
 }
 
+/* 上游范围选择器是 `h-8 bg-background/50 rounded-md` 的一组 `h-6.5 rounded-sm` 触发器。 */
 .history-range {
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 5px;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
 }
 
 .history-range button {
-  padding: 6px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  height: 26px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-sm);
   color: var(--muted);
-  background: var(--glass-soft);
-  font-size: 10px;
-  font-weight: 720;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 500;
   cursor: pointer;
 }
 
 .history-range button.is-active {
-  border-color: color-mix(in srgb, var(--emerald) 44%, transparent);
-  color: var(--emerald);
-  background: var(--emerald-soft);
+  color: var(--selection);
 }
 
 .history-range button:disabled {
@@ -2755,10 +3070,24 @@ a {
   border-radius: var(--radius);
 }
 
+/*
+ * 历史图表卡片与上游 LoadChart / PingChart 的 CardX 同源：
+ * `bg-background/50 border-none hover:bg-background rounded-md`，内容 padding 12px。
+ */
 .history-chart {
   min-width: 0;
-  padding: 18px;
-  border-radius: var(--radius);
+  padding: 12px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  box-shadow: none;
+  transition: background-color 170ms ease;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.history-chart:hover {
+  background: var(--background);
 }
 
 .history-chart__header {
@@ -2825,7 +3154,7 @@ a {
   justify-content: center;
   flex-direction: column;
   padding: 28px;
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   text-align: center;
 }
 
@@ -2846,11 +3175,6 @@ a {
 @media (min-width: 768px) {
   .detail-resource-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .detail-metric-card {
-    height: 96px;
-    min-height: 96px;
   }
 }
 
@@ -2893,10 +3217,6 @@ a {
 
   .detail-resource-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .detail-section {
-    margin-top: 26px;
   }
 
   .detail-section__header,

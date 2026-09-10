@@ -194,6 +194,35 @@ server click -> its source -> detail/history/ws
 
 正式版本为 1.0.0。main 推送通过 CI 后创建 annotated `v1.0.0` tag；tag workflow 重新执行完整质量门并发布 `CFSM-Glassmorphism-1.0.0.zip`。本地与仓库均不保留生成的 dist 或 ZIP。
 
+## 第 13 轮 · v1.1.0-test.4 详情页 1:1 收口
+
+本轮同样只动展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、History
+（九档 hours + revision + AbortController）、probe 的 `false` / `null` / 数值三态、
+`theme_options`、JWT / Turnstile、多 apiBase 归属、server ID 校验、403 / 5xx 分类与
+50+ 节点性能优化全部原样保留。normalized data model 未改动。
+
+- **显示格式函数改名**：第 11 轮引入的 `formatHome*` 实测与上游详情页同规则，
+  改名为 `formatDisplay*` 并在两页共用。**只是改名，输出完全不变**。
+  运行时间是两页唯一不同的地方，因此保持三个独立函数：
+  首页节点卡 `formatHomeUptimeDays`（到天）、节点列表 `formatUptime`（到小时）、
+  详情页 `formatDetailUptime`（到分钟且省略为零的单位）。
+- **详情指标卡模型**：`PresentationCard` 增加 `unit` 与 `tone`；
+  `buildDetailCards` 按上游 `splitMetricValue` / `splitMeasurement` 拆分 value / unit，
+  说明文字降级为 tooltip，进度条移除。
+- **预设来源分离**：新增独立的 `ALL_DETAIL_CARD_KEYS`，
+  自定义模式的允许集合不再由「综合」预设推导。
+- **新增 `src/utils/cpu-benchmark.ts`**：逐字移植上游 `utils/cpuBenchmark.ts`。
+  它只读取 CPU 型号字符串，不请求任何接口，也不产生 CFSM 之外的数据。
+- **详情卡片表面**：指标卡、信息卡、探针卡、GPU 卡、磁盘 IO 卡、历史图表卡
+  统一改用上游详情卡的 `--background/50` + 无边框 + `--radius-md`(8px) + 无阴影 + 无 backdrop；
+  信息格改用上游对 `.bg-slate-500/5` 的覆盖值。自创的 `glass-panel` 退出详情页。
+- **分区 Tab**：`nodeDetailSectionTabsEnabled` 此前只是一个空设置，本轮真正实现为
+  概览 / 负载 / 延迟三段，与上游一致（默认关闭，关闭时全部堆叠）。
+
+CFSM 与上游的详情页差异全部记录在 `docs/detail-fidelity-audit.md`：
+IP、物理核心数、虚拟机类型、厂商（城市 / ASN）、系统温度、近一天网速峰值
+六项因 CFSM 公开 API 不提供而隐藏，不以估算值补位。
+
 ## 第 11 轮 · v1.1.0-test.3 首页 1:1 收口
 
 本轮全部改动都在展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、

@@ -10,10 +10,10 @@ import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import {
   formatCurrencyValue,
-  formatHomeBytes,
-  formatHomeMebibytes,
-  formatHomePrice,
-  formatHomeSpeed,
+  formatDisplayBytes,
+  formatDisplayMebibytes,
+  formatDisplayPrice,
+  formatDisplaySpeed,
   formatHomeUptimeDays,
   formatLatency,
   formatLoad,
@@ -78,7 +78,7 @@ const uptimeText = computed(() => formatHomeUptimeDays(props.server.bootTime))
  */
 const priceText = computed(() => {
   if (!props.priceVisible || !props.server.showPrice) return ''
-  const text = formatHomePrice(props.server.price, props.server.currency, props.server.billingCycle)
+  const text = formatDisplayPrice(props.server.price, props.server.currency, props.server.billingCycle)
   return text === '—' ? '' : text
 })
 const expireVisible = computed(() => props.server.showExpire && props.server.expireDate !== null)
@@ -274,9 +274,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="memoryPercent" :status="tone(memoryPercent)" />
           <div class="node-metric__hint">
-            {{ formatHomeMebibytes(server.memory.used) }}
+            {{ formatDisplayMebibytes(server.memory.used) }}
             /
-            {{ formatHomeMebibytes(server.memory.total) }}
+            {{ formatDisplayMebibytes(server.memory.total) }}
           </div>
         </div>
 
@@ -289,9 +289,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="diskPercent" :status="tone(diskPercent)" />
           <div class="node-metric__hint">
-            {{ formatHomeMebibytes(server.disk.used) }}
+            {{ formatDisplayMebibytes(server.disk.used) }}
             /
-            {{ formatHomeMebibytes(server.disk.total) }}
+            {{ formatDisplayMebibytes(server.disk.total) }}
           </div>
         </div>
 
@@ -306,9 +306,9 @@ function hideMissingImage(event: Event): void {
           </div>
           <AppProgressThin :percentage="traffic ? traffic.percent : null" :status="tone(traffic ? traffic.percent : null)" />
           <div class="node-metric__hint">
-            {{ formatHomeBytes(traffic ? traffic.used : null) }}
+            {{ formatDisplayBytes(traffic ? traffic.used : null) }}
             /
-            {{ traffic ? formatHomeBytes(traffic.limit) : '∞' }}
+            {{ traffic ? formatDisplayBytes(traffic.limit) : '∞' }}
           </div>
         </div>
       </div>
@@ -317,21 +317,21 @@ function hideMissingImage(event: Event): void {
         <div class="node-box">
           <span class="node-box__row node-box__row--up">
             <AppIcon name="tabler:chevron-up" :size="11" />
-            <span class="node-box__text">{{ formatHomeSpeed(server.network.outSpeed) }}</span>
+            <span class="node-box__text">{{ formatDisplaySpeed(server.network.outSpeed) }}</span>
           </span>
           <span class="node-box__row node-box__row--down">
             <AppIcon name="tabler:chevron-down" :size="11" />
-            <span class="node-box__text">{{ formatHomeSpeed(server.network.inSpeed) }}</span>
+            <span class="node-box__text">{{ formatDisplaySpeed(server.network.inSpeed) }}</span>
           </span>
         </div>
         <div class="node-box">
           <span class="node-box__row">
             <AppIcon name="tabler:upload" :size="11" />
-            <span class="node-box__text">{{ formatHomeBytes(server.network.transmitted) }}</span>
+            <span class="node-box__text">{{ formatDisplayBytes(server.network.transmitted) }}</span>
           </span>
           <span class="node-box__row">
             <AppIcon name="tabler:download" :size="11" />
-            <span class="node-box__text">{{ formatHomeBytes(server.network.received) }}</span>
+            <span class="node-box__text">{{ formatDisplayBytes(server.network.received) }}</span>
           </span>
         </div>
         <div class="node-box">

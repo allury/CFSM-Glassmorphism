@@ -174,20 +174,28 @@ export function formatCurrencyValue(value: number | null, currency: string | nul
 }
 
 /*
- * ===== 首页显示格式 =====
+ * ===== 展示层显示格式 =====
  *
- * Komari 首页用的是 KB / MB / GB / TB（换算基数仍是 1024），
+ * Komari 的首页与详情页共用同一套字节与价格规则（上游两处都调用
+ * `formatBytesWithConfig` / `formatPriceWithCycle`）：
+ * 单位 B / KB / MB / GB / TB / PB，换算基数仍是 1024，
  * 精度 B 0、KB 0、MB 1、GB 1、TB 2，速度在单位后加 `/s`；
- * 节点卡片的运行时间只显示整天数，计费周期显示为中文。
+ * 计费周期显示为中文。
  *
- * 这一组函数只服务首页总览卡片、节点卡片与节点列表。详情页结构与格式已冻结，
- * 继续使用上面的 `formatBytes` / `formatUptime` / `formatPrice`，
- * 所以这里另起一组显示函数，而不是就地改写既有格式化器。
- * normalized data model 不受影响：改动只发生在展示层。
+ * 第 11 轮引入这组函数时它们只服务首页，因此叫 `formatHome*`；
+ * 第 13 轮实测确认详情页用的是同一套规则，故改名为 `formatDisplay*`。
+ * 只是改名，行为与首页输出完全不变。
+ *
+ * 运行时间是两页**唯一不同**的地方，各自单列：
+ * 首页节点卡只到天（`formatHomeUptimeDays`），
+ * 详情页到分钟且省略为零的单位（`formatDetailUptime`），
+ * 节点列表到小时（沿用上面的 `formatUptime`）。
+ *
+ * 这些改动全部发生在展示层，normalized data model 不受影响。
  */
 
-const HOME_BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const
-const HOME_BYTE_DECIMALS: Readonly<Record<string, number>> = {
+const DISPLAY_BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'] as const
+const DISPLAY_BYTE_DECIMALS: Readonly<Record<string, number>> = {
   B: 0,
   KB: 0,
   MB: 1,
@@ -202,21 +210,21 @@ export interface SplitAmount {
   readonly unit: string
 }
 
-export function formatHomeBytesSplit(value: number | null): SplitAmount {
+export function formatDisplayBytesSplit(value: number | null): SplitAmount {
   const bytes = normalizedNumber(value)
   if (bytes === null) return { value: '—', unit: '' }
   if (bytes === 0) return { value: '0', unit: 'B' }
 
   const unitIndex = Math.min(
     Math.floor(Math.log(bytes) / Math.log(1024)),
-    HOME_BYTE_UNITS.length - 1,
+    DISPLAY_BYTE_UNITS.length - 1,
   )
-  const unit = HOME_BYTE_UNITS[unitIndex] ?? 'PB'
-  return { value: (bytes / 1024 ** unitIndex).toFixed(HOME_BYTE_DECIMALS[unit] ?? 1), unit }
+  const unit = DISPLAY_BYTE_UNITS[unitIndex] ?? 'PB'
+  return { value: (bytes / 1024 ** unitIndex).toFixed(DISPLAY_BYTE_DECIMALS[unit] ?? 1), unit }
 }
 
-export function formatHomeSpeedSplit(value: number | null): SplitAmount {
-  const split = formatHomeBytesSplit(value)
+export function formatDisplaySpeedSplit(value: number | null): SplitAmount {
+  const split = formatDisplayBytesSplit(value)
   return split.unit === '' ? split : { value: split.value, unit: `${split.unit}/s` }
 }
 
@@ -224,24 +232,24 @@ function joinSplit(split: SplitAmount): string {
   return split.unit === '' ? split.value : `${split.value} ${split.unit}`
 }
 
-export function formatHomeBytes(value: number | null): string {
-  return joinSplit(formatHomeBytesSplit(value))
+export function formatDisplayBytes(value: number | null): string {
+  return joinSplit(formatDisplayBytesSplit(value))
 }
 
-export function formatHomeSpeed(value: number | null): string {
-  return joinSplit(formatHomeSpeedSplit(value))
+export function formatDisplaySpeed(value: number | null): string {
+  return joinSplit(formatDisplaySpeedSplit(value))
 }
 
 /** CFSM 的内存 / 硬盘用量以 MiB 上报，首页仍按 Komari 的显示规则渲染。 */
-export function formatHomeMebibytesSplit(value: number | null): SplitAmount {
+export function formatDisplayMebibytesSplit(value: number | null): SplitAmount {
   const mebibytes = normalizedNumber(value)
   return mebibytes === null
     ? { value: '—', unit: '' }
-    : formatHomeBytesSplit(mebibytes * 1024 * 1024)
+    : formatDisplayBytesSplit(mebibytes * 1024 * 1024)
 }
 
-export function formatHomeMebibytes(value: number | null): string {
-  return joinSplit(formatHomeMebibytesSplit(value))
+export function formatDisplayMebibytes(value: number | null): string {
+  return joinSplit(formatDisplayMebibytesSplit(value))
 }
 
 /** Komari NodeCard 的运行时间只显示整天数（`在线 N 天`），不显示小时。 */
@@ -255,7 +263,7 @@ export function formatHomeUptimeDays(bootTime: number | null, now = Date.now()):
  * CFSM 的 `billing_cycle` 是自由文本。官方枚举值可以安全本地化；
  * 其它取值原样保留，不猜测它代表哪个周期。
  */
-const HOME_BILLING_CYCLE_LABELS: Readonly<Record<string, string>> = {
+const DISPLAY_BILLING_CYCLE_LABELS: Readonly<Record<string, string>> = {
   month: '月',
   quarter: '季',
   half_year: '半年',
@@ -266,16 +274,71 @@ const HOME_BILLING_CYCLE_LABELS: Readonly<Record<string, string>> = {
   five_years: '五年',
 }
 
-export function formatHomeBillingCycle(billingCycle: string | null): string {
+export function formatDisplayBillingCycle(billingCycle: string | null): string {
   const cycle = billingCycle?.trim()
   if (!cycle) return ''
-  return HOME_BILLING_CYCLE_LABELS[cycle.toLowerCase()] ?? cycle
+  return DISPLAY_BILLING_CYCLE_LABELS[cycle.toLowerCase()] ?? cycle
 }
 
-export function formatHomePrice(
+export function formatDisplayPrice(
   price: string | null,
   currency: string | null,
   billingCycle: string | null,
 ): string {
-  return priceWithCycleLabel(price, currency, formatHomeBillingCycle(billingCycle))
+  return priceWithCycleLabel(price, currency, formatDisplayBillingCycle(billingCycle))
+}
+
+/*
+ * ===== 详情页专用显示格式 =====
+ *
+ * 只有运行时间与到期文案在上游详情页与首页不同，这里单列。
+ */
+
+const DETAIL_UPTIME_UNITS = [
+  { seconds: 86_400, label: '天' },
+  { seconds: 3_600, label: '小时' },
+  { seconds: 60, label: '分钟' },
+] as const
+
+/**
+ * 对应 Komari `formatUptimeWithFormat(seconds, 'minute')`：
+ * 最细到分钟，值为 0 的单位直接省略（所以是 `3 天` 而不是 `3 天 0 小时`），
+ * 不足一分钟显示「不足 1 分钟」。
+ */
+export function formatDetailUptime(bootTime: number | null, now = Date.now()): string {
+  const startedAt = normalizeTimestampMilliseconds(bootTime)
+  if (startedAt === null || startedAt > now) return '—'
+
+  let remaining = Math.floor((now - startedAt) / 1000)
+  const parts: string[] = []
+  for (const unit of DETAIL_UPTIME_UNITS) {
+    const amount = Math.floor(remaining / unit.seconds)
+    if (amount > 0) {
+      parts.push(`${amount} ${unit.label}`)
+      remaining %= unit.seconds
+    }
+  }
+  return parts.length > 0 ? parts.join(' ') : '不足 1 分钟'
+}
+
+export type ExpireStatus = 'unknown' | 'expired' | 'critical' | 'warning' | 'normal' | 'long_term'
+
+/** 阈值取自 Komari `EXPIRE_THRESHOLDS`：5 天内 critical、10 天内 warning、超过 36500 天视为长期。 */
+export function detailExpireStatus(days: number | null): ExpireStatus {
+  if (days === null) return 'unknown'
+  if (days <= 0) return 'expired'
+  if (days <= 5) return 'critical'
+  if (days <= 10) return 'warning'
+  if (days > 36_500) return 'long_term'
+  return 'normal'
+}
+
+/** 对应 Komari `getExpireText`：未知 `-`、已过期、长期，否则 `N 天`。 */
+export function formatDetailExpireText(days: number | null): string {
+  switch (detailExpireStatus(days)) {
+    case 'unknown': return '-'
+    case 'expired': return '已过期'
+    case 'long_term': return '长期'
+    default: return `${days} 天`
+  }
 }

@@ -4,19 +4,23 @@ import { parseSettingKeys, type ThemeSettings } from '@/theme/settings'
 import type { CfsmServer } from '@/types/cfsm'
 import type { GlassServer } from '@/types/glassmorphism'
 import {
-  formatBytes,
+  detailExpireStatus,
   formatCount,
-  formatHomeBytes,
-  formatHomeBytesSplit,
-  formatHomeMebibytesSplit,
-  formatHomeSpeed,
-  formatHomeSpeedSplit,
+  formatCurrencyValue,
+  formatDetailExpireText,
+  formatDetailUptime,
+  formatDisplayBytes,
+  formatDisplayBytesSplit,
+  formatDisplayMebibytes,
+  formatDisplayMebibytesSplit,
+  formatDisplayPrice,
+  formatDisplaySpeed,
+  formatDisplaySpeedSplit,
   formatLoad,
   formatPercent,
   formatPrice,
-  formatSpeed,
-  formatUptime,
   parseCfsmDate,
+  type SplitAmount,
 } from '@/utils/format'
 
 /*
@@ -34,10 +38,16 @@ export type GeneralCardKey =
   | 'regionDistribution' | 'systemDistribution'
 
 export type QuickControlKey = 'favorite' | 'totalTraffic' | 'upload' | 'download' | 'peak' | 'offline' | 'highLoad' | 'expiring'
+/*
+ * 详情指标卡的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_DETAIL_METRIC_CARD_KEYS`。
+ * 唯一删去的是 `temperature`：CFSM 的 `/api/server` 不返回温度字段（只有历史行里有），
+ * 因此不制造一张永远显示 `-` 的卡片。
+ */
 export type DetailCardKey =
-  | 'nodePrice' | 'monthlyCost' | 'remainingTime' | 'cpuUsage' | 'gpuUsage'
-  | 'memoryUsage' | 'swapUsage' | 'diskUsage' | 'load' | 'processes' | 'connections'
-  | 'uptime' | 'uploadSpeed' | 'downloadSpeed' | 'totalTraffic' | 'trafficQuota'
+  | 'nodePrice' | 'monthlyCost' | 'remainingTime' | 'remainingValue'
+  | 'cpuUsage' | 'gpuUsage' | 'memoryUsage' | 'swapUsage' | 'diskUsage'
+  | 'load' | 'processes' | 'connections' | 'uptime'
+  | 'uploadSpeed' | 'downloadSpeed' | 'totalTraffic' | 'trafficQuota'
 export type ChartFamily = 'cpu' | 'memory' | 'disk' | 'network' | 'traffic' | 'gpu' | 'ping' | 'pingLoss'
 
 /** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
@@ -92,13 +102,26 @@ const ALL_QUICK_CONTROL_KEYS: readonly QuickControlKey[] = [
   'download',
 ]
 
+/** Komari `ALL_DETAIL_METRIC_CARD_KEYS` 的顺序，去掉 CFSM 不提供的 `temperature`。 */
+const ALL_DETAIL_CARD_KEYS: readonly DetailCardKey[] = [
+  'nodePrice', 'monthlyCost', 'remainingTime', 'remainingValue',
+  'cpuUsage', 'gpuUsage', 'memoryUsage', 'swapUsage', 'diskUsage',
+  'load', 'processes', 'connections', 'uptime',
+  'uploadSpeed', 'downloadSpeed', 'totalTraffic', 'trafficQuota',
+]
+
+/*
+ * 逐项对应 Komari `DETAIL_METRIC_CARD_PRESETS`（finance / status / resource /
+ * network / gpu / full / custom），保持同一顺序，只删去 `temperature`。
+ * 上游的 `full` 本来就不含 uptime 与 trafficQuota，这里也照原样保留。
+ */
 const DETAIL_PRESETS: Record<ThemeSettings['detailMetricCardPreset'], readonly DetailCardKey[]> = {
-  财务: ['nodePrice', 'monthlyCost', 'remainingTime', 'totalTraffic', 'trafficQuota', 'uptime', 'connections'],
-  状态: ['cpuUsage', 'load', 'processes', 'connections', 'uptime', 'uploadSpeed', 'downloadSpeed', 'totalTraffic'],
-  资源: ['cpuUsage', 'gpuUsage', 'memoryUsage', 'swapUsage', 'diskUsage', 'load', 'processes', 'connections', 'uptime'],
-  网络: ['uploadSpeed', 'downloadSpeed', 'totalTraffic', 'trafficQuota', 'connections', 'uptime'],
-  GPU: ['gpuUsage', 'cpuUsage', 'memoryUsage', 'diskUsage', 'load', 'uptime'],
-  综合: ['nodePrice', 'monthlyCost', 'remainingTime', 'cpuUsage', 'gpuUsage', 'memoryUsage', 'swapUsage', 'diskUsage', 'load', 'processes', 'connections', 'uptime', 'uploadSpeed', 'downloadSpeed', 'totalTraffic', 'trafficQuota'],
+  财务: ['nodePrice', 'monthlyCost', 'remainingTime', 'remainingValue', 'totalTraffic', 'trafficQuota', 'uptime', 'connections'],
+  状态: ['cpuUsage', 'memoryUsage', 'diskUsage', 'load', 'uptime', 'processes', 'connections'],
+  资源: ['cpuUsage', 'gpuUsage', 'memoryUsage', 'swapUsage', 'diskUsage', 'load', 'processes', 'connections', 'uptime', 'uploadSpeed', 'downloadSpeed'],
+  网络: ['uploadSpeed', 'downloadSpeed', 'totalTraffic', 'trafficQuota', 'connections', 'processes', 'uptime', 'remainingTime'],
+  GPU: ['gpuUsage', 'cpuUsage', 'memoryUsage', 'load', 'processes', 'connections', 'uptime'],
+  综合: ['nodePrice', 'monthlyCost', 'remainingTime', 'remainingValue', 'cpuUsage', 'gpuUsage', 'memoryUsage', 'swapUsage', 'diskUsage', 'load', 'processes', 'connections', 'uploadSpeed', 'downloadSpeed', 'totalTraffic'],
   自定义: [],
 }
 
@@ -121,7 +144,7 @@ function selectedKeys<T extends string>(preset: readonly T[], custom: string, al
 
 const GENERAL_KEYS = new Set<string>(ALL_GENERAL_CARD_KEYS)
 const QUICK_KEYS = new Set<string>(ALL_QUICK_CONTROL_KEYS)
-const DETAIL_KEYS = new Set<string>(DETAIL_PRESETS.综合)
+const DETAIL_KEYS = new Set<string>(ALL_DETAIL_CARD_KEYS)
 const CHART_KEYS = new Set<string>(CHART_PRESETS.完整)
 
 export function resolveGeneralCardKeys(settings: ThemeSettings): GeneralCardKey[] {
@@ -171,7 +194,13 @@ const BILLING_CYCLE_DAYS: Readonly<Record<string, number>> = {
  * 未知周期不猜测；无效日期也保持不可用。这样首页可以复刻 Komari 的短金额行，
  * 又不会把 CFSM 的自由文本 `billing_cycle` 擅自解释成某个周期。
  */
-export function remainingValue(server: GlassServer, now = Date.now()): number | null {
+export interface BillableServer {
+  price: string | null
+  billingCycle: string | null
+  expireDate: string | null
+}
+
+export function remainingValue(server: BillableServer, now = Date.now()): number | null {
   const price = Number(server.price)
   if (!Number.isFinite(price) || price <= 0) return null
 
@@ -264,6 +293,8 @@ export interface PresentationCard {
   value: string
   hint: string
   unit?: string
+  /** 数值着色，对应 Komari 详情卡的 `valueClass`（目前只有剩余时间使用）。 */
+  tone?: 'danger' | 'warning' | 'muted' | 'ok'
   percentage?: number | null
 }
 
@@ -317,8 +348,8 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
     metric: { used: number | null, total: number | null, percentage: number | null },
   ): PresentationCard | null => {
     if (metric.percentage === null) return null
-    const used = formatHomeMebibytesSplit(metric.used)
-    const total = formatHomeMebibytesSplit(metric.total)
+    const used = formatDisplayMebibytesSplit(metric.used)
+    const total = formatDisplayMebibytesSplit(metric.total)
     return {
       key,
       icon,
@@ -355,16 +386,16 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
   const highLoadCount = servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length
   const expiringCount = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length
   const trafficWarningCount = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length
-  const totalTrafficSplit = formatHomeBytesSplit(totalTraffic)
-  const uploadSplit = formatHomeSpeedSplit(upload)
-  const downloadSplit = formatHomeSpeedSplit(download)
-  const peakSplit = formatHomeSpeedSplit(peak?.value ?? null)
+  const totalTrafficSplit = formatDisplayBytesSplit(totalTraffic)
+  const uploadSplit = formatDisplaySpeedSplit(upload)
+  const downloadSplit = formatDisplaySpeedSplit(download)
+  const peakSplit = formatDisplaySpeedSplit(peak?.value ?? null)
 
   const values: Record<GeneralCardKey, PresentationCard | null> = {
     currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now), hint: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(now) },
     memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
     disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatHomeBytes(trafficUp)}\n↓ ${formatHomeBytes(trafficDown)}` },
+    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(trafficUp)}\n↓ ${formatDisplayBytes(trafficDown)}` },
     uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
     downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
     onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },
@@ -378,7 +409,7 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
     // 上游用 `tabler:chip`，该名称已不在 Iconify Tabler 集内，改用同族的 `tabler:cpu`。
     cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), unit: 'Core', hint: '有数据节点合计' },
     gpuNodes: { key: 'gpuNodes', icon: 'tabler:device-imac', label: 'GPU 节点', value: formatCount(gpuNodeCount), unit: `/ ${formatCount(servers.length)}`, hint: '包含真实 gpu_info' },
-    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.name}\n${formatHomeSpeed(peak.value)}` },
+    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.name}\n${formatDisplaySpeed(peak.value)}` },
     highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadCount), unit: `/ ${formatCount(online.length)}`, hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
     expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringCount), unit: '台', hint: `${settings.homeExpiringDays} 天内` },
     trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningCount), unit: '台', hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
@@ -388,13 +419,44 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
   return resolveGeneralCardKeys(settings).flatMap((key) => values[key] ? [values[key] as PresentationCard] : [])
 }
 
-function monthlyPrice(server: CfsmServer): string | null {
+/*
+ * 详情指标卡的 value / unit 拆分，逐条对应 Komari `splitMetricValue`：
+ * 先按 ` / ` 拆出计费周期，再按 `N 天` 拆出剩余天数，最后按尾随的三字母币种码拆分。
+ */
+const EXPIRES_IN_SUFFIX_PATTERN = /^(\d+)\s*(天)$/
+const CURRENCY_SUFFIX_PATTERN = /^(\S.*\S)\s+([A-Z]{3})$/
+
+function splitMetricValue(value: string): SplitAmount {
+  const cycleIndex = value.indexOf(' / ')
+  if (cycleIndex > -1) return { value: value.slice(0, cycleIndex), unit: value.slice(cycleIndex + 1) }
+  const expiresIn = EXPIRES_IN_SUFFIX_PATTERN.exec(value)
+  if (expiresIn) return { value: expiresIn[1] ?? value, unit: expiresIn[2] ?? '' }
+  const currency = CURRENCY_SUFFIX_PATTERN.exec(value)
+  if (currency) return { value: currency[1] ?? value, unit: currency[2] ?? '' }
+  return { value, unit: '' }
+}
+
+/** 对应 Komari `splitMeasurement`：把 `1.5 GB/s` 拆成数值与单位。 */
+function splitMeasurement(value: string): SplitAmount {
+  const separator = value.lastIndexOf(' ')
+  if (separator <= 0) return { value, unit: '' }
+  return { value: value.slice(0, separator), unit: value.slice(separator + 1) }
+}
+
+/**
+ * 月均支出。上游把计费周期当成天数直接除；CFSM 的 `billing_cycle` 是枚举文本，
+ * 因此按同一张官方周期天数表折算成 30 天口径。未知周期返回「不适用」，不猜测。
+ */
+function monthlyAverageCost(server: CfsmServer): string | null {
   const amount = Number(server.price)
-  if (!Number.isFinite(amount) || amount < 0) return null
-  const months: Record<string, number> = { month: 1, quarter: 3, half_year: 6, year: 12, two_years: 24, three_years: 36, four_years: 48, five_years: 60 }
-  const divisor = months[server.billingCycle ?? '']
-  if (!divisor) return null
-  return `${server.currency ?? ''}${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(amount / divisor)} / month`
+  if (!Number.isFinite(amount)) return null
+  if (amount === 0 || amount === -1) return formatPrice(server.price, server.currency, null)
+  if (amount < 0) return null
+  const cycleDays = BILLING_CYCLE_DAYS[server.billingCycle?.trim().toLowerCase() ?? '']
+  if (!cycleDays) return '不适用'
+  const monthly = amount / cycleDays * 30
+  const digits = Math.abs(monthly) >= 100 ? 0 : 2
+  return `${server.currency?.trim() ?? ''}${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(monthly)} / 月`
 }
 
 export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, now = Date.now()): PresentationCard[] {
@@ -411,24 +473,59 @@ export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, no
       : calculation === 'ul' ? tx
         : calculation === 'max' ? Math.max(rx ?? 0, tx ?? 0)
           : (rx ?? 0) + (tx ?? 0)
-  const monthly = monthlyPrice(server)
+  const monthly = monthlyAverageCost(server)
+  const priceText = server.price === null ? null : formatDisplayPrice(server.price, server.currency, server.billingCycle)
+  const remaining = remainingValue(server, now)
+  const freePrice = server.price !== null && (Number(server.price) === 0 || Number(server.price) === -1)
+  const remainingValueText = server.price === null
+    ? null
+    : freePrice ? '无' : remaining === null ? null : formatCurrencyValue(remaining, server.currency)
+  const memoryPercent = percent(server.memoryUsed, server.memoryTotal)
+  const swapPercent = percent(server.swapUsed, server.swapTotal)
+  const diskPercent = percent(server.diskUsed, server.diskTotal)
+  const uploadSplit = splitMeasurement(formatDisplaySpeed(server.networkOutSpeed))
+  const downloadSplit = splitMeasurement(formatDisplaySpeed(server.networkInSpeed))
+  const trafficSplit = splitMeasurement(formatDisplayBytes(totalTraffic))
+  const hasQuota = quotaLimit !== null && quotaUsed !== null
+  const quotaPercent = hasQuota ? Math.min(100, quotaUsed / quotaLimit * 100) : null
+  const card = (
+    key: DetailCardKey,
+    icon: IconName,
+    label: string,
+    value: string,
+    unit = '',
+    hint = '',
+  ): PresentationCard => ({ key, icon, label, value, unit: unit || undefined, hint })
+
+  /*
+   * 逐条对应 Komari `getDetailMetricCard`：label、icon、value / unit 拆分与 tooltip 都取自上游。
+   * 上游用 `-` 表示缺数据，本主题保持同一写法，不把缺失或超时写成 0。
+   */
   const model: Record<DetailCardKey, PresentationCard | null> = {
-    nodePrice: server.price === null ? null : { key: 'nodePrice', icon: 'tabler:cash', label: '节点价格', value: formatPrice(server.price, server.currency, server.billingCycle), hint: 'CFSM 套餐字段' },
-    monthlyCost: monthly === null ? null : { key: 'monthlyCost', icon: 'tabler:receipt-2', label: '月均支出', value: monthly, hint: '按账期等分，不做汇率换算' },
-    remainingTime: days === null ? null : { key: 'remainingTime', icon: 'tabler:hourglass', label: '剩余时间', value: days < 0 ? `已过期 ${Math.abs(days)} 天` : `${days} 天`, hint: server.expireDate ?? '' },
-    cpuUsage: server.cpu === null ? null : { key: 'cpuUsage', icon: 'tabler:cpu', label: 'CPU', value: formatPercent(server.cpu), hint: `Load ${formatLoad(server.load1)} / ${formatLoad(server.load5)} / ${formatLoad(server.load15)}`, percentage: server.cpu },
-    gpuUsage: gpu === null ? null : { key: 'gpuUsage', icon: 'tabler:cpu-2', label: 'GPU', value: formatPercent(gpu), hint: `${server.gpus.length} 个设备`, percentage: gpu },
-    memoryUsage: percent(server.memoryUsed, server.memoryTotal) === null ? null : { key: 'memoryUsage', icon: 'icon-park-outline:memory', label: 'RAM', value: formatPercent(percent(server.memoryUsed, server.memoryTotal)), hint: `${formatBytes(server.memoryUsed === null ? null : server.memoryUsed * 1024 ** 2)} / ${formatBytes(server.memoryTotal === null ? null : server.memoryTotal * 1024 ** 2)}`, percentage: percent(server.memoryUsed, server.memoryTotal) },
-    swapUsage: percent(server.swapUsed, server.swapTotal) === null ? null : { key: 'swapUsage', icon: 'icon-park-outline:switch', label: 'Swap', value: formatPercent(percent(server.swapUsed, server.swapTotal)), hint: '真实使用比例', percentage: percent(server.swapUsed, server.swapTotal) },
-    diskUsage: percent(server.diskUsed, server.diskTotal) === null ? null : { key: 'diskUsage', icon: 'tabler:server-2', label: 'Disk', value: formatPercent(percent(server.diskUsed, server.diskTotal)), hint: '真实使用比例', percentage: percent(server.diskUsed, server.diskTotal) },
-    load: server.load1 === null ? null : { key: 'load', icon: 'tabler:gauge', label: '系统负载', value: formatLoad(server.load1), hint: `${formatLoad(server.load5)} / ${formatLoad(server.load15)}` },
-    processes: server.processes === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程', value: formatCount(server.processes), hint: '当前上报值' },
-    connections: server.tcpConnections === null && server.udpConnections === null ? null : { key: 'connections', icon: 'tabler:activity', label: '连接', value: formatCount((server.tcpConnections ?? 0) + (server.udpConnections ?? 0)), hint: `TCP ${formatCount(server.tcpConnections)} · UDP ${formatCount(server.udpConnections)}` },
-    uptime: server.bootTime === null ? null : { key: 'uptime', icon: 'tabler:clock', label: '运行时间', value: formatUptime(server.bootTime, now), hint: '根据 boot_time 计算' },
-    uploadSpeed: server.networkOutSpeed === null ? null : { key: 'uploadSpeed', icon: 'tabler:arrow-big-up-lines', label: '实时上传', value: formatSpeed(server.networkOutSpeed), hint: '当前节点' },
-    downloadSpeed: server.networkInSpeed === null ? null : { key: 'downloadSpeed', icon: 'tabler:arrow-big-down-lines', label: '实时下载', value: formatSpeed(server.networkInSpeed), hint: '当前节点' },
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:chart-histogram', label: '累计流量', value: formatBytes(totalTraffic), hint: '接收 + 发送' },
-    trafficQuota: quotaLimit === null || quotaUsed === null ? null : { key: 'trafficQuota', icon: 'tabler:alert-triangle', label: '流量配额', value: formatPercent(quotaUsed / quotaLimit * 100), hint: `${formatBytes(quotaUsed)} / ${formatBytes(quotaLimit)}`, percentage: quotaUsed / quotaLimit * 100 },
+    nodePrice: priceText === null ? null : (() => { const s = splitMetricValue(priceText); return card('nodePrice', 'tabler:cash', '节点价格', s.value, s.unit) })(),
+    monthlyCost: monthly === null ? null : (() => { const s = splitMetricValue(monthly); return card('monthlyCost', 'tabler:receipt-2', '月均支出', s.value, s.unit) })(),
+    remainingTime: server.expireDate === null ? null : (() => {
+      const s = splitMetricValue(formatDetailExpireText(days))
+      const status = detailExpireStatus(days)
+      const tone = status === 'expired' || status === 'critical' ? 'danger'
+        : status === 'warning' ? 'warning'
+          : status === 'long_term' || status === 'unknown' ? 'muted' : 'ok'
+      return { ...card('remainingTime', 'tabler:calendar-dollar', '剩余时间', s.value, s.unit), tone }
+    })(),
+    remainingValue: remainingValueText === null ? null : (() => { const s = splitMetricValue(remainingValueText); return card('remainingValue', 'tabler:coins', '剩余价值', s.value, s.unit) })(),
+    cpuUsage: server.cpu === null ? null : card('cpuUsage', 'tabler:cpu', 'CPU 使用率', server.cpu.toFixed(1), '%'),
+    gpuUsage: server.gpus.length === 0 ? null : card('gpuUsage', 'tabler:device-desktop-analytics', 'GPU 使用率', gpu === null ? '-' : gpu.toFixed(1), gpu === null ? '' : '%', server.gpus.map((item) => item.name).filter(Boolean).join('\n')),
+    memoryUsage: memoryPercent === null ? null : card('memoryUsage', 'icon-park-outline:memory', '内存使用率', memoryPercent.toFixed(1), '%', `${formatDisplayMebibytes(server.memoryUsed)} / ${formatDisplayMebibytes(server.memoryTotal)}`),
+    swapUsage: swapPercent === null ? null : card('swapUsage', 'icon-park-outline:switch', '交换内存', swapPercent.toFixed(1), '%', `${formatDisplayMebibytes(server.swapUsed)} / ${formatDisplayMebibytes(server.swapTotal)}`),
+    diskUsage: diskPercent === null ? null : card('diskUsage', 'tabler:server-2', '硬盘使用率', diskPercent.toFixed(1), '%', `${formatDisplayMebibytes(server.diskUsed)} / ${formatDisplayMebibytes(server.diskTotal)}`),
+    load: server.load1 === null ? null : card('load', 'tabler:chart-line', '系统负载', formatLoad(server.load1), '1m', `5m ${formatLoad(server.load5)} / 15m ${formatLoad(server.load15)}`),
+    processes: server.processes === null ? null : card('processes', 'tabler:list-numbers', '进程数', formatCount(server.processes)),
+    connections: server.tcpConnections === null && server.udpConnections === null ? null : card('connections', 'tabler:plug-connected', '连接数', formatCount((server.tcpConnections ?? 0) + (server.udpConnections ?? 0)), '', `TCP ${formatCount(server.tcpConnections)} / UDP ${formatCount(server.udpConnections)}`),
+    uptime: server.bootTime === null ? null : card('uptime', 'tabler:clock-up', '运行时间', formatDetailUptime(server.bootTime, now)),
+    uploadSpeed: server.networkOutSpeed === null ? null : card('uploadSpeed', 'tabler:chevrons-up', '实时上行', uploadSplit.value, uploadSplit.unit),
+    downloadSpeed: server.networkInSpeed === null ? null : card('downloadSpeed', 'tabler:chevrons-down', '实时下行', downloadSplit.value, downloadSplit.unit),
+    totalTraffic: totalTraffic === null ? null : card('totalTraffic', 'tabler:arrows-transfer-up-down', '累计流量', trafficSplit.value, trafficSplit.unit, `↑ ${formatDisplayBytes(server.networkTransmitted)} / ↓ ${formatDisplayBytes(server.networkReceived)}`),
+    trafficQuota: !server.trafficLimit ? null : card('trafficQuota', 'tabler:gauge', '流量配额', hasQuota ? (quotaPercent ?? 0).toFixed(1) : '∞', hasQuota ? '%' : '', hasQuota ? `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}` : '无限流量'),
   }
   return resolveDetailCardKeys(settings).flatMap((key) => model[key] ? [model[key] as PresentationCard] : [])
 }

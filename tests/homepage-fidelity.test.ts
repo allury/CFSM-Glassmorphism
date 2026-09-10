@@ -7,12 +7,12 @@ import {
   resolveQuickControlKeys,
 } from '@/domain/theme-presentation'
 import {
-  formatHomeBillingCycle,
-  formatHomeBytes,
-  formatHomeBytesSplit,
-  formatHomeMebibytes,
-  formatHomePrice,
-  formatHomeSpeed,
+  formatDisplayBillingCycle,
+  formatDisplayBytes,
+  formatDisplayBytesSplit,
+  formatDisplayMebibytes,
+  formatDisplayPrice,
+  formatDisplaySpeed,
   formatHomeUptimeDays,
   formatPrice,
 } from '@/utils/format'
@@ -56,27 +56,27 @@ function customGeneral(keys: string): ReturnType<typeof cloneThemeSettings> {
 
 describe('首页字节格式（Komari utils/helper.ts 规则）', () => {
   it('使用 KB / MB / GB / TB 而不是 KiB / MiB / GiB，换算基数仍是 1024', () => {
-    expect(formatHomeBytes(1024)).toBe('1 KB')
-    expect(formatHomeBytes(1024 ** 2)).toBe('1.0 MB')
-    expect(formatHomeBytes(1024 ** 3)).toBe('1.0 GB')
-    expect(formatHomeBytes(1024 ** 4)).toBe('1.00 TB')
-    expect(formatHomeBytes(1024 ** 5)).toBe('1.00 PB')
+    expect(formatDisplayBytes(1024)).toBe('1 KB')
+    expect(formatDisplayBytes(1024 ** 2)).toBe('1.0 MB')
+    expect(formatDisplayBytes(1024 ** 3)).toBe('1.0 GB')
+    expect(formatDisplayBytes(1024 ** 4)).toBe('1.00 TB')
+    expect(formatDisplayBytes(1024 ** 5)).toBe('1.00 PB')
   })
 
   it('按 B 0 / KB 0 / MB 1 / GB 1 / TB 2 的精度输出', () => {
-    expect(formatHomeBytesSplit(512)).toEqual({ value: '512', unit: 'B' })
-    expect(formatHomeBytesSplit(1536)).toEqual({ value: '2', unit: 'KB' })
-    expect(formatHomeBytesSplit(1.5 * 1024 ** 2)).toEqual({ value: '1.5', unit: 'MB' })
-    expect(formatHomeBytesSplit(62.25 * 1024 ** 3)).toEqual({ value: '62.3', unit: 'GB' })
-    expect(formatHomeBytesSplit(2.125 * 1024 ** 4)).toEqual({ value: '2.13', unit: 'TB' })
+    expect(formatDisplayBytesSplit(512)).toEqual({ value: '512', unit: 'B' })
+    expect(formatDisplayBytesSplit(1536)).toEqual({ value: '2', unit: 'KB' })
+    expect(formatDisplayBytesSplit(1.5 * 1024 ** 2)).toEqual({ value: '1.5', unit: 'MB' })
+    expect(formatDisplayBytesSplit(62.25 * 1024 ** 3)).toEqual({ value: '62.3', unit: 'GB' })
+    expect(formatDisplayBytesSplit(2.125 * 1024 ** 4)).toEqual({ value: '2.13', unit: 'TB' })
   })
 
   it('速度在单位后加 /s，缺失值保持占位符而不是 0', () => {
-    expect(formatHomeSpeed(1024 ** 2)).toBe('1.0 MB/s')
-    expect(formatHomeSpeed(0)).toBe('0 B/s')
-    expect(formatHomeSpeed(null)).toBe('—')
-    expect(formatHomeBytes(null)).toBe('—')
-    expect(formatHomeMebibytes(1024)).toBe('1.0 GB')
+    expect(formatDisplaySpeed(1024 ** 2)).toBe('1.0 MB/s')
+    expect(formatDisplaySpeed(0)).toBe('0 B/s')
+    expect(formatDisplaySpeed(null)).toBe('—')
+    expect(formatDisplayBytes(null)).toBe('—')
+    expect(formatDisplayMebibytes(1024)).toBe('1.0 GB')
   })
 })
 
@@ -89,23 +89,23 @@ describe('首页运行天数与计费周期', () => {
   })
 
   it('本地化 CFSM 官方计费周期，未知自由文本原样保留', () => {
-    expect(formatHomeBillingCycle('month')).toBe('月')
-    expect(formatHomeBillingCycle('quarter')).toBe('季')
-    expect(formatHomeBillingCycle('half_year')).toBe('半年')
-    expect(formatHomeBillingCycle('year')).toBe('年')
-    expect(formatHomeBillingCycle('two_years')).toBe('两年')
-    expect(formatHomeBillingCycle('three_years')).toBe('三年')
-    expect(formatHomeBillingCycle('four_years')).toBe('四年')
-    expect(formatHomeBillingCycle('five_years')).toBe('五年')
-    expect(formatHomeBillingCycle('每两周')).toBe('每两周')
-    expect(formatHomeBillingCycle(null)).toBe('')
+    expect(formatDisplayBillingCycle('month')).toBe('月')
+    expect(formatDisplayBillingCycle('quarter')).toBe('季')
+    expect(formatDisplayBillingCycle('half_year')).toBe('半年')
+    expect(formatDisplayBillingCycle('year')).toBe('年')
+    expect(formatDisplayBillingCycle('two_years')).toBe('两年')
+    expect(formatDisplayBillingCycle('three_years')).toBe('三年')
+    expect(formatDisplayBillingCycle('four_years')).toBe('四年')
+    expect(formatDisplayBillingCycle('five_years')).toBe('五年')
+    expect(formatDisplayBillingCycle('每两周')).toBe('每两周')
+    expect(formatDisplayBillingCycle(null)).toBe('')
   })
 
   it('首页价格使用中文周期，详情页的 formatPrice 保持原样', () => {
-    expect(formatHomePrice('18', 'USD', 'year')).toBe('USD18 / 年')
-    expect(formatHomePrice('24', 'USD', 'month')).toBe('USD24 / 月')
-    expect(formatHomePrice('0', 'CNY', 'year')).toBe('免费')
-    expect(formatHomePrice(null, 'CNY', 'year')).toBe('—')
+    expect(formatDisplayPrice('18', 'USD', 'year')).toBe('USD18 / 年')
+    expect(formatDisplayPrice('24', 'USD', 'month')).toBe('USD24 / 月')
+    expect(formatDisplayPrice('0', 'CNY', 'year')).toBe('免费')
+    expect(formatDisplayPrice(null, 'CNY', 'year')).toBe('—')
     expect(formatPrice('18', 'USD', 'year')).toBe('USD18 / year')
   })
 })
