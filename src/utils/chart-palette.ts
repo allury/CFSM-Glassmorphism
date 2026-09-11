@@ -98,3 +98,11 @@ export function getChartThemeColors(dark: boolean) {
 }
 
 export type ChartThemeColors = ReturnType<typeof getChartThemeColors>
+
+/** 上游 `PingChart.vue` 的 `chartThemeColors` 只有浅色 `borderColor` 不同：0.06 而不是 0.1。 */
+export function getPingChartThemeColors(dark: boolean): ChartThemeColors {
+  return {
+    ...getChartThemeColors(dark),
+    borderColor: dark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+  }
+}

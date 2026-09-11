@@ -13,6 +13,8 @@ import { cloneThemeSettings, DEFAULT_THEME_SETTINGS } from '@/theme/settings'
 
 const stylesheet = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
 const detailView = readFileSync(new URL('../src/views/ServerDetailView.vue', import.meta.url), 'utf8')
+const loadChart = readFileSync(new URL('../src/components/detail/LoadChart.vue', import.meta.url), 'utf8')
+const pingChart = readFileSync(new URL('../src/components/detail/PingChart.vue', import.meta.url), 'utf8')
 const serverCard = readFileSync(new URL('../src/components/dashboard/ServerCard.vue', import.meta.url), 'utf8')
 const serverList = readFileSync(new URL('../src/components/dashboard/ServerList.vue', import.meta.url), 'utf8')
 
@@ -215,7 +217,7 @@ describe('详情页 DOM 与分区结构', () => {
     expect(detailView).toContain("{ value: 'ping', label: '延迟', icon: 'tabler:timeline' }")
     expect(detailView).toContain('overviewVisible')
     expect(detailView).toContain('pingVisible')
-    expect(detailView).toContain('historyVisible')
+    expect(detailView).toContain('loadVisible')
   })
 
   it('指标卡没有进度条，说明文字走 title tooltip', () => {
@@ -223,20 +225,34 @@ describe('详情页 DOM 与分区结构', () => {
     expect(detailView).not.toContain('card.percentage !== undefined')
   })
 
-  it('GPU / 磁盘 IO / 探针区仍按真实数据存在与否渲染', () => {
-    expect(detailView).toContain('v-if="overviewVisible && server.diskIo"')
-    expect(detailView).toContain('v-if="overviewVisible && server.gpus.length"')
-    expect(detailView).toContain('v-if="pingVisible && probeTargets.length"')
+  it('下半部与上游一致，只有 LoadChart 与 PingChart，按分区可见性挂载', () => {
+    expect(detailView).toContain('<LoadChart v-if="loadVisible" />')
+    expect(detailView).toContain('<PingChart v-if="pingVisible" />')
+    // 旧的 PROBES / DISK IO / GPU / HISTORY 四个自创分区不再存在。
+    for (const legacy of ['detail-section', 'probe-detail', 'gpu-detail', 'detail-stat-grid', 'history-range', 'HistoryChart']) {
+      expect(detailView).not.toContain(legacy)
+    }
   })
 
-  it('CFSM 没有的字段不出现在详情页的可见文案里', () => {
+  it('GPU / 磁盘 IO / 探针仍按真实数据存在与否出现', () => {
+    // 卡片可见性统一走 visibleLoadCards：不在方案里、或所选时段没有真实采样的卡片不渲染。
+    expect(loadChart).toContain('visibleLoadCards(')
+    expect(loadChart).toContain('theme.runtime.gpuChartEnabled')
+    // 延迟面板的任务只来自真实配置过的探测目标。
+    expect(pingChart).toContain('activeProbeTargets(current, pingHistoryPoints.value)')
+  })
+
+  it('CFSM 没有的字段不出现在详情页的可见文案里；厂商只取运营者文本', () => {
     // 只断言渲染出来的标签，避免误伤解释这些缺口的注释文字。
     const labels = [...detailView.matchAll(/label: '([^']+)'/g)].map((match) => match[1])
     expect(labels).not.toContain('虚拟机')
     expect(labels).not.toContain('物理核心')
-    expect(labels).not.toContain('厂商')
     expect(labels).not.toContain('IP')
-    expect(labels).toEqual(expect.arrayContaining(['架构', 'Agent', '操作系统', '内核版本', '运行时间', '数据源']))
+    expect(labels).toEqual(expect.arrayContaining(['架构', 'Agent', '操作系统', '内核版本', '运行时间', '厂商']))
+    // 上游第四格就是「厂商」；原来的数据源名称保留在这一格的 title 里。
+    expect(labels).not.toContain('数据源')
+    expect(detailView).toContain('`数据源：${current.source.label}`')
+    expect(detailView).toContain('resolveNodeProvider(server.value, theme.runtime.providerAliases)')
   })
 })
 
@@ -259,11 +275,24 @@ describe('详情页表面契约（浏览器实测值）', () => {
     expect(stylesheet).toContain(":root[data-theme='dark'] .detail-fact {\n  background: rgb(255 255 255 / 5%);\n}")
   })
 
-  it('历史图表卡片与指标卡同源，不再使用自创的 glass-panel', () => {
-    expect(detailView).not.toContain('glass-panel')
-    const chart = stylesheet.slice(stylesheet.indexOf('.history-chart {'), stylesheet.indexOf('.history-chart:hover'))
-    expect(chart).toContain('border-radius: var(--radius-md)')
-    expect(chart).toContain('background: color-mix(in oklab, var(--background) 50%, transparent)')
+  it('图表卡片、延迟任务卡与大图和指标卡同源，不再使用自创的 glass-panel', () => {
+    for (const code of [detailView, loadChart, pingChart]) expect(code).not.toContain('glass-panel')
+    const surface = stylesheet.slice(
+      stylesheet.indexOf('.detail-metric-card,\n.detail-info-card,'),
+      stylesheet.indexOf('.detail-metric-card:hover,'),
+    )
+    for (const selector of ['.metric-chart-card', '.ping-task', '.ping-chart__canvas']) expect(surface).toContain(selector)
+    // hover 变不透明只有图表卡片（上游 CardX 的 hover:bg-background）；延迟大图没有 hover。
+    const hover = stylesheet.slice(stylesheet.indexOf('.detail-metric-card:hover,'), stylesheet.indexOf('.detail-metric-card {'))
+    expect(hover).toContain('.metric-chart-card:hover')
+    expect(hover).not.toContain('.ping-chart__canvas')
+  })
+
+  it('图表卡片几何照上游 CardX size="small" 与 h-48，延迟大图照 h-80 p-4', () => {
+    expect(stylesheet).toContain('.metric-chart-card__header {\n  display: flex;\n  align-items: center;\n  gap: 8px;\n  padding: 8px 12px;\n}')
+    expect(stylesheet).toContain('.metric-chart-card__body {\n  padding: 0 12px 12px;\n}')
+    expect(stylesheet).toContain('.metric-chart-card__chart {\n  height: 192px;\n}')
+    expect(stylesheet).toContain('.ping-chart__canvas {\n  height: 320px;\n  padding: 16px;\n}')
   })
 
   it('指标卡高度与字号按上游 min-h-10 / md:min-h-18 与 text-base / sm:text-2xl', () => {

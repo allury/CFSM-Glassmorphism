@@ -1,6 +1,14 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import {
+  baseTooltip,
+  cpuChartOption,
+  memoryChartOption,
+  metricSeriesChartOption,
+  networkChartOption,
+} from '@/domain/detail-chart-options'
 import { buildGeneralCards } from '@/domain/theme-presentation'
+import { getChartSeriesPalette, getChartThemeColors, getLoadChartPalette } from '@/utils/chart-palette'
 import { cloneThemeSettings, DEFAULT_THEME_SETTINGS } from '@/theme/settings'
 import type { GlassServer } from '@/types/glassmorphism'
 
@@ -11,9 +19,6 @@ import type { GlassServer } from '@/types/glassmorphism'
 const stylesheet = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')
 const serverCard = readFileSync(new URL('../src/components/dashboard/ServerCard.vue', import.meta.url), 'utf8')
-const historyChart = readFileSync(new URL('../src/components/detail/HistoryChart.vue', import.meta.url), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
-  .replace(/\/\/.*$/gm, '')
 
 /*
  * 第 15 轮的字体一致性回归。
@@ -75,17 +80,40 @@ describe('字重落在与上游相同的实体字面上', () => {
     expect(brand).not.toContain('letter-spacing')
   })
 
-  it('详情分区标题是 600 且不加负字距，对应上游 text-base font-semibold', () => {
-    const heading = cssBlock('.detail-section__header h2,\n.history-chart h3')
+  it('图表卡标题是 600 且不加负字距，对应上游 MetricChartHeader 的 text-sm font-semibold sm:text-base', () => {
+    const heading = cssBlock('.metric-chart-header__title')
+    expect(heading).toContain('font-size: 14px')
     expect(heading).toContain('font-weight: 600')
     expect(heading).not.toContain('letter-spacing')
+    expect(stylesheet).toContain('.metric-chart-header__title {\n    font-size: 16px;\n    line-height: 24px;')
+  })
+
+  it('图表卡右侧最新值是 12px / 16px 的 muted 文字，对应上游 text-xs text-muted-foreground', () => {
+    const value = cssBlock('.metric-chart-header__value')
+    expect(value).toContain('font-size: 12px')
+    expect(value).toContain('line-height: 16px')
+    expect(value).toContain('color: var(--muted)')
   })
 })
 
 describe('canvas 内的图表文字', () => {
-  it('tooltip 字号与上游 MetricSeriesChartCard 一致', () => {
-    expect(historyChart).toContain('fontSize: 12')
-    expect(historyChart).not.toContain('fontSize: 11')
+  const theme = getChartThemeColors(false)
+  const context = { rows: [], hours: 1, load: getLoadChartPalette(false), series: getChartSeriesPalette(false), theme }
+
+  it('tooltip 字号与上游一致：LoadChart / PingChart 12px 行高 20，MetricSeriesChartCard 12px', () => {
+    expect(baseTooltip(theme).textStyle).toMatchObject({ fontSize: 12, lineHeight: 20 })
+    expect(metricSeriesChartOption([], theme).tooltip.textStyle.fontSize).toBe(12)
+  })
+
+  it('坐标轴与图例字号照抄上游：内联卡 11px，卡片图 10px', () => {
+    const cpu = cpuChartOption(context)
+    expect(cpu.xAxis.axisLabel.fontSize).toBe(11)
+    expect(cpu.yAxis[0]?.axisLabel.fontSize).toBe(11)
+    expect(memoryChartOption(context).legend.textStyle.fontSize).toBe(10)
+    expect(networkChartOption(context).legend.textStyle.fontSize).toBe(11)
+    const card = metricSeriesChartOption([], theme)
+    expect(card.xAxis.axisLabel.fontSize).toBe(10)
+    expect(card.legend.textStyle.fontSize).toBe(10)
   })
 })
 

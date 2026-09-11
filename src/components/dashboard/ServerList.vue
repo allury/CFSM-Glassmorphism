@@ -7,6 +7,7 @@ import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { matchProvider, trafficUsage, type ProviderAlias } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
+import { trafficStatus, usageStatus } from '@/utils/progress-status'
 import {
   formatDisplayPrice,
   formatDisplaySpeed,
@@ -240,28 +241,35 @@ function hideMissingImage(event: Event): void {
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
-            <AppProgressThin :percentage="server.cpu" />
+            <!-- 上游 NodeList 的进度条同样按 `getStatus` 着色。 -->
+            <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
             </span>
-            <AppProgressThin :percentage="ratio(server.memory.used, server.memory.total)" />
+            <AppProgressThin
+              :percentage="ratio(server.memory.used, server.memory.total)"
+              :status="usageStatus(ratio(server.memory.used, server.memory.total))"
+            />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
             </span>
-            <AppProgressThin :percentage="ratio(server.disk.used, server.disk.total)" />
+            <AppProgressThin
+              :percentage="ratio(server.disk.used, server.disk.total)"
+              :status="usageStatus(ratio(server.disk.used, server.disk.total))"
+            />
           </div>
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
               {{ trafficPercent(server) === null ? '∞' : formatPercent(trafficPercent(server)) }}
             </span>
-            <AppProgressThin :percentage="trafficPercent(server)" />
+            <AppProgressThin :percentage="trafficPercent(server)" :status="trafficStatus(trafficPercent(server))" />
           </div>
 
           <div class="node-list__cell">

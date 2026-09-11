@@ -1,3 +1,4 @@
+import { splitProviderTags } from './provider-tags'
 import type {
   ApiSource,
   CfsmRealtimeSample,
@@ -267,13 +268,15 @@ export function normalizeServer(
   const id = stringValue(input.id)
   if (id === null) throw new Error('Server response is missing a valid id')
   const [load1, load5, load15] = loadValues(input.load_avg)
+  const { tags, providerTags } = splitProviderTags(splitTags(input.tags))
 
   return {
     id,
     source,
     name: stringValue(input.name) ?? id,
     group: stringValue(input.server_group) ?? '',
-    tags: splitTags(input.tags),
+    tags,
+    providerTags,
     price: stringValue(input.price),
     billingCycle: stringValue(input.billing_cycle),
     autoRenewal: stringValue(input.auto_renewal),
@@ -427,7 +430,10 @@ export function mergeRealtimeSample(
   const name = stringValue(input.name)
   if (name !== null) next.name = name
   if ('server_group' in input) next.group = normalized.group
-  if ('tags' in input) next.tags = normalized.tags
+  if ('tags' in input) {
+    next.tags = normalized.tags
+    next.providerTags = normalized.providerTags
+  }
   if ('price' in input) next.price = normalized.price
   if ('billing_cycle' in input) next.billingCycle = normalized.billingCycle
   if ('auto_renewal' in input) next.autoRenewal = normalized.autoRenewal
@@ -512,6 +518,9 @@ export function normalizeHistory(value: unknown): HistoryPoint[] {
       networkOutSpeed: numberValue(entry.net_out_speed),
       networkReceived: numberValue(entry.net_rx),
       networkTransmitted: numberValue(entry.net_tx),
+      processes: numberValue(entry.processes),
+      tcpConnections: numberValue(entry.tcp_conn),
+      udpConnections: numberValue(entry.udp_conn),
       load1,
       load5,
       load15,

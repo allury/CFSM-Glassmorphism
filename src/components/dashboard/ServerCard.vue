@@ -20,8 +20,9 @@ import {
   formatLoad,
   formatPercent,
   formatProbePercent,
-  formatTimestamp,
+  normalizeTimestampMilliseconds,
 } from '@/utils/format'
+import { trafficStatus, trafficTextTone, usageStatus } from '@/utils/progress-status'
 
 /**
  * 对齐 Komari `NodeCard` 的节点卡片。
@@ -38,7 +39,6 @@ const props = defineProps<{
   /** 卡片密度直接来自主题设置 `nodeCardSize`，与 Komari 的 NodeCard 一致。 */
   density: NodeCardSize
   favorite: boolean
-  highLoadThreshold: number
   /** 主题级价格隐私（未登录隐藏价格）。每台节点自身的 showPrice 仍单独生效。 */
   priceVisible: boolean
 }>()
@@ -50,13 +50,6 @@ const emit = defineEmits<{
 
 const isMini = computed(() => props.density === 'mini')
 
-function tone(percentage: number | null): 'normal' | 'warning' | 'danger' | 'neutral' {
-  if (percentage === null) return 'neutral'
-  if (percentage >= props.highLoadThreshold) return 'danger'
-  if (percentage >= props.highLoadThreshold * 0.8) return 'warning'
-  return 'normal'
-}
-
 function ratio(used: number | null, total: number | null): number | null {
   if (used === null || total === null || total <= 0) return null
   return Math.min(100, Math.max(0, (used / total) * 100))
@@ -66,6 +59,19 @@ const memoryPercent = computed(() => ratio(props.server.memory.used, props.serve
 const diskPercent = computed(() => ratio(props.server.disk.used, props.server.disk.total))
 // 节点关闭流量展示时不显示配额，避免呈现服务端已隐藏的数据。
 const traffic = computed(() => (props.server.showTraffic ? trafficUsage(props.server) : null))
+const trafficPercent = computed(() => (traffic.value ? traffic.value.percent : null))
+const trafficTone = computed(() => trafficTextTone(trafficPercent.value))
+const trafficCritical = computed(() => trafficPercent.value !== null && trafficPercent.value >= 95)
+
+/** 上游内存格挂 `Swap 已用 … / 总计 …` 的 title；CFSM 没有上报 Swap 时不挂，不写成 0。 */
+const swapTooltip = computed(() => {
+  const { used, total } = props.server.swap
+  if (used === null) return undefined
+  const usedText = formatDisplayMebibytes(Math.max(0, used))
+  return total !== null && total > 0
+    ? `Swap 已用 ${usedText} / 总计 ${formatDisplayMebibytes(total)}`
+    : `Swap 已用 ${usedText}`
+})
 
 const osName = computed(() => osDisplayName(props.server.operatingSystem))
 const regionCode = computed(() => resolveRegionCoordinates(props.server.region)?.code ?? null)
@@ -109,9 +115,19 @@ const remainingValueText = computed(() => {
   if (price === 0 || price === -1) return '无'
   return formatCurrencyValue(remainingValue(props.server), props.server.currency)
 })
-const offlineText = computed(() => (
-  props.server.lastUpdated === null ? '尚无上报' : `最后上报 ${formatTimestamp(props.server.lastUpdated)}`
-))
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0')
+}
+
+/** 上游离线遮罩显示 `formatDateTime(node.time)`：`YYYY-MM-DD HH:mm:ss`，不带前缀。 */
+const offlineText = computed(() => {
+  const timestamp = normalizeTimestampMilliseconds(props.server.lastUpdated)
+  if (timestamp === null) return '尚无上报'
+  const date = new Date(timestamp)
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} `
+    + `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+})
 
 const chips = computed(() => {
   const list: string[] = [uptimeText.value]
@@ -270,28 +286,32 @@ function hideMissingImage(event: Event): void {
         <span v-for="chip in chips" :key="chip" class="node-chip">{{ chip }}</span>
       </div>
 
-      <div class="node-metrics" :class="{ 'node-metrics--mini': isMini }">
-        <div class="node-metric">
-          <div class="node-metric__head">
-            <span class="node-metric__label node-metric__label--cpu">
-              <AppIcon name="tabler:cpu" :size="13" /><span>CPU</span>
-            </span>
-            <span class="node-metric__value">{{ formatPercent(server.cpu) }}</span>
+      <!--
+        上游 mini 档的指标区是另一套结构（`grid-cols-[3fr_2fr]`）：左栏 CPU / 内存
+        只放图标，内存用量占满左栏；右栏是带文字的流量。不是把四项挤进三列。
+      -->
+      <div v-if="isMini" class="node-metrics node-metrics--mini">
+        <div class="node-metrics__pair">
+          <div class="node-metric">
+            <div class="node-metric__head">
+              <span class="node-metric__label node-metric__label--cpu" role="img" title="CPU" aria-label="CPU">
+                <AppIcon name="tabler:cpu" :size="12" />
+              </span>
+              <span class="node-metric__value">{{ formatPercent(server.cpu) }}</span>
+            </div>
+            <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
           </div>
-          <AppProgressThin :percentage="server.cpu" :status="tone(server.cpu)" />
-          <div v-if="!isMini" class="node-metric__hint">
-            {{ formatLoad(server.load.one) }}, {{ formatLoad(server.load.five) }}, {{ formatLoad(server.load.fifteen) }}
-          </div>
-        </div>
 
-        <div class="node-metric">
-          <div class="node-metric__head">
-            <span class="node-metric__label node-metric__label--memory">
-              <AppIcon name="icon-park-outline:memory" :size="13" /><span>内存</span>
-            </span>
-            <span class="node-metric__value">{{ formatPercent(memoryPercent) }}</span>
+          <div class="node-metric" :title="swapTooltip">
+            <div class="node-metric__head">
+              <span class="node-metric__label node-metric__label--memory" role="img" title="内存" aria-label="内存">
+                <AppIcon name="icon-park-outline:memory" :size="12" />
+              </span>
+              <span class="node-metric__value">{{ formatPercent(memoryPercent) }}</span>
+            </div>
+            <AppProgressThin :percentage="memoryPercent" :status="usageStatus(memoryPercent)" />
           </div>
-          <AppProgressThin :percentage="memoryPercent" :status="tone(memoryPercent)" />
+
           <div class="node-metric__hint">
             {{ formatDisplayMebibytes(server.memory.used) }}
             /
@@ -299,14 +319,61 @@ function hideMissingImage(event: Event): void {
           </div>
         </div>
 
-        <div v-if="!isMini" class="node-metric">
+        <div class="node-metric">
+          <div class="node-metric__head">
+            <span class="node-metric__label node-metric__label--traffic">
+              <AppIcon name="tabler:arrows-transfer-up-down" :size="12" /><span>流量</span>
+            </span>
+            <span class="node-metric__value" :class="`node-metric__value--${trafficTone}`">
+              {{ traffic ? formatPercent(traffic.percent) : '∞' }}
+            </span>
+          </div>
+          <AppProgressThin :percentage="trafficPercent" :status="trafficStatus(trafficPercent)" />
+          <div class="node-metric__hint" :class="{ 'node-metric__hint--danger': trafficCritical }">
+            {{ formatDisplayBytes(traffic ? traffic.used : null) }}
+            /
+            {{ traffic ? formatDisplayBytes(traffic.limit) : '∞' }}
+          </div>
+        </div>
+      </div>
+
+      <div v-else class="node-metrics">
+        <div class="node-metric">
+          <div class="node-metric__head">
+            <span class="node-metric__label node-metric__label--cpu">
+              <AppIcon name="tabler:cpu" :size="13" /><span>CPU</span>
+            </span>
+            <span class="node-metric__value">{{ formatPercent(server.cpu) }}</span>
+          </div>
+          <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
+          <div class="node-metric__hint">
+            {{ formatLoad(server.load.one) }}, {{ formatLoad(server.load.five) }}, {{ formatLoad(server.load.fifteen) }}
+          </div>
+        </div>
+
+        <div class="node-metric" :title="swapTooltip">
+          <div class="node-metric__head">
+            <span class="node-metric__label node-metric__label--memory">
+              <AppIcon name="icon-park-outline:memory" :size="13" /><span>内存</span>
+            </span>
+            <span class="node-metric__value">{{ formatPercent(memoryPercent) }}</span>
+          </div>
+          <AppProgressThin :percentage="memoryPercent" :status="usageStatus(memoryPercent)" />
+          <div class="node-metric__hint">
+            {{ formatDisplayMebibytes(server.memory.used) }}
+            /
+            {{ formatDisplayMebibytes(server.memory.total) }}
+          </div>
+        </div>
+
+        <div class="node-metric">
           <div class="node-metric__head">
             <span class="node-metric__label node-metric__label--disk">
               <AppIcon name="tabler:server-2" :size="13" /><span>硬盘</span>
             </span>
             <span class="node-metric__value">{{ formatPercent(diskPercent) }}</span>
           </div>
-          <AppProgressThin :percentage="diskPercent" :status="tone(diskPercent)" />
+          <AppProgressThin :percentage="diskPercent" :status="usageStatus(diskPercent)" />
           <div class="node-metric__hint">
             {{ formatDisplayMebibytes(server.disk.used) }}
             /
@@ -319,12 +386,12 @@ function hideMissingImage(event: Event): void {
             <span class="node-metric__label node-metric__label--traffic">
               <AppIcon name="tabler:arrows-transfer-up-down" :size="13" /><span>流量</span>
             </span>
-            <span class="node-metric__value">
+            <span class="node-metric__value" :class="`node-metric__value--${trafficTone}`">
               {{ traffic ? formatPercent(traffic.percent) : '∞' }}
             </span>
           </div>
-          <AppProgressThin :percentage="traffic ? traffic.percent : null" :status="tone(traffic ? traffic.percent : null)" />
-          <div class="node-metric__hint">
+          <AppProgressThin :percentage="trafficPercent" :status="trafficStatus(trafficPercent)" />
+          <div class="node-metric__hint" :class="{ 'node-metric__hint--danger': trafficCritical }">
             {{ formatDisplayBytes(traffic ? traffic.used : null) }}
             /
             {{ traffic ? formatDisplayBytes(traffic.limit) : '∞' }}

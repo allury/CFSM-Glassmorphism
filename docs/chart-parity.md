@@ -3,6 +3,10 @@
 基准：Komari Glassmorphism `bf8376587c720de915ac48789a8a180357c762d6`
 本轮起点：`v1.1.0-test.5` / `961a4edb1683e72b6bd615e3d0b8c69783d4eccc`
 
+> **第二阶段 Test 2 起**：详情页图表已按上游 `LoadChart` / `PingChart` 重建，`HistoryChart.vue` 已移除。
+> 下文的逐图对照表，以及「一个组件覆盖全部分族」的描述，只反映第 15 轮的状态。
+> 现行对照见 [`phase2-test2.md`](phase2-test2.md) 第 2 节。CHART-001 / 002 的根因结论（canvas 不解析 CSS 变量）仍然有效。
+
 ## 先确定每张图对应哪个上游组件
 
 上游详情页（`views/InstanceDetail.vue`）只挂两个图表组件：`LoadChart` 与 `PingChart`。

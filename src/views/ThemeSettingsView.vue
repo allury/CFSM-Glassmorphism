@@ -347,7 +347,7 @@ onMounted(async () => {
               <label class="settings-field settings-field--wide">
                 <span>自定义图表 keys</span>
                 <textarea v-model="theme.draft.chartDashboardTemplate" rows="4" :disabled="theme.draft.chartDashboardPreset !== '自定义'" spellcheck="false" />
-                <small>cpu、memory、disk、network、traffic、gpu、ping、pingLoss；缺失序列不会合成。</small>
+                <small>cpu、memory、disk、network、traffic、gpu、connections、process、diskIo、ping、pingLoss，也可写上游中文名（CPU、内存、硬盘、网络、流量、GPU、连接、进程、磁盘IO、延迟、丢包）；缺失序列不会合成。</small>
               </label>
             </section>
 

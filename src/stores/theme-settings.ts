@@ -55,53 +55,62 @@ export interface ThemeSaveOutcome {
   refetchWarning: string | null
 }
 
+/*
+ * 文字色（`*Text` / `*MutedText`）逐字取自 Komari `utils/glassTheme.ts` 的
+ * emerald / soft / contrast / midnight：它们只在节点卡内部生效（见 `applyRuntime`），
+ * 上游节点卡的正文、标签、提示行实测就是这几个值。此前这里是自拟的
+ * `#101722` / `#536274` 等，节点卡文字因此比上游浅且偏蓝。
+ *
+ * 表面色（card / control / border）仍是本主题的值：它们驱动顶栏、提示框、面板等
+ * 上游没有一一对应的界面，整表替换会波及这些界面，单列为已知差异。
+ */
 const PRESET_COLORS: Record<Exclude<GlassColorPreset, '自定义'>, GlassCustomColors> = {
   翡翠: {
     lightCard: '#f6f9fcb8',
     lightControl: '#eaf1f89e',
-    lightText: '#101722',
-    lightMutedText: '#536274',
+    lightText: '#10151c',
+    lightMutedText: '#374151',
     lightBorder: '#ffffffbd',
     darkCard: '#0b111bc2',
     darkControl: '#121b29a3',
-    darkText: '#f2f6fb',
-    darkMutedText: '#b6c2d0',
+    darkText: '#f8fafc',
+    darkMutedText: '#d6dae4',
     darkBorder: '#ffffff21',
   },
   柔和: {
     lightCard: '#f8f5f2c7',
     lightControl: '#eee8e3ad',
-    lightText: '#24201f',
-    lightMutedText: '#6d625e',
+    lightText: '#14151a',
+    lightMutedText: '#4b5563',
     lightBorder: '#ffffffc9',
     darkCard: '#171416d9',
     darkControl: '#211d21c2',
-    darkText: '#fbf6f1',
-    darkMutedText: '#cabfba',
+    darkText: '#f8fafc',
+    darkMutedText: '#cbd5e1',
     darkBorder: '#ffffff24',
   },
   高对比: {
     lightCard: '#fffffff2',
     lightControl: '#edf1f5f2',
-    lightText: '#05070a',
-    lightMutedText: '#303945',
+    lightText: '#080b12',
+    lightMutedText: '#1f2937',
     lightBorder: '#70809070',
     darkCard: '#05070af2',
     darkControl: '#111722f2',
     darkText: '#ffffff',
-    darkMutedText: '#dce5ef',
+    darkMutedText: '#e5e7eb',
     darkBorder: '#ffffff52',
   },
   午夜: {
     lightCard: '#e9eef8d9',
     lightControl: '#dce5f4cc',
-    lightText: '#11182a',
-    lightMutedText: '#485675',
+    lightText: '#0f172a',
+    lightMutedText: '#334155',
     lightBorder: '#ffffffbd',
     darkCard: '#080b18e6',
     darkControl: '#0f1529d9',
-    darkText: '#f0f3ff',
-    darkMutedText: '#abb7d8',
+    darkText: '#eaf2ff',
+    darkMutedText: '#c7d2fe',
     darkBorder: '#9cb6ff33',
   },
 }
@@ -252,8 +261,16 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     root.style.setProperty('--glass-soft', control)
     root.style.setProperty('--glass-hover', control)
     root.style.setProperty('--glass-border', border)
-    root.style.setProperty('--ink', text)
-    root.style.setProperty('--muted', muted)
+    /*
+     * 上游 `Provider.vue` 把预设的文字色写进 `--glass-*-text` / `--glass-*-muted-text`，
+     * 只在玻璃卡片内部生效；全局 `--foreground` / `--muted-foreground` 不受预设影响。
+     * 这里此前直接覆盖了全局 `--ink` / `--muted`，总览卡与详情页因此都跟着预设变色。
+     * 节点卡内部如何接管见 `styles/main.css` 的 `.node-card`。
+     */
+    root.style.setProperty('--glass-text', text)
+    root.style.setProperty('--glass-muted-text', muted)
+    root.style.removeProperty('--ink')
+    root.style.removeProperty('--muted')
   }
 
   function rebuildFromLayers(reseedDraft = false): void {

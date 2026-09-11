@@ -3,7 +3,6 @@ import {
   buildDetailCards,
   buildGeneralCards,
   daysUntilExpiry,
-  filterChartsBySettings,
   isExpiring,
   isHighLoad,
   isTrafficWarning,
@@ -16,7 +15,8 @@ import {
   resolveGeneralCardKeys,
   resolveQuickControlKeys,
 } from '@/domain/theme-presentation'
-import { buildMetricHistoryCharts, buildProbeHistoryCharts } from '@/domain/server-detail'
+import { probeSeries, visibleLoadCards } from '@/domain/detail-chart-options'
+import { buildChartRows } from '@/domain/server-detail'
 import { normalizeHistory, normalizeServer } from '@/services/cfsm/adapters'
 import { cloneThemeSettings, DEFAULT_THEME_SETTINGS } from '@/theme/settings'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -57,7 +57,18 @@ describe('round 7 theme presentation contracts', () => {
     expect(resolveGeneralCardKeys(settings)).toEqual(['trafficWarnings', 'avgCpu'])
     expect(resolveQuickControlKeys(settings)).toEqual(['offline', 'peak'])
     expect(resolveDetailCardKeys(settings)).toEqual(['cpuUsage', 'connections'])
-    expect(resolveChartFamilies(settings)).toEqual(['pingLoss', 'cpu'])
+    // 连接数现在是真实可画的图表卡（`tcp_conn` / `udp_conn` 历史列），不再被当成不支持的 key 丢掉。
+    expect(resolveChartFamilies(settings)).toEqual(['pingLoss', 'connections', 'cpu'])
+  })
+
+  it('aligns chart presets with Komari CHART_DASHBOARD_PRESETS and accepts its Chinese aliases', () => {
+    const settings = cloneThemeSettings(DEFAULT_THEME_SETTINGS)
+    // 上游默认七张卡 + 本主题独有的磁盘 IO（没有数据时不出现）。
+    expect(resolveChartFamilies(settings)).toEqual(['cpu', 'memory', 'disk', 'network', 'gpu', 'connections', 'process', 'diskIo'])
+    settings.chartDashboardPreset = '自定义'
+    settings.chartDashboardTemplate = '内存\n连接\n磁盘IO\n温度\n内存'
+    // 温度需要 CFSM 历史里没有的列，与重复项一起被丢掉。
+    expect(resolveChartFamilies(settings)).toEqual(['memory', 'connections', 'diskIo'])
   })
 
   it('uses only reliable CFSM limits, expiry dates and normalized metrics for warnings', () => {
@@ -113,13 +124,19 @@ describe('round 7 theme presentation contracts', () => {
       price: '30', billing_cycle: 'quarter', currency: '¥', expire_date: '2026-12-31',
       boot_time: 1_700_000_000,
     }, source)
-    const points = normalizeHistory([{ timestamp: 1, cpu: 10, loss_node_1: 0 }])
+    const rows = buildChartRows(normalizeHistory([{ timestamp: 1, cpu: 10, loss_node_1: 0 }]))
     const cards = buildDetailCards(server, settings, Date.UTC(2026, 8, 8))
-    const charts = filterChartsBySettings(buildMetricHistoryCharts(points), buildProbeHistoryCharts(points), settings)
+    const lossSeries = probeSeries(rows, [{ target: 'node_1', label: 'Node 1' }], 'packetLoss', ['#FF6B6B'], false)
+    const charts = visibleLoadCards(resolveChartFamilies(settings), rows, settings.gpuChartEnabled, {
+      traffic: 0,
+      ping: 0,
+      pingLoss: lossSeries.length,
+    })
 
     expect(cards.find((card) => card.key === 'monthlyCost')).toMatchObject({ value: '¥10.00', unit: '/ 月' })
     expect(cards.some((card) => card.key === 'memoryUsage')).toBe(true)
     expect(cards.some((card) => card.key === 'trafficQuota')).toBe(false)
-    expect(charts.map((chart) => chart.key)).toEqual(['cpu', 'loss'])
+    // GPU 在方案里且开关打开，但历史里没有 GPU 采样，卡片不出现；丢包 0 是有效值，卡片出现。
+    expect(charts).toEqual(['cpu', 'pingLoss'])
   })
 })

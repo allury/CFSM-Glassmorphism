@@ -62,12 +62,24 @@ export interface LatestReportUpdate {
   samples: ReportSample[]
 }
 
+/**
+ * 运营者按约定写进 tags 的厂商信息（见 `services/cfsm/provider-tags.ts`）。
+ * 适配层会把这类标签从 `tags` 里拿出来，不再作为普通标签渲染。
+ */
+export interface ProviderTags {
+  /** 规范成 `AS12345` 形式；没有写就是 null。 */
+  asn: string | null
+  /** 组织 / 厂商名原文；没有写就是 null。 */
+  org: string | null
+}
+
 export interface CfsmServer {
   id: string
   source: ApiSource
   name: string
   group: string
   tags: string[]
+  providerTags: ProviderTags
   price: string | null
   billingCycle: string | null
   autoRenewal: string | null
@@ -179,6 +191,14 @@ export interface HistoryPoint {
   networkOutSpeed: NullableNumber
   networkReceived: NullableNumber
   networkTransmitted: NullableNumber
+  /*
+   * `/api/history/all` 的 `processes` / `tcp_conn` / `udp_conn`。
+   * 长时段聚合时 CFSM 对这三列取桶内最大值（`HISTORY_METRIC_AGGREGATION_POLICY`），
+   * 不是平均值。
+   */
+  processes: NullableNumber
+  tcpConnections: NullableNumber
+  udpConnections: NullableNumber
   load1: NullableNumber
   load5: NullableNumber
   load15: NullableNumber

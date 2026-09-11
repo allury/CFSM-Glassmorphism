@@ -104,8 +104,14 @@
     system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --page: #dfe9f4;
   --page-soft: #eef4f9;
-  --ink: #101722;
-  --muted: #536274;
+  /*
+   * 正文与次要文字对应 Komari 的 `--foreground` / `--muted-foreground`，取上游页面的计算值。
+   * 此前这里是自拟的 `#101722` / `#536274`：浏览器实测上游首页总览卡标签、详情页信息格标签、
+   * 图表卡右侧数值全是 `text-muted-foreground` = `oklch(0.34 0.02 285.938)`（约 rgb 55 55 66），
+   * 本主题同位元素是 rgb 83 98 116，浅了一大截且偏蓝。
+   */
+  --ink: oklch(0.11 0.01 285.823);
+  --muted: oklch(0.34 0.02 285.938);
   --faint: #77879a;
   --glass: rgb(246 249 252 / 72%);
   --glass-strong: rgb(249 251 253 / 88%);
@@ -126,6 +132,18 @@
   --red-soft: rgb(220 76 90 / 12%);
   --violet: #8467d7;
   /*
+   * Komari 的状态色与 `bg-muted`（进度条轨道），取自上游 `styles/main.css` 的 :root，
+   * 节点卡的状态点、网速、进度条、流量百分比都用它们。
+   * `--muted-base` 是基础次要色的副本：节点卡内部会把 `--muted` 换成预设色，
+   * 而上游标签边框 `border-muted-foreground/15` 用的是不受预设影响的基础色。
+   */
+  --success: oklch(0.696 0.17 162.48);
+  --warning: oklch(0.768 0.155 70);
+  --destructive: oklch(0.577 0.245 27.325);
+  --info: oklch(0.6 0.118 230);
+  --progress-track: oklch(0.967 0.001 286.375);
+  --muted-base: oklch(0.34 0.02 285.938);
+  /*
    * Komari `--radius: 0.625rem`（10px），派生 `--radius-sm: calc(--radius - 4px)` = 6px、
    * `--radius-md: calc(--radius - 2px)` = 8px、`--radius-xl: calc(--radius + 4px)` = 14px。
    * 详情页的指标卡与信息卡用 `rounded-md`，节点卡用 `rounded-xl`，总览卡用 `rounded-lg`。
@@ -142,8 +160,9 @@
   --selection: oklch(0.74 0.17 162);
   --page: #070b12;
   --page-soft: #0b111b;
-  --ink: #f2f6fb;
-  --muted: #b6c2d0;
+  /* 上游深色 `--foreground` / `--muted-foreground` 的计算值。 */
+  --ink: oklch(0.985 0 0);
+  --muted: oklch(0.86 0.012 286.067);
   --faint: #8593a5;
   --glass: rgb(11 17 27 / 76%);
   --glass-strong: rgb(13 20 32 / 91%);
@@ -163,6 +182,12 @@
   --red: #ff7b86;
   --red-soft: rgb(255 123 134 / 13%);
   --violet: #b9a4ff;
+  --success: oklch(0.74 0.17 162);
+  --warning: oklch(0.79 0.16 70);
+  --destructive: oklch(0.704 0.191 22.216);
+  --info: oklch(0.68 0.13 230);
+  --progress-track: oklch(0.274 0.006 286.033);
+  --muted-base: oklch(0.86 0.012 286.067);
 }
 
 * {
@@ -562,9 +587,9 @@ a {
 }
 
 .status-dot--online,
+/* 上游状态点是 `size-2.5 rounded-full bg-success`（离线 `bg-destructive`），没有外圈。 */
 .node-status--online {
-  background: var(--emerald);
-  box-shadow: 0 0 0 4px var(--emerald-soft);
+  background: var(--success);
 }
 
 .status-dot--pending {
@@ -1132,6 +1157,18 @@ a {
  * CPU·内存·硬盘·流量四项进度 / 网速·总流量·剩余或负载三列指标盒 /
  * 延迟与丢包双面板 / 自定义标签 / 离线遮罩。
  */
+/*
+ * 上游只在玻璃卡片内部（`.node-card` / `.bg-card` / `[data-slot='card']` / `.bg-background`）
+ * 用配色预设的文字色覆盖 `--foreground` / `--muted-foreground`；总览卡与详情页卡片是
+ * `bg-background/50`，不在这组选择器里，用的是基础色。节点卡对应上游的 `.node-card`，
+ * 在这里接管预设色，其余地方保持基础色。
+ */
+.node-card {
+  --ink: var(--glass-text, oklch(0.11 0.01 285.823));
+  --muted: var(--glass-muted-text, oklch(0.34 0.02 285.938));
+  color: var(--ink);
+}
+
 .node-card {
   position: relative;
   display: flex;
@@ -1192,9 +1229,11 @@ a {
   margin-top: -4px;
 }
 
-.node-card--offline {
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 30%, transparent);
-}
+/*
+ * 上游模板给离线卡写了 `!shadow-destructive/30` 的红圈，但玻璃主题对 `.node-card`
+ * 的 `box-shadow: … !important` 会覆盖它：实测上游离线卡只有普通卡片阴影，没有红圈。
+ * 本主题此前照模板画了红圈，与上游实际页面不符，这里不再单独设置阴影。
+ */
 
 .node-card--mini {
   gap: 0;
@@ -1294,7 +1333,8 @@ a {
   padding: 2px 8px;
   border-radius: 999px;
   color: var(--muted);
-  background: color-mix(in srgb, var(--muted) 10%, transparent);
+  /* 上游 `bg-slate-500/10`。 */
+  background: color-mix(in oklab, oklch(0.554 0.046 257.417) 10%, transparent);
   font-size: 11px;
   line-height: 1.35;
   text-overflow: ellipsis;
@@ -1307,9 +1347,26 @@ a {
   gap: 10px 16px;
 }
 
+/*
+ * 上游 mini 档的指标区是另一套结构：`grid-cols-[3fr_2fr] gap-x-4 gap-y-2`，
+ * 左栏再分 `grid-cols-2 gap-x-3 gap-y-1` 放 CPU / 内存（只有图标，没有文字标签），
+ * 内存用量占满左栏两列；右栏是带「流量」文字的流量。
+ * 此前本主题用 `3fr 3fr 4fr` 三列并保留 CPU / 内存文字，303px 卡片上被截成「C...」「内.」。
+ */
 .node-metrics--mini {
-  grid-template-columns: 3fr 3fr 4fr;
-  gap: 0 12px;
+  grid-template-columns: 3fr 2fr;
+  gap: 8px 16px;
+}
+
+.node-metrics__pair {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
+}
+
+.node-metrics__pair > .node-metric__hint {
+  grid-column: 1 / -1;
 }
 
 .node-metric {
@@ -1350,20 +1407,42 @@ a {
   white-space: nowrap;
 }
 
-.node-metric__label--cpu {
-  color: var(--blue);
+/*
+ * 上游标签是 `text-muted-foreground`，只有图标着色：`text-sky-500` / `text-emerald-500` /
+ * `text-orange-500` / `text-violet-500`（Tailwind v4 500 档，实测计算值）。
+ * 此前本主题把文字也染成了指标色，而且用的是自拟的 --blue / --emerald / --amber / --violet。
+ */
+.node-metric__label--cpu > .app-icon {
+  color: oklch(0.685 0.169 237.323);
 }
 
-.node-metric__label--memory {
-  color: var(--emerald);
+.node-metric__label--memory > .app-icon {
+  color: oklch(0.696 0.17 162.48);
 }
 
-.node-metric__label--disk {
-  color: var(--amber);
+.node-metric__label--disk > .app-icon {
+  color: oklch(0.705 0.213 47.604);
 }
 
-.node-metric__label--traffic {
-  color: var(--violet);
+.node-metric__label--traffic > .app-icon {
+  color: oklch(0.606 0.25 292.717);
+}
+
+/* 上游 `trafficPercentageClass`：无配额 muted，≥95 destructive，≥60 warning，其余 success。 */
+.node-metric__value--success {
+  color: var(--success);
+}
+
+.node-metric__value--warning {
+  color: var(--warning);
+}
+
+.node-metric__value--danger {
+  color: var(--destructive);
+}
+
+.node-metric__value--muted {
+  color: var(--muted);
 }
 
 /*
@@ -1379,13 +1458,18 @@ a {
   font-variant-numeric: tabular-nums;
 }
 
+/* 上游提示行是 `text-[11px] text-muted-foreground`，流量用量 ≥95% 时换成 `text-destructive`。 */
 .node-metric__hint {
   overflow: hidden;
-  color: var(--faint);
+  color: var(--muted);
   font-size: 11px;
   line-height: 15.7143px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.node-metric__hint--danger {
+  color: var(--destructive);
 }
 
 .node-boxes {
@@ -1402,7 +1486,16 @@ a {
   padding: 6px 8px;
   overflow: hidden;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--muted) 6%, transparent);
+  /*
+   * 上游盒子与延迟 / 丢包面板都是 `bg-slate-500/5`，玻璃主题把它覆盖成
+   * 亮色 `rgb(255 255 255 / 15%)`、暗色 `rgb(255 255 255 / 5%)`（与详情页信息格同一条规则）。
+   */
+  background: rgb(255 255 255 / 15%);
+}
+
+:root[data-theme='dark'] .node-box,
+:root[data-theme='dark'] .node-probe {
+  background: rgb(255 255 255 / 5%);
 }
 
 /*
@@ -1439,11 +1532,11 @@ a {
 }
 
 .node-box__row--warning {
-  color: var(--amber);
+  color: var(--warning);
 }
 
 .node-box__row--danger {
-  color: var(--red);
+  color: var(--destructive);
 }
 
 .node-card--mini .node-box {
@@ -1464,12 +1557,13 @@ a {
   gap: 2px;
 }
 
+/* 上游上行是 `text-success`，下行是 `text-blue-600`（深浅模式同一个值）。 */
 .node-box__row--up {
-  color: var(--emerald);
+  color: var(--success);
 }
 
 .node-box__row--down {
-  color: var(--blue);
+  color: oklch(0.546 0.245 262.881);
 }
 
 .node-probes {
@@ -1487,11 +1581,13 @@ a {
   gap: 6px;
   padding: 8px;
   border-radius: 8px;
-  background: color-mix(in srgb, var(--muted) 6%, transparent);
+  background: rgb(255 255 255 / 15%);
 }
 
+/* 上游离线时两块面板是 `blur-xs opacity-50`（实测 blur(4px) / 0.5）。 */
 .node-card--offline .node-probe {
   opacity: 0.5;
+  filter: blur(4px);
 }
 
 .node-card--mini .node-probe {
@@ -1598,7 +1694,8 @@ a {
   align-items: center;
   padding: 0 8px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--muted) 15%, transparent);
+  /* 上游 `border-muted-foreground/15`：边框取基础次要色，不随配色预设变。 */
+  border: 1px solid color-mix(in oklab, var(--muted-base) 15%, transparent);
   border-radius: 999px;
   color: var(--muted);
   font-size: 11px;
@@ -1611,28 +1708,44 @@ a {
   min-height: 20px;
 }
 
+/*
+ * 上游离线遮罩是内容列上的 `absolute inset-0 rounded-xl bg-white/20 dark:bg-black/20
+ * backdrop-blur-[2px]`：只盖内容区，不盖头部，也不越过卡片内边距（实测与内容列同框）。
+ * 此前的 `inset: -14px` 是 Test 1 改盒模型之前按 14px 卡片内边距写的，
+ * 现在会向左右与底部多伸 13px，并压住头部底部 14px。
+ */
 .node-card__offline {
   display: flex;
   position: absolute;
-  inset: -14px;
+  inset: 0 16px 16px;
   z-index: 10;
   align-items: center;
   justify-content: center;
   flex-direction: column;
-  gap: 4px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--page) 20%, transparent);
+  border-radius: 14px;
+  background: rgb(255 255 255 / 20%);
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
 
+:root[data-theme='dark'] .node-card__offline {
+  background: rgb(0 0 0 / 20%);
+}
+
+.node-card--mini .node-card__offline {
+  bottom: 8px;
+}
+
+/* `text-sm font-semibold text-destructive` 与 `text-[11px] text-muted-foreground mt-1`。 */
 .node-card__offline strong {
-  color: var(--red);
+  color: var(--destructive);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .node-card__offline span {
+  margin-top: 4px;
   color: var(--muted);
   font-size: 11px;
 }
@@ -1652,8 +1765,7 @@ a {
 }
 
 .node-status--offline {
-  background: var(--red);
-  box-shadow: 0 0 0 4px var(--red-soft);
+  background: var(--destructive);
 }
 
 .node-status-pulse {
@@ -1665,11 +1777,11 @@ a {
 }
 
 .node-status-pulse--online {
-  background: var(--emerald);
+  background: var(--success);
 }
 
 .node-status-pulse--offline {
-  background: var(--red);
+  background: var(--destructive);
 }
 
 .favorite-button {
@@ -1716,32 +1828,41 @@ a {
   height: 4px;
   overflow: hidden;
   border-radius: 99px;
-  background: var(--line);
+  /* 上游轨道是 `bg-muted`（实测 oklch(0.967 0.001 286.375)）。 */
+  background: var(--progress-track);
 }
 
+/*
+ * 上游填充是纯色：`bg-success` / `bg-warning` / `bg-destructive` / `bg-info`。
+ * 此前这里是自拟的渐变（翡翠→蓝、琥珀、红），与上游页面实测不同。
+ */
 .resource-meter__fill {
   display: block;
   width: 0;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--emerald), color-mix(in srgb, var(--emerald) 60%, var(--blue)));
-  transition: width 350ms cubic-bezier(0.22, 1, 0.36, 1);
+  background: var(--success);
+  transition: width 300ms ease-out;
 }
 
-.resource-meter__fill--normal {
-  background: linear-gradient(90deg, var(--emerald), color-mix(in srgb, var(--emerald) 60%, var(--blue)));
+.resource-meter__fill--success {
+  background: var(--success);
+}
+
+.resource-meter__fill--warning {
+  background: var(--warning);
+}
+
+.resource-meter__fill--error {
+  background: var(--destructive);
+}
+
+.resource-meter__fill--info {
+  background: var(--info);
 }
 
 .resource-meter__fill--neutral {
   background: var(--line-strong);
-}
-
-.resource-meter__fill--warning {
-  background: linear-gradient(90deg, var(--amber), #f0c35e);
-}
-
-.resource-meter__fill--danger {
-  background: linear-gradient(90deg, var(--red), #ff8b72);
 }
 
 .server-grid--dense .node-card {
@@ -2201,10 +2322,6 @@ a {
   }
 
 
-  .node-card--mini .node-metrics {
-    grid-template-columns: 1fr;
-  }
-
   .node-card--mini .node-card__name {
     font-size: 12px;
   }
@@ -2337,8 +2454,7 @@ a {
   margin: 10vh auto 0;
 }
 
-.detail-state small,
-.history-state small {
+.detail-state small {
   color: var(--faint);
 }
 
@@ -2459,7 +2575,8 @@ a {
 
 .detail-overview,
 .detail-information-grid,
-.detail-section {
+.load-chart,
+.ping-chart {
   margin-top: 16px;
 }
 
@@ -2469,26 +2586,6 @@ a {
   font-weight: 750;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.detail-section__header {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 13px;
-}
-
-/*
- * 上游分区标题是 `truncate text-sm font-semibold sm:text-base`：16px / 600 / 无负字距。
- * 这里此前靠 `h2` 的浏览器默认粗体（700）加 `-0.025em`，在只有 Regular/Bold 的
- * 字族上看不出来，但在带 Semibold 实体字面的系统上会比上游粗一档。
- */
-.detail-section__header h2,
-.history-chart h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
 }
 
 /* CardX 头部标题是 `font-medium`，16px，不加负字距。 */
@@ -2510,20 +2607,97 @@ a {
   display: none;
 }
 
-.detail-tabs-bar .app-tabs__list {
+/*
+ * 分区 Tab 与两条图表时间范围 Tab 同一套上游类名：
+ * 列表 `h-8 p-[3px] bg-background/50 backdrop-blur-xl rounded-md`，
+ * 触发器 `h-6.5 px-2 text-xs font-medium rounded-sm`，未选中是前景色 60%，
+ * 选中项 `bg-background`。浏览器实测（Komari 1440×900）：列表 32px / 内边距 3px /
+ * 圆角 8px / 模糊 24px，触发器 26px / 左右 8px / 12px 500 / 圆角 6px。
+ */
+.detail-tabs-bar .app-tabs__list,
+.detail-range-tabs .app-tabs__list {
   width: max-content;
   height: 32px;
-  padding: 2px;
+  gap: 0;
+  padding: 3px;
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--background) 50%, transparent);
-  backdrop-filter: blur(18px);
+  backdrop-filter: blur(24px);
 }
 
-.detail-section__header > span,
-.detail-section__header p {
-  margin: 0;
-  color: var(--faint);
-  font-size: 11px;
+.detail-tabs-bar .app-tabs__trigger,
+.detail-range-tabs .app-tabs__trigger {
+  height: 26px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+:root[data-theme='dark'] .detail-tabs-bar .app-tabs__trigger,
+:root[data-theme='dark'] .detail-range-tabs .app-tabs__trigger {
+  color: var(--muted);
+}
+
+.detail-tabs-bar .app-tabs__trigger:hover,
+.detail-range-tabs .app-tabs__trigger:hover {
+  color: var(--ink);
+}
+
+.detail-tabs-bar .app-tabs__trigger[data-state='active'],
+.detail-range-tabs .app-tabs__trigger[data-state='active'] {
+  background: var(--background);
+}
+
+/* 分区 Tab 选中是 `text-selection`，时间范围选中是 `text-green-600`。 */
+.detail-tabs-bar .app-tabs__trigger[data-state='active'] {
+  color: var(--selection);
+}
+
+.detail-range-tabs .app-tabs__trigger[data-state='active'] {
+  color: oklch(0.627 0.194 149.214);
+}
+
+.detail-range-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.detail-range-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+/* 上游厂商标识：`rounded-full bg-background/50 px-3 py-1 text-xs text-muted-foreground`，图标 14px。 */
+.detail-provider {
+  max-width: 100%;
+}
+
+.detail-provider__chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  color: var(--muted);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  font-size: 12px;
+  line-height: 1.375;
+}
+
+.detail-provider__chip > .app-icon {
+  flex: none;
+}
+
+.detail-provider__chip > span {
+  overflow-wrap: anywhere;
 }
 
 .detail-resource-grid {
@@ -2548,10 +2722,9 @@ a {
  */
 .detail-metric-card,
 .detail-info-card,
-.probe-detail-card,
-.gpu-detail-card,
-.detail-stat-grid > article,
-.history-state {
+.metric-chart-card,
+.ping-task,
+.ping-chart__canvas {
   border: none;
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--background) 50%, transparent);
@@ -2563,9 +2736,7 @@ a {
 
 .detail-metric-card:hover,
 .detail-info-card:hover,
-.probe-detail-card:hover,
-.gpu-detail-card:hover,
-.detail-stat-grid > article:hover {
+.metric-chart-card:hover {
   background: var(--background);
 }
 
@@ -2576,13 +2747,6 @@ a {
   justify-content: space-between;
   gap: 12px;
   padding: 12px;
-}
-
-.detail-stat-grid span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 750;
-  text-transform: uppercase;
 }
 
 .detail-metric-card__head {
@@ -2671,34 +2835,6 @@ a {
   }
 }
 
-.detail-meter {
-  overflow: hidden;
-  height: 5px;
-  border-radius: 999px;
-  background: var(--line);
-}
-
-.detail-meter i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--blue);
-  transition: width 240ms ease;
-}
-
-.detail-metric-card--cpu .detail-meter i,
-.detail-metric-card--emerald .detail-meter i {
-  background: var(--emerald);
-}
-
-.detail-metric-card--violet .detail-meter i {
-  background: var(--violet);
-}
-
-.detail-metric-card--amber .detail-meter i {
-  background: var(--amber);
-}
-
 .detail-information-grid {
   display: grid;
   grid-template-columns: 1fr;
@@ -2755,7 +2891,12 @@ a {
   grid-template-columns: minmax(0, 1fr);
 }
 
+/*
+ * 上游存储卡的内容区没有 `flex-1`，三格保持自然高度（实测 60px），多出的行高留在卡片底部；
+ * 此前这里跟着系统卡一起 `flex: 1`，三格被拉伸到 62px。
+ */
 .detail-storage-grid {
+  flex: none;
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
@@ -2829,6 +2970,11 @@ a {
   color: var(--muted);
   background: color-mix(in srgb, var(--muted) 8%, transparent);
   font-size: 11px;
+  /*
+   * 上游 `text-[11px]` 只设字号，行高继承正文的 1.5，即 16.5px，
+   * 链接高 4 + 16.5 + 4 = 24.5px（实测）。此前继承到 20px，整行高出 3.5px。
+   */
+  line-height: 16.5px;
   text-decoration: none;
   transition: background-color 160ms ease, color 160ms ease;
 }
@@ -2849,10 +2995,12 @@ a {
   margin-top: 4px;
 }
 
+/* `text-xs font-bold`：12px / 16px。 */
 .detail-cpu-tier__letter {
   flex: none;
   font-size: 12px;
   font-weight: 700;
+  line-height: 16px;
 }
 
 .detail-cpu-tier__bar {
@@ -2870,10 +3018,12 @@ a {
   transition: width 700ms ease;
 }
 
+/* 与链接同理：`text-[11px]` 继承 1.5 行高，分级行因此高 16.5px（实测），此前只有 15px。 */
 .detail-cpu-tier__label {
   flex: none;
   color: var(--muted);
   font-size: 11px;
+  line-height: 16.5px;
 }
 
 .detail-cpu-tier__letter.is-tier-S { color: #eab308; }
@@ -3069,221 +3219,422 @@ a {
   text-align: right;
 }
 
-.probe-detail-grid,
-.gpu-detail-grid,
-.detail-stat-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.probe-detail-card,
-.gpu-detail-card,
-.detail-stat-grid article {
-  padding: 12px;
-  border-radius: var(--radius-md);
-}
-
-.probe-detail-card > span,
-.gpu-detail-card > span {
-  display: block;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 750;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.probe-detail-card strong,
-.gpu-detail-card strong,
-.detail-stat-grid strong {
-  display: block;
-  margin-top: 8px;
-  font-size: 18px;
-}
-
-.probe-detail-card small,
-.probe-detail-card em {
-  display: block;
-  margin-top: 5px;
-  color: var(--faint);
-  font-size: 10px;
-  font-style: normal;
-}
-
-.gpu-detail-card .detail-meter {
-  margin-top: 12px;
-}
-
-.gpu-detail-card .detail-meter i {
-  background: var(--violet);
-}
-
-.detail-stat-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-}
-
-.detail-stat-grid article {
-  min-width: 0;
-}
-
-.detail-stat-grid strong {
-  overflow: hidden;
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.detail-history__header {
-  align-items: center;
-}
-
-/* 上游范围选择器是 `h-8 bg-background/50 rounded-md` 的一组 `h-6.5 rounded-sm` 触发器。 */
-.history-range {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  align-items: center;
-  gap: 2px;
-  padding: 2px;
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--background) 50%, transparent);
-}
-
-.history-range button {
-  height: 26px;
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--radius-sm);
-  color: var(--muted);
-  background: transparent;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.history-range button.is-active {
-  color: var(--selection);
-}
-
-.history-range button:disabled {
-  cursor: wait;
-  opacity: 0.55;
-}
-
-.history-loading,
-.history-chart-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.history-loading .skeleton {
-  height: 340px;
-  border-radius: var(--radius);
-}
-
 /*
- * 历史图表卡片与上游 LoadChart / PingChart 的 CardX 同源：
- * `bg-background/50 border-none hover:bg-background rounded-md`，内容 padding 12px。
+ * 详情页下半部，移植自 Komari `LoadChart.vue` / `PingChart.vue`（浏览器实测 1440×900）：
+ * 时间范围条在上、内容在下，间距 16px；图表栅格 1 / 2 / 3 列（768 / 1280 断点），间距 16px。
  */
-.history-chart {
-  min-width: 0;
-  padding: 12px;
-  border: none;
-  border-radius: var(--radius-md);
-  background: color-mix(in oklab, var(--background) 50%, transparent);
-  box-shadow: none;
-  transition: background-color 170ms ease;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-}
-
-.history-chart:hover {
-  background: var(--background);
-}
-
-.history-chart__header {
+.load-chart,
+.ping-chart {
   display: flex;
-  align-items: start;
+  min-width: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.metric-chart-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+/* CardX size="small"：头部 `px-3 py-2`（48px 高），内容 `p-3 pt-0`，图表区 `h-48`。 */
+.metric-chart-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.metric-chart-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.metric-chart-card__body {
+  padding: 0 12px 12px;
+}
+
+.metric-chart-card__chart {
+  height: 192px;
+}
+
+.metric-chart-header {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.history-chart__header p {
-  margin: 4px 0 0;
-  color: var(--faint);
-  font-size: 10px;
-}
-
-.history-chart__header > span {
-  flex: none;
-  color: var(--faint);
-  font-size: 10px;
-}
-
-/* ECharts 需要容器有确定高度；与 Komari 的 h-48 图表区一致。 */
-.history-chart__canvas {
-  width: 100%;
-  height: 192px;
-  margin-top: 10px;
-}
-
-.history-chart__legend {
+.metric-chart-header__lead {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 8px;
-}
-
-.history-chart__legend > span {
-  display: inline-flex;
+  min-width: 0;
   align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 10px;
+  gap: 10px;
 }
 
-.history-chart__legend i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-}
-
-.history-chart__legend strong {
-  color: var(--ink);
-  font-size: 10px;
-}
-
-.history-chart__legend small {
-  color: var(--faint);
-  font-size: 8px;
-}
-
-.history-state {
+/*
+ * 色调图标框：`size-8 rounded-md ring-1 ring-inset` + `bg-{tone}-500/10 text-{tone}-500
+ * ring-{tone}-500/20`。色值是 Tailwind v4 的 500 档，与上游页面实测的计算值逐一相同。
+ */
+.metric-chart-header__icon {
+  --tone: oklch(0.554 0.046 257.417);
   display: flex;
-  min-height: 180px;
+  width: 32px;
+  height: 32px;
+  flex: none;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  padding: 28px;
   border-radius: var(--radius-md);
+  color: var(--tone);
+  background: color-mix(in oklab, var(--tone) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--tone) 20%, transparent);
+}
+
+.metric-chart-header__icon.is-rose { --tone: oklch(0.645 0.246 16.439); }
+.metric-chart-header__icon.is-amber { --tone: oklch(0.769 0.188 70.08); }
+.metric-chart-header__icon.is-emerald { --tone: oklch(0.696 0.17 162.48); }
+.metric-chart-header__icon.is-cyan { --tone: oklch(0.715 0.143 215.221); }
+.metric-chart-header__icon.is-sky { --tone: oklch(0.685 0.169 237.323); }
+.metric-chart-header__icon.is-violet { --tone: oklch(0.606 0.25 292.717); }
+.metric-chart-header__icon.is-orange { --tone: oklch(0.705 0.213 47.604); }
+.metric-chart-header__icon.is-slate { --tone: oklch(0.554 0.046 257.417); }
+
+.metric-chart-header__text {
+  min-width: 0;
+}
+
+/* `truncate text-sm font-semibold sm:text-base`：14px / 600，≥640px 为 16px / 24px，无负字距。 */
+.metric-chart-header__title {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric-chart-header__subtitle {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 右侧最新值：`min-w-0 shrink-0 text-right text-xs text-muted-foreground`。 */
+.metric-chart-header__value {
+  min-width: 0;
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+  text-align: right;
+}
+
+.metric-chart-value {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.metric-chart-value--tight {
+  gap: 2px;
+}
+
+.metric-chart-value--wide {
+  gap: 8px;
+}
+
+.metric-chart-value__rate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+@media (min-width: 640px) {
+  .metric-chart-header__title {
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+
+@media (min-width: 768px) {
+  .metric-chart-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .metric-chart-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* 上游 Spinner：内容留在原处，上面盖一层半透明遮罩与 24px / 2px 的旋转圆环。 */
+.chart-spinner {
+  position: relative;
+}
+
+.chart-spinner.is-loading {
+  min-height: 160px;
+}
+
+.chart-spinner__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  background: color-mix(in oklab, var(--background) 60%, transparent);
+  backdrop-filter: blur(4px);
+}
+
+.chart-spinner__ring {
+  width: 24px;
+  height: 24px;
+  border: 2px solid color-mix(in srgb, currentColor 18%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: chart-spin 1s linear infinite;
+}
+
+@keyframes chart-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 上游错误态是居中的 `text-red-500 py-8`；CFSM 的错误类型更多，附上原因与重试。 */
+.detail-chart-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 32px 16px;
   text-align: center;
 }
 
-.history-state p {
+.detail-chart-error strong {
+  color: var(--red);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detail-chart-error p,
+.detail-chart-error small {
   max-width: 560px;
-  margin: 7px 0 14px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.detail-chart-error button,
+.ping-chart__button {
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  background: color-mix(in oklab, var(--background) 50%, transparent);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.detail-chart-error button {
+  margin-top: 6px;
+}
+
+.detail-chart-error button:hover,
+.ping-chart__button:hover {
+  background: var(--background);
+}
+
+/* 工具行：范围条可横向滚动，右侧全选 / 全不选（`h-7 rounded-sm bg-background/50`）。 */
+.ping-chart__toolbar {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.ping-chart__range {
+  min-width: 0;
+  flex: 1;
+}
+
+.ping-chart__actions,
+.ping-chart__smooth {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 选中态：`shadow-[0_0_0_2px] shadow-green-600/10 text-green-600`。 */
+.ping-chart__button.is-active {
+  color: oklch(0.627 0.194 149.214);
+  box-shadow: 0 0 0 2px color-mix(in oklab, oklch(0.627 0.194 149.214) 10%, transparent);
+}
+
+/* 上游 Spinner 的内容区不是 flex：任务卡、平滑峰值行（`py-2`）与大图首尾相接。 */
+.ping-task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+/* 任务卡：`p-2 rounded-md bg-background/50 hover:bg-background hover:shadow-[0_0_0_2px] hover:shadow-primary/10`。 */
+.ping-task {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 150ms ease, box-shadow 150ms ease, opacity 150ms ease;
+}
+
+.ping-task:hover {
+  background: var(--background);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--ink) 10%, transparent);
+}
+
+.ping-task:focus-visible {
+  outline: 2px solid var(--selection);
+  outline-offset: 2px;
+}
+
+.ping-task.is-off {
+  opacity: 0.3;
+}
+
+.ping-task__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.ping-task__head {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.ping-task__bar {
+  width: 4px;
+  height: 16px;
+  flex: none;
+  border-radius: 4px;
+}
+
+.ping-task__name {
+  overflow: hidden;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 信息按钮：`variant="ghost" size="icon-xs" text-slate-500`，24×24。 */
+.ping-task__info {
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: oklch(0.554 0.046 257.417);
+  background: transparent;
+  cursor: pointer;
+}
+
+.ping-task__info:hover {
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.ping-chart__smooth .ping-task__info {
+  margin-left: 0;
+  cursor: help;
+}
+
+.ping-task__stats {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.ping-task__avg {
+  font-weight: 500;
+}
+
+.ping-task__stats .is-dim {
+  opacity: 0.6;
+}
+
+/* 统计气泡：`text-xs gap-x-4 gap-y-1.5 grid grid-cols-4`，数值 `font-medium`。 */
+.ping-task-stats {
+  max-width: min(360px, calc(100vw - 24px));
+  padding: 12px;
+  white-space: normal;
+}
+
+.ping-task-stats__grid {
+  display: grid;
+  grid-template-columns: repeat(4, auto);
+  gap: 6px 16px;
+  font-size: 12px;
+}
+
+.ping-task-stats__grid > span {
   color: var(--muted);
 }
 
-.history-state button {
-  padding: 8px 12px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  background: var(--glass-soft);
-  cursor: pointer;
+.ping-task-stats__grid > strong {
+  font-weight: 500;
+}
+
+.ping-task-stats__note {
+  margin: 8px 0 0;
+  color: var(--faint);
+  font-size: 11px;
+}
+
+.ping-chart__options {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+/* 延迟大图：`h-80 bg-background/50 p-4 rounded-md`，没有 hover 态。 */
+.ping-chart__canvas {
+  height: 320px;
+  padding: 16px;
 }
 
 @media (min-width: 768px) {
@@ -3304,22 +3655,6 @@ a {
   }
 }
 
-@media (max-width: 1040px) {
-  .probe-detail-grid,
-  .gpu-detail-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .detail-stat-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .history-chart-grid,
-  .history-loading {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 720px) {
   .detail-page {
     width: min(100%, 1280px);
@@ -3332,33 +3667,9 @@ a {
   .detail-resource-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .detail-section__header,
-  .detail-history__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .history-range {
-    justify-content: flex-start;
-  }
 }
 
 @media (max-width: 430px) {
-  .probe-detail-grid,
-  .gpu-detail-grid,
-  .detail-stat-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .detail-stat-grid strong {
-    white-space: normal;
-  }
-
-  .history-chart {
-    padding: 12px;
-  }
-
   .detail-metric-card {
     padding: 13px;
   }

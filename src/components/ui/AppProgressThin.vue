@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { ProgressStatus } from '@/utils/progress-status'
 
 /**
- * 对齐 Komari `components/ui/progress-thin`：细进度条，按状态着色。
- * 百分比为 null 时表示无采样，渲染为中性轨道而不是 0%。
+ * 对齐 Komari `components/ui/progress-thin`：`bg-muted` 轨道 + 按状态着色的纯色填充
+ * （`bg-success` / `bg-warning` / `bg-destructive` / `bg-info`），
+ * 宽度动画是 `transition-[width] duration-300 ease-out`。
+ * 百分比为 null 时表示无采样，只画中性轨道而不是 0%。
  */
 const props = withDefaults(defineProps<{
   percentage: number | null
-  status?: 'normal' | 'warning' | 'danger' | 'neutral'
+  status?: ProgressStatus
   height?: number
 }>(), {
-  status: 'normal',
+  status: 'success',
   height: 4,
 })
 

@@ -1,5 +1,4 @@
 import type { IconName } from '@/constants/icons'
-import type { DetailChartModel } from '@/domain/server-detail'
 import { parseSettingKeys, type ThemeSettings } from '@/theme/settings'
 import type { CfsmServer } from '@/types/cfsm'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -48,7 +47,13 @@ export type DetailCardKey =
   | 'cpuUsage' | 'gpuUsage' | 'memoryUsage' | 'swapUsage' | 'diskUsage'
   | 'load' | 'processes' | 'connections' | 'uptime'
   | 'uploadSpeed' | 'downloadSpeed' | 'totalTraffic' | 'trafficQuota'
-export type ChartFamily = 'cpu' | 'memory' | 'disk' | 'network' | 'traffic' | 'gpu' | 'ping' | 'pingLoss'
+/*
+ * 图表卡片 key 对应 Komari `ChartDashboardCardKey`。上游的 `gpuMemory` / `temperature`
+ * 需要 CFSM 历史里没有的显存与温度列，不收；`diskIo` 是本主题独有的磁盘 IO 卡。
+ */
+export type ChartFamily =
+  | 'cpu' | 'memory' | 'disk' | 'network' | 'traffic' | 'gpu'
+  | 'connections' | 'process' | 'diskIo' | 'ping' | 'pingLoss'
 
 /** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
 const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
@@ -125,16 +130,39 @@ const DETAIL_PRESETS: Record<ThemeSettings['detailMetricCardPreset'], readonly D
   自定义: [],
 }
 
+/*
+ * 逐项对应 Komari `CHART_DASHBOARD_PRESETS`（all / compact / resource / network /
+ * gpu / latency / ops / full / custom），保持同一顺序：
+ * - 删去 CFSM 历史里不存在的 `gpuMemory` 与 `temperature`；
+ * - 本主题独有的 `diskIo` 追加在「默认」「资源」「运维」「完整」的末尾，
+ *   节点没有磁盘 IO 数据时这张卡本来就不出现。
+ * 此前这张表是按本主题旧图表拆分自拟的，「默认」里没有连接数与进程，与上游不一致。
+ */
 const CHART_PRESETS: Record<ThemeSettings['chartDashboardPreset'], readonly ChartFamily[]> = {
-  默认: ['cpu', 'memory', 'disk', 'network', 'traffic', 'ping', 'pingLoss'],
-  精简: ['cpu', 'memory', 'network', 'ping'],
-  资源: ['cpu', 'memory', 'disk'],
-  网络: ['network', 'traffic'],
+  默认: ['cpu', 'memory', 'disk', 'network', 'gpu', 'connections', 'process', 'diskIo'],
+  精简: ['cpu', 'memory', 'network'],
+  资源: ['cpu', 'memory', 'disk', 'process', 'diskIo'],
+  网络: ['network', 'traffic', 'connections'],
   GPU: ['gpu', 'cpu', 'memory'],
-  延迟: ['ping', 'pingLoss'],
-  运维: ['cpu', 'memory', 'disk', 'network', 'ping', 'pingLoss'],
-  完整: ['cpu', 'memory', 'disk', 'network', 'traffic', 'gpu', 'ping', 'pingLoss'],
+  延迟: ['ping', 'pingLoss', 'network'],
+  运维: ['cpu', 'memory', 'disk', 'network', 'connections', 'process', 'ping', 'pingLoss', 'diskIo'],
+  完整: ['cpu', 'memory', 'disk', 'network', 'traffic', 'gpu', 'connections', 'process', 'ping', 'pingLoss', 'diskIo'],
   自定义: [],
+}
+
+/** 上游 `CHART_DASHBOARD_LABEL_ALIASES`：自定义模板里也可以写中文名。 */
+const CHART_LABEL_ALIASES: Readonly<Record<string, ChartFamily>> = {
+  CPU: 'cpu',
+  内存: 'memory',
+  硬盘: 'disk',
+  网络: 'network',
+  流量: 'traffic',
+  GPU: 'gpu',
+  连接: 'connections',
+  进程: 'process',
+  延迟: 'ping',
+  丢包: 'pingLoss',
+  磁盘IO: 'diskIo',
 }
 
 function selectedKeys<T extends string>(preset: readonly T[], custom: string, allowed: ReadonlySet<string>): T[] {
@@ -160,7 +188,10 @@ export function resolveDetailCardKeys(settings: ThemeSettings): DetailCardKey[] 
 }
 
 export function resolveChartFamilies(settings: ThemeSettings): ChartFamily[] {
-  return selectedKeys(CHART_PRESETS[settings.chartDashboardPreset], settings.chartDashboardTemplate, CHART_KEYS)
+  const template = parseSettingKeys(settings.chartDashboardTemplate)
+    .map((key) => CHART_LABEL_ALIASES[key] ?? key)
+    .join('\n')
+  return [...new Set(selectedKeys(CHART_PRESETS[settings.chartDashboardPreset], template, CHART_KEYS))]
 }
 
 export function isHighLoad(server: GlassServer, threshold: number): boolean {
@@ -544,13 +575,4 @@ export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, no
     trafficQuota: !server.trafficLimit ? null : card('trafficQuota', 'tabler:gauge', '流量配额', hasQuota ? (quotaPercent ?? 0).toFixed(1) : '∞', hasQuota ? '%' : '', hasQuota ? `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}` : '无限流量'),
   }
   return resolveDetailCardKeys(settings).flatMap((key) => model[key] ? [model[key] as PresentationCard] : [])
-}
-
-export function filterChartsBySettings(metric: DetailChartModel[], probes: DetailChartModel[], settings: ThemeSettings): DetailChartModel[] {
-  const families = new Set(resolveChartFamilies(settings))
-  const metricFamily: Record<string, ChartFamily> = { cpu: 'cpu', load: 'cpu', memory: 'memory', disk: 'disk', 'disk-io': 'disk', 'network-speed': 'network', traffic: 'traffic', gpu: 'gpu' }
-  return [
-    ...metric.filter((chart) => families.has(metricFamily[chart.key] ?? 'cpu') && (chart.key !== 'gpu' || settings.gpuChartEnabled)),
-    ...probes.filter((chart) => chart.key === 'ping' ? families.has('ping') : families.has('pingLoss')),
-  ]
 }

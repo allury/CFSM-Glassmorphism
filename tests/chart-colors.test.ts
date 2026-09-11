@@ -1,40 +1,76 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { buildMetricHistoryCharts, buildProbeHistoryCharts } from '@/domain/server-detail'
-import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette, getChartThemeColors, getLoadChartPalette } from '@/utils/chart-palette'
+import {
+  connectionsChartOption,
+  cpuChartOption,
+  diskChartOption,
+  diskIoChartOption,
+  gpuChartOption,
+  memoryChartOption,
+  metricSeriesChartOption,
+  networkChartOption,
+  pingChartOption,
+  probeSeries,
+  processChartOption,
+  trafficSeries,
+  type LoadChartContext,
+  type PingTaskLine,
+} from '@/domain/detail-chart-options'
+import { buildChartRows } from '@/domain/server-detail'
+import {
+  ACCESSIBLE_LINE_TYPES,
+  getChartSeriesPalette,
+  getChartThemeColors,
+  getLoadChartPalette,
+  getPingChartThemeColors,
+} from '@/utils/chart-palette'
 import type { HistoryPoint } from '@/types/cfsm'
 
-const historyChart = readFileSync(new URL('../src/components/detail/HistoryChart.vue', import.meta.url), 'utf8')
+const optionsSource = readFileSync(new URL('../src/domain/detail-chart-options.ts', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/\/\/.*$/gm, '')
 
 /*
- * 第 15 轮的图表颜色回归。
+ * 详情图表的颜色与数据语义回归。
  *
- * 根因：ECharts 走 `CanvasRenderer`，序列与坐标轴颜色最终落到 canvas 2D 的
- * `strokeStyle` / `fillStyle`，而 canvas **不解析 CSS 变量**——赋一个
- * `var(--emerald)` 会被直接丢弃。本主题此前把 `var(--emerald)` 这类值同时用于
- * 图表 option 与 HTML（tooltip 气泡、底部摘要色点），于是 HTML 一侧正常、
- * canvas 一侧全部画成纯黑。
+ * 第 15 轮的根因仍然成立：ECharts 走 `CanvasRenderer`，颜色落到 canvas 2D 的
+ * `strokeStyle` / `fillStyle`，canvas **不解析 CSS 变量**，`var(--x)` 会被直接丢弃，
+ * 折线被画成纯黑。所以这里断言的是「进入图表的颜色一定是具体值」。
  *
- * 浏览器像素实测（1440×900、浅色、本地生产构建）：
- * - 修复前，9 张图的绘图区取样只有 `0,0,0`；图例条带出现不透明白色文字。
- * - 修复后，绘图区取样为 `#FF6B6B` / `#4ECDC4` / `#A78BFA` / `#60A5FA` / `#FFB347`，
- *   与底部 HTML 摘要色点逐一相等；坐标轴与图例文字为 `rgba(0,0,0,0.55)`，
- *   深色模式下为 `rgba(255,255,255,0.55)`。
- * - 同一批取样在上游 Komari 详情页得到同一组色值，说明配色来源一致。
- *
- * 因此这里断言的是「进入图表的颜色一定是可被 canvas 解析的具体值」，
- * 而不是「源码里出现过某个颜色字符串」。
+ * 第二阶段详情页 1:1 重建后，图表按上游拆成三类 option：
+ * - `LoadChart.vue` 内联卡（CPU 与负载、内存与 Swap、磁盘、实时网络、GPU、网络连接、进程）
+ *   用 `getLoadChartPalette()` 的角色色，1.5 + 圆线帽，总量线 1.2 虚线；
+ * - `MetricSeriesChartCard`（累计流量、Ping 延迟、Ping 丢包）1.6、无线帽；
+ * - `PingChart.vue` 延迟大图，序列板取色，色觉友好模式下轮换线型。
+ * 以下逐序列的取值直接读自 Komari `bf83765`。
  */
 
 const CSS_VAR = /var\(\s*--/
+const HEX = /^#[0-9A-Fa-f]{6}$/
+
+interface LooseSeries {
+  name: string
+  data: unknown[]
+  connectNulls?: boolean
+  yAxisIndex?: number
+  smooth?: number | boolean
+  lineStyle: { color: string, width: number, cap?: string, type?: string }
+  itemStyle: { color: string }
+  areaStyle?: { color: { colorStops: Array<{ offset: number, color: string }> } }
+}
+
+function seriesOf(option: { series: unknown }): LooseSeries[] {
+  return option.series as LooseSeries[]
+}
 
 function point(timestamp: number, index: number): HistoryPoint {
   return {
     timestamp,
     cpu: 10 + index,
-    gpus: [{ id: '0', name: 'NVIDIA T4', utilization: 20 + index }],
+    gpus: [
+      { id: '0', name: 'NVIDIA T4', utilization: 20 + index },
+      { id: '1', name: 'NVIDIA L4', utilization: 30 + index },
+    ],
     memoryUsed: 2048 + index,
     memoryTotal: 8192,
     swapUsed: 256,
@@ -45,6 +81,9 @@ function point(timestamp: number, index: number): HistoryPoint {
     networkOutSpeed: 600_000 + index,
     networkReceived: 4_000_000_000 + index,
     networkTransmitted: 2_000_000_000 + index,
+    processes: 90 + index,
+    tcpConnections: 7 + index,
+    udpConnections: 2,
     load1: 0.1,
     load5: 0.2,
     load15: 0.3,
@@ -55,26 +94,72 @@ function point(timestamp: number, index: number): HistoryPoint {
   }
 }
 
-const points = Array.from({ length: 6 }, (_, index) => point(1_700_000_000_000 + index * 300_000, index))
+const START = 1_700_000_000_000
+const points = Array.from({ length: 6 }, (_, index) => point(START + index * 300_000, index))
+const rows = buildChartRows(points)
 
-function allSeries() {
-  return [...buildMetricHistoryCharts(points), ...buildProbeHistoryCharts(points)]
-    .flatMap((chart) => chart.series.map((item) => ({ chart: chart.key, ...item })))
+function context(accessible = false, dark = false, source: readonly HistoryPoint[] = points): LoadChartContext {
+  return {
+    rows: buildChartRows(source),
+    hours: 1,
+    load: getLoadChartPalette(accessible),
+    series: getChartSeriesPalette(accessible),
+    theme: getChartThemeColors(dark),
+  }
+}
+
+function inlineOptions(ctx: LoadChartContext = context()) {
+  return {
+    cpu: cpuChartOption(ctx),
+    memory: memoryChartOption(ctx),
+    disk: diskChartOption(ctx),
+    network: networkChartOption(ctx),
+    gpu: gpuChartOption(ctx),
+    connections: connectionsChartOption(ctx),
+    process: processChartOption(ctx),
+    diskIo: diskIoChartOption(ctx),
+  }
+}
+
+function named(option: { series: unknown }, name: string): LooseSeries {
+  const item = seriesOf(option).find((series) => series.name === name)
+  expect(item, `${name} 缺失`).toBeDefined()
+  return item as LooseSeries
+}
+
+const PROBES = [
+  { target: 'ct', label: '电信' },
+  { target: 'cu', label: '联通' },
+  { target: 'cm', label: '移动' },
+  { target: 'bd', label: 'BGP' },
+  { target: 'node_1', label: 'Tokyo' },
+] as const
+
+function pingTasks(accessible = false): PingTaskLine[] {
+  const palette = getChartSeriesPalette(accessible)
+  return PROBES.map((probe, index) => ({ ...probe, color: palette[index % palette.length] as string }))
 }
 
 describe('进入 canvas 的颜色必须是具体色值', () => {
-  it('每一条历史序列的颜色都不是 CSS 变量', () => {
-    const series = allSeries()
-    expect(series.length).toBeGreaterThan(10)
-    for (const item of series) {
-      expect(item.color, `${item.chart}/${item.key}`).not.toMatch(CSS_VAR)
-      expect(item.color, `${item.chart}/${item.key}`).toMatch(/^#[0-9A-Fa-f]{6}$/)
+  it('内联卡每条序列的线色与色点都是具体 hex，且二者同源', () => {
+    for (const [key, option] of Object.entries(inlineOptions())) {
+      const series = seriesOf(option)
+      expect(series.length, key).toBeGreaterThan(0)
+      for (const item of series) {
+        expect(item.lineStyle.color, `${key}/${item.name}`).toMatch(HEX)
+        expect(item.itemStyle.color, `${key}/${item.name}`).toBe(item.lineStyle.color)
+        for (const stop of item.areaStyle?.color.colorStops ?? []) expect(stop.color).toMatch(/^rgba\(/)
+      }
     }
   })
 
   it('序列颜色全部来自两块调色板，不出现调色板之外的自造色', () => {
     const allowed = new Set([...getChartSeriesPalette(false), ...Object.values(getLoadChartPalette(false))])
-    for (const item of allSeries()) expect(allowed.has(item.color), `${item.chart}/${item.key} = ${item.color}`).toBe(true)
+    for (const [key, option] of Object.entries(inlineOptions())) {
+      for (const item of seriesOf(option)) {
+        expect(allowed.has(item.lineStyle.color), `${key}/${item.name} = ${item.lineStyle.color}`).toBe(true)
+      }
+    }
   })
 
   it('图表主题色在深浅两种模式下都是具体 rgba，且逐项不同', () => {
@@ -89,93 +174,97 @@ describe('进入 canvas 的颜色必须是具体色值', () => {
     }
   })
 
-  it('图表组件的 option 里不再出现任何 CSS 变量', () => {
-    const option = historyChart.slice(historyChart.indexOf('const chartOption'), historyChart.indexOf('</script>'))
-    expect(option).not.toMatch(CSS_VAR)
+  it('延迟大图的主题色只有浅色边框与负载图不同（上游是 0.06 对 0.1）', () => {
+    expect(getPingChartThemeColors(false)).toEqual({ ...getChartThemeColors(false), borderColor: 'rgba(0, 0, 0, 0.06)' })
+    expect(getPingChartThemeColors(true)).toEqual(getChartThemeColors(true))
+  })
+
+  it('option 构建模块里不出现任何 CSS 变量', () => {
+    expect(optionsSource).not.toMatch(CSS_VAR)
+  })
+
+  it('流量 / Ping / 丢包卡的 option 同样只有具体色值（上游这个组件写的是 var(--color-*)）', () => {
+    const ctx = context()
+    const option = metricSeriesChartOption(probeSeries(ctx.rows, PROBES, 'latency', ctx.series, false), ctx.theme)
+    expect(JSON.stringify(option)).not.toMatch(CSS_VAR)
+    expect(option.tooltip.backgroundColor).toBe(ctx.theme.tooltipBg)
+    expect(option.legend.textStyle.color).toBe(ctx.theme.textSecondary)
   })
 })
 
-/*
- * 第二阶段 Test 1：逐序列对照上游，而不是「都来自调色板」就算对齐。
- * 取值直接读自 Komari `bf83765` 的 `LoadChart.vue`：
- *   CPU     CPU=primary(+area) / 负载=secondary(第二根轴)
- *   memory  RAM=primary(+area) / Swap=secondary
- *   disk    磁盘已用=tertiary(+area)
- *   network 下载=quinary / 上传=quaternary，**两条都没有 areaStyle**
- *   gpu     GPU 使用率=senary
- *   traffic 累计下载=quinary / 累计上传=quaternary（走 MetricSeriesChartCard）
- * 内联图线形是 `width: 1.5` + `cap: 'round'`，卡片图是 `width: 1.6` 且无 cap。
- */
 describe('逐序列对照上游 LoadChart', () => {
   const load = getLoadChartPalette(false)
-  const charts = Object.fromEntries(buildMetricHistoryCharts(points).map((c) => [c.key, c]))
-  function pick(chartKey: string, seriesKey: string) {
-    const item = charts[chartKey]?.series.find((s) => s.key === seriesKey)
-    expect(item, `${chartKey}/${seriesKey} 缺失`).toBeDefined()
-    return item!
-  }
+  const options = inlineOptions()
 
-  it('语义序列取到上游同名序列的角色色', () => {
-    expect(pick('cpu', 'cpu').color).toBe(load.primary)
-    expect(pick('memory', 'ram').color).toBe(load.primary)
-    expect(pick('memory', 'swap').color).toBe(load.secondary)
-    expect(pick('disk', 'disk').color).toBe(load.tertiary)
-    expect(pick('network-speed', 'network-in').color).toBe(load.quinary)
-    expect(pick('network-speed', 'network-out').color).toBe(load.quaternary)
-    expect(pick('traffic', 'network-rx').color).toBe(load.quinary)
-    expect(pick('traffic', 'network-tx').color).toBe(load.quaternary)
-    expect(pick('gpu', 'gpu-0').color).toBe(load.senary)
+  it('CPU 与负载：CPU = primary 带渐变，负载 = secondary 且在第二根 Y 轴', () => {
+    const cpu = named(options.cpu, 'CPU')
+    expect(cpu.lineStyle.color).toBe(load.primary)
+    expect(cpu.areaStyle?.color.colorStops.map((stop) => stop.color)).toEqual([load.primaryAreaStrong, load.primaryAreaFaint])
+    expect(cpu.yAxisIndex).toBe(0)
+    const loadLine = named(options.cpu, '负载')
+    expect(loadLine.lineStyle.color).toBe(load.secondary)
+    expect(loadLine.yAxisIndex).toBe(1)
+    expect(loadLine.areaStyle).toBeUndefined()
   })
 
-  it('只有上游确有 areaStyle 的序列才带填充', () => {
-    expect(pick('cpu', 'cpu').area).toEqual({ strong: load.primaryAreaStrong, faint: load.primaryAreaFaint })
-    expect(pick('memory', 'ram').area).toEqual({ strong: load.primaryAreaStrong, faint: load.primaryAreaFaint })
-    expect(pick('disk', 'disk').area).toEqual({ strong: load.tertiaryAreaStrong, faint: load.tertiaryAreaFaint })
-    // 上游网络图、Swap、流量、探针都没有填充——不能一刀切给所有内联图加 areaStyle。
-    expect(pick('memory', 'swap').area).toBeUndefined()
-    expect(pick('network-speed', 'network-in').area).toBeUndefined()
-    expect(pick('network-speed', 'network-out').area).toBeUndefined()
-    expect(pick('traffic', 'network-rx').area).toBeUndefined()
-    for (const item of buildProbeHistoryCharts(points).flatMap((c) => c.series)) {
-      expect(item.area, item.key).toBeUndefined()
-    }
+  it('内存与 Swap：RAM = primary 带渐变，RAM 总量 / Swap 总量是 1.2 虚线', () => {
+    expect(named(options.memory, 'RAM').lineStyle.color).toBe(load.primary)
+    expect(named(options.memory, 'RAM').areaStyle).toBeDefined()
+    expect(named(options.memory, 'RAM 总量').lineStyle).toMatchObject({ color: load.quinary, width: 1.2, type: 'dashed' })
+    expect(named(options.memory, 'Swap').lineStyle.color).toBe(load.secondary)
+    expect(named(options.memory, 'Swap').areaStyle).toBeUndefined()
+    expect(named(options.memory, 'Swap 总量').lineStyle).toMatchObject({ color: load.quaternary, width: 1.2, type: 'dashed' })
   })
 
-  it('线宽与线帽按所对应的上游组件区分', () => {
-    for (const key of ['cpu', 'load', 'memory', 'disk', 'network-speed', 'gpu']) {
-      for (const item of charts[key]?.series ?? []) {
-        expect(item.lineWidth, `${key}/${item.key}`).toBe(1.5)
-        expect(item.roundCap, `${key}/${item.key}`).toBe(true)
+  it('磁盘：已用 = tertiary 带渐变，总量 = quinary 1.2 虚线', () => {
+    const used = named(options.disk, '磁盘已用')
+    expect(used.lineStyle.color).toBe(load.tertiary)
+    expect(used.areaStyle?.color.colorStops.map((stop) => stop.color)).toEqual([load.tertiaryAreaStrong, load.tertiaryAreaFaint])
+    expect(named(options.disk, '磁盘总量').lineStyle).toMatchObject({ color: load.quinary, width: 1.2, type: 'dashed' })
+  })
+
+  it('实时网络：下载 = quinary、上传 = quaternary，两条都没有填充', () => {
+    expect(named(options.network, '下载').lineStyle.color).toBe(load.quinary)
+    expect(named(options.network, '上传').lineStyle.color).toBe(load.quaternary)
+    for (const item of seriesOf(options.network)) expect(item.areaStyle, item.name).toBeUndefined()
+  })
+
+  it('GPU：平均使用率 = senary，设备线取序列板且为 1.2 虚线；CFSM 没有显存，不画显存线', () => {
+    const palette = getChartSeriesPalette(false)
+    expect(named(options.gpu, 'GPU 使用率').lineStyle.color).toBe(load.senary)
+    expect(named(options.gpu, 'NVIDIA T4').lineStyle).toMatchObject({ color: palette[0], width: 1.2, type: 'dashed' })
+    expect(named(options.gpu, 'NVIDIA L4').lineStyle).toMatchObject({ color: palette[1], width: 1.2, type: 'dashed' })
+    expect(seriesOf(options.gpu).some((item) => item.name === '显存使用率')).toBe(false)
+  })
+
+  it('网络连接：TCP = primary、UDP = tertiary；进程 = quaternary 并带上游写死的紫色填充', () => {
+    expect(named(options.connections, 'TCP').lineStyle.color).toBe(load.primary)
+    expect(named(options.connections, 'UDP').lineStyle.color).toBe(load.tertiary)
+    const processLine = named(options.process, '进程数')
+    expect(processLine.lineStyle.color).toBe(load.quaternary)
+    expect(processLine.areaStyle?.color.colorStops.map((stop) => stop.color))
+      .toEqual(['rgba(167, 139, 250, 0.25)', 'rgba(167, 139, 250, 0.02)'])
+  })
+
+  it('累计与周期流量卡：累计下载 = quinary、累计上传 = quaternary', () => {
+    expect(trafficSeries(context()).map((item) => [item.name, item.color, item.kind])).toEqual([
+      ['累计下载', load.quinary, 'bytes'],
+      ['累计上传', load.quaternary, 'bytes'],
+    ])
+  })
+
+  it('内联卡线宽 1.5（总量与设备虚线 1.2）+ 圆线帽；卡片图 1.6 且没有线帽', () => {
+    for (const [key, option] of Object.entries(options)) {
+      for (const item of seriesOf(option)) {
+        expect(item.lineStyle.cap, `${key}/${item.name}`).toBe('round')
+        expect(item.lineStyle.width, `${key}/${item.name}`).toBe(item.lineStyle.type === 'dashed' ? 1.2 : 1.5)
       }
     }
-    for (const key of ['traffic', 'disk-io']) {
-      for (const item of charts[key]?.series ?? []) {
-        expect(item.lineWidth, `${key}/${item.key}`).toBe(1.6)
-        expect(item.roundCap, `${key}/${item.key}`).toBe(false)
-      }
+    const ctx = context()
+    for (const item of seriesOf(metricSeriesChartOption(trafficSeries(ctx), ctx.theme))) {
+      expect(item.lineStyle.width).toBe(1.6)
+      expect(item.lineStyle.cap).toBeUndefined()
     }
-    for (const item of buildProbeHistoryCharts(points).flatMap((c) => c.series)) {
-      expect(item.lineWidth, item.key).toBe(1.6)
-      expect(item.roundCap, item.key).toBe(false)
-    }
-  })
-
-  it('图表组件按序列自身的线形与填充渲染', () => {
-    expect(historyChart).toContain('width: item.lineWidth')
-    expect(historyChart).toContain("item.roundCap ? { cap: 'round' as const } : {}")
-    expect(historyChart).toContain('item.area')
-    expect(historyChart).toContain('colorStops')
-  })
-})
-
-describe('折线、图例与摘要取同一个颜色来源', () => {
-  it('series 的 lineStyle、itemStyle 与底部摘要都用 item.color', () => {
-    expect(historyChart).toContain('color: item.color')
-    expect(historyChart).toContain('itemStyle: { color: item.color }')
-    // 顶层 palette、tooltip 色点与底部摘要色点同样取自序列自身的颜色。
-    expect(historyChart).toContain('color: props.chart.series.map((item) => item.color)')
-    expect(historyChart).toContain('background:${item.color}')
-    expect(historyChart).toContain(':style="{ backgroundColor: item.color }"')
   })
 })
 
@@ -185,43 +274,117 @@ describe('色觉友好模式', () => {
     const accessible = getChartSeriesPalette(true)
     expect(accessible).not.toEqual(standard)
     expect(accessible[0]).toBe('#0072B2')
-    for (const color of accessible) expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/)
+    for (const color of accessible) expect(color).toMatch(HEX)
   })
 
-  it('指标图按角色板切换，探针图按序列板切换', () => {
-    const accessibleLoad = getLoadChartPalette(true)
-    const loadRoles = new Set(Object.values(accessibleLoad))
-    const metric = buildMetricHistoryCharts(points, accessibleLoad)
-    for (const item of metric.flatMap((chart) => chart.series)) {
-      expect(loadRoles.has(item.color), `${item.key} = ${item.color}`).toBe(true)
-    }
-    const accessibleSeries = getChartSeriesPalette(true)
-    const probe = buildProbeHistoryCharts(points, undefined, accessibleSeries)
-    for (const item of probe.flatMap((chart) => chart.series)) {
-      expect(accessibleSeries).toContain(item.color)
+  it('内联卡整体切到无障碍角色板', () => {
+    const roles = new Set(Object.values(getLoadChartPalette(true)))
+    const series = new Set(getChartSeriesPalette(true))
+    for (const [key, option] of Object.entries(inlineOptions(context(true)))) {
+      for (const item of seriesOf(option)) {
+        expect(roles.has(item.lineStyle.color) || series.has(item.lineStyle.color), `${key}/${item.name}`).toBe(true)
+      }
     }
   })
 
-  it('线型取上游 ACCESSIBLE_LINE_TYPES，不自造虚线段长', () => {
+  it('延迟大图按选中顺序轮换上游 ACCESSIBLE_LINE_TYPES，普通模式全是实线', () => {
     expect([...ACCESSIBLE_LINE_TYPES]).toEqual(['solid', 'dashed', 'dotted'])
-    expect(historyChart).toContain('ACCESSIBLE_LINE_TYPES[index % ACCESSIBLE_LINE_TYPES.length]')
+    const tasks = pingTasks(true)
+    const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: false }
+    expect(seriesOf(pingChartOption({ ...base, accessible: true })).map((item) => item.lineStyle.type))
+      .toEqual(['solid', 'dashed', 'dotted', 'solid', 'dashed'])
+    expect(seriesOf(pingChartOption({ ...base, accessible: false })).every((item) => item.lineStyle.type === 'solid')).toBe(true)
+  })
+
+  it('Ping 卡片的颜色与虚线按目标在完整列表里的位置决定（与上游 pingSeries 相同）', () => {
+    const palette = getChartSeriesPalette(true)
+    // BGP 全程未配置，序列被滤掉，但 Tokyo 仍按第 5 位取色、按第 5 位决定虚线。
+    expect(probeSeries(rows, PROBES, 'latency', palette, true).map((item) => [item.name, item.color, item.dashed])).toEqual([
+      ['电信', palette[0], false],
+      ['联通', palette[1], true],
+      ['移动', palette[2], false],
+      ['Tokyo', palette[4], false],
+    ])
   })
 })
 
-describe('修颜色没有动数据语义', () => {
-  it('缺口仍然是缺口：connectNulls 关闭，false / null 不写成 0', () => {
-    expect(historyChart).toContain('connectNulls: false')
-    const ping = buildProbeHistoryCharts(points).find((chart) => chart.key === 'ping')
-    const bd = ping?.series.find((item) => item.key === 'ping-bd')
-    // bd 全程 false，整条序列不应该被造出来。
-    expect(bd).toBeUndefined()
-    const ct = ping?.series.find((item) => item.key === 'ping-ct')
-    expect(ct?.points.every((item) => item.value !== 0)).toBe(true)
+describe('数据语义：不补点、不插值、不写 0', () => {
+  it('每一条序列都关闭 connectNulls', () => {
+    const ctx = context()
+    const tasks = pingTasks()
+    const all = [
+      ...Object.values(inlineOptions(ctx)),
+      metricSeriesChartOption(trafficSeries(ctx), ctx.theme),
+      metricSeriesChartOption(probeSeries(ctx.rows, PROBES, 'packetLoss', ctx.series, false), ctx.theme, true),
+      pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: true, accessible: false }),
+    ]
+    for (const option of all) {
+      for (const item of seriesOf(option)) expect(item.connectNulls, item.name).toBe(false)
+    }
   })
 
-  it('时间戳按真实值升序落点，没有被重采样', () => {
-    const cpu = buildMetricHistoryCharts(points).find((chart) => chart.key === 'cpu')
-    expect(cpu?.series[0]?.points.map((item) => item.timestamp))
-      .toEqual(points.map((item) => item.timestamp))
+  it('缺失的指标保持 null，不像上游那样写成 0', () => {
+    const sparse = points.map((item, index) => (
+      index === 2 ? { ...item, networkInSpeed: null, processes: null, tcpConnections: null } : item
+    ))
+    const ctx = context(false, false, sparse)
+    expect(named(networkChartOption(ctx), '下载').data[2]).toBeNull()
+    expect(named(processChartOption(ctx), '进程数').data[2]).toBeNull()
+    expect(named(connectionsChartOption(ctx), 'TCP').data[2]).toBeNull()
+    expect(optionsSource).not.toMatch(/\?\?\s*0\b/)
+  })
+
+  it('探针的 false（未配置）与 null（超时）都不进入数值序列', () => {
+    const timeouts = points.map((item, index) => (
+      index === 1 ? { ...item, latency: { ...item.latency, ct: null } } : item
+    ))
+    const series = probeSeries(buildChartRows(timeouts), PROBES, 'latency', getChartSeriesPalette(false), false)
+    expect(series.some((item) => item.name === 'BGP')).toBe(false)
+    const ct = series.find((item) => item.name === '电信')
+    expect(ct?.data[1]?.[1]).toBeNull()
+    expect(ct?.data.every(([, value]) => value !== 0)).toBe(true)
+  })
+
+  it('真实采样的时间戳原样保留，没有被重采样', () => {
+    expect(rows.map((row) => row.timestamp)).toEqual(points.map((item) => item.timestamp))
+    expect(rows.every((row) => row.point !== null)).toBe(true)
+  })
+
+  it('离线空档只放不带数值的缺口标记，tooltip 写明这里没有采样', () => {
+    const gapped = [...points, point(START + 5 * 300_000 + 60 * 60_000, 6)]
+    const ctx = context(false, false, gapped)
+    const markerIndex = ctx.rows.findIndex((row) => row.point === null)
+    expect(markerIndex).toBe(6)
+    for (const [key, option] of Object.entries(inlineOptions(ctx))) {
+      for (const item of seriesOf(option)) expect(item.data[markerIndex], `${key}/${item.name}`).toBeNull()
+      const tooltip = option.tooltip as { formatter: (params: unknown) => string }
+      expect(tooltip.formatter([{ dataIndex: markerIndex, seriesName: 'x', value: null, color: '#000000' }]), key)
+        .toContain('该时段没有采样')
+    }
+    expect(cpuChartOption(ctx).xAxis.data).toHaveLength(ctx.rows.length)
+  })
+
+  it('没有交换分区时不画 Swap 两条线，不把「没有」画成 0', () => {
+    const noSwap = points.map((item) => ({ ...item, swapUsed: 0, swapTotal: 0 }))
+    expect(seriesOf(memoryChartOption(context(false, false, noSwap))).map((item) => item.name)).toEqual(['RAM', 'RAM 总量'])
+  })
+
+  it('「平滑峰值」只改变绘制曲率，数值一点不改', () => {
+    const tasks = pingTasks()
+    const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false }
+    const off = seriesOf(pingChartOption({ ...base, smooth: false }))
+    const on = seriesOf(pingChartOption({ ...base, smooth: true }))
+    expect(off.map((item) => item.smooth)).toEqual(off.map(() => 0.1))
+    expect(on.map((item) => item.smooth)).toEqual(on.map(() => 0.6))
+    expect(on.map((item) => item.data)).toEqual(off.map((item) => item.data))
+  })
+
+  it('tooltip 里的节点侧文字先转义再拼进 HTML', () => {
+    const label = '<img src=x onerror=alert(1)>'
+    const tasks = [{ target: 'ct' as const, label, color: '#FF6B6B' }]
+    const option = pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: false, accessible: false })
+    const html = option.tooltip.formatter([{ dataIndex: 0, seriesName: label, value: 20 }])
+    expect(html).toContain('&lt;img')
+    expect(html).not.toContain('<img')
   })
 })

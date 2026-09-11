@@ -158,3 +158,31 @@ Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
 - UPSTREAM-LIMITATION / NECESSARY-CFSM-DIFFERENCE 6 项
 - DEFERRED-UI-CONFLICT 2 项，均写明数据事实、上游表现、影响范围与候选方案，留待下一版本裁决
 - NEEDS-EVIDENCE 3 项，记录在 `docs/cfsm-source-audit.md` 的「仍未确认」一节
+
+---
+
+## 第二阶段 Test 2
+
+逐项证据见 [`phase2-test2.md`](phase2-test2.md)。所有数值取自上游 Komari 页面与本主题页面的同机实测（1440×900，浅色与深色）。
+
+| ID | 类型 | 项 | 根因 / 数据事实 | 处理 |
+|---|---|---|---|---|
+| CARD-CLIP-02 | BUG-CONFIRMED | 「剩余 N 天」在行边缘被裁切 | `.node-box__row` 多了一层 `overflow: hidden`，上游只在盒子上裁切 | `249483d` 改为盒子级裁切 |
+| DETAIL-001 | BUG-CONFIRMED | 详情页下半部与上游结构不同 | 四个自有分区，对应上游 `LoadChart` + `PingChart` | 按上游重建，几何逐项相同 |
+| DETAIL-002 | BUG-CONFIRMED | 信息卡比上游高 2px | 链接行高 20 对 16.5，分级行 15 对 16.5，存储格被拉伸 | 已修复，信息区 351 = 上游 |
+| TOKEN-001 | BUG-CONFIRMED | 次要文字色偏浅偏蓝 | 预设文字色写进全局 `--ink` / `--muted`；上游只在玻璃卡片内覆盖 | 分层：基础色全局，预设色只在节点卡内 |
+| HOME-001 | BUG-CONFIRMED | mini 档 CPU / 内存标签被截成「C...」「内.」 | 四项挤成 `3fr 3fr 4fr` 三列；上游是 `3fr 2fr` 且只放图标 | 改为上游结构 |
+| HOME-002 | BUG-CONFIRMED | 指标标签文字被染成指标色 | 上游文字是次要色，只有图标用 Tailwind 500 档着色 | 已修复 |
+| HOME-003 | BUG-CONFIRMED | 进度条颜色与阈值不同 | 自拟渐变 + 「高负载阈值」；上游是纯色 + 60 / 80 | 已修复，列表视图同步 |
+| HOME-004 | BUG-CONFIRMED | 离线遮罩越界、离线卡多出红圈 | `inset: -14px` 是 Test 1 改盒模型前的遗留；上游红圈被玻璃样式覆盖，实际页面没有 | 已修复 |
+| HOME-005 | BUG-CONFIRMED | 提示行、网速、流量百分比、盒子表面与上游不同 | 均为自拟色 | 已按上游实测值修复 |
+| HOME-006 | BUG-CONFIRMED | 配色预设文字色与上游不同 | 预设色值自拟，与 `glassTheme.ts` 不符 | 文字色逐字对齐上游 |
+| DEFERRED-CHART-01 | 已解决 | 内联图的填充与线形 | Test 2 按上游 `LoadChart` 逐图移植 | 关闭 |
+| D-01 | 待裁决 | 首页丢包口径 | 本主题显示最新一桶；上游是窗口加权平均（真实部署：V.PS 1.60%、绿云 0.80%、NETCUP 3.20%） | 等待裁决 |
+| DEFERRED-PRESET-01 | DEFERRED | 配色预设的表面色 | 驱动顶栏、提示框等上游无一一对应的界面 | 单列，另行处理 |
+
+### Test 2 终态
+
+- **P0 = 0 ｜ P1 = 0 ｜ 未解决的发布阻塞项 = 0**
+- BUG-CONFIRMED 10 项，全部已修复并有回归测试
+- 待裁决 1 项（D-01），DEFERRED 1 项（PRESET-01），CHART-003 仍未复现

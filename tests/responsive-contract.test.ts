@@ -15,7 +15,11 @@ describe('responsive layout contract', () => {
     expect(stylesheet).toContain('@media (max-width: 430px)')
     expect(stylesheet).toContain('@media (max-width: 380px)')
     expect(stylesheet).toContain('.node-list__row')
-    expect(stylesheet).toContain('.history-chart-grid')
+    // 详情图表栅格照上游 LoadChart 的 grid-cols-1 md:grid-cols-2 xl:grid-cols-3。
+    expect(stylesheet).toContain('@media (min-width: 768px) {\n  .metric-chart-grid {\n    grid-template-columns: repeat(2, minmax(0, 1fr));')
+    expect(stylesheet).toContain('@media (min-width: 1280px) {\n  .metric-chart-grid {\n    grid-template-columns: repeat(3, minmax(0, 1fr));')
+    // 延迟任务卡照上游 repeat(auto-fit, minmax(180px, 1fr))。
+    expect(stylesheet).toContain('grid-template-columns: repeat(auto-fit, minmax(180px, 1fr))')
     expect(stylesheet).toContain('.settings-layout')
     // 第 9.5 轮起 Earth 与总览合为 Komari 的统一栅格，Earth 自身的响应式
     // 由三个渲染器各自的 scoped 样式承担（对齐 Komari 的断点）。

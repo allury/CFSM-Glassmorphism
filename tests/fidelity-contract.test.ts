@@ -336,28 +336,39 @@ describe('Komari fidelity contracts', () => {
   /* 第 9.95 轮：详情页 / History 图表 / UI 基元。 */
 
   it('renders history on the upstream echarts stack instead of a hand-written SVG chart', () => {
-    const chart = source('../src/components/detail/HistoryChart.vue')
+    const charts = ['LoadChart', 'PingChart', 'MetricSeriesChartCard']
+      .map((name) => source(`../src/components/detail/${name}.vue`))
     const registry = source('../src/utils/echarts.ts')
 
-    expect(chart).toContain('vue-echarts')
-    expect(chart).toContain('<VChart')
-    expect(chart).toContain('autoresize')
+    for (const chart of charts) {
+      expect(chart).toContain('vue-echarts')
+      expect(chart).toContain('<VChart')
+      expect(chart).toContain('autoresize')
+      // 旧的手写 SVG 折线实现不得残留。
+      expect(chart).not.toContain('pathSegments')
+      expect(chart).not.toContain('viewBox="0 0 800 220"')
+    }
     // 只注册实际用到的组件，与 Komari utils/echarts.ts 一致。
     expect(registry).toContain('echarts/core')
     expect(registry).toContain('LineChart')
     expect(registry).toContain('CanvasRenderer')
-    // 旧的手写 SVG 折线实现不得残留。
-    expect(chart).not.toContain('pathSegments')
-    expect(chart).not.toContain('viewBox="0 0 800 220"')
   })
 
   it('never fabricates history points when charting', () => {
-    const chart = source('../src/components/detail/HistoryChart.vue')
+    // 注释里会提到上游的插值函数名（用来解释为什么不移植），断言跑在去掉注释的副本上。
+    const strip = (code: string) => code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+    const options = strip(source('../src/domain/detail-chart-options.ts'))
+    const rows = strip(source('../src/domain/server-detail.ts'))
 
-    // 缺口保持缺口：超时(null)与缺失(false)都不进入数值 series，也不连线跨越。
-    expect(chart).toContain('connectNulls: false')
-    expect(chart).toContain('numericValue(point)')
-    expect(chart).not.toMatch(/\?\?\s*0\b/)
+    // 缺口保持缺口：超时(null)与缺失(false)都不进入数值 series，也不连线跨越；
+    // 离线空档只插入不带数值的断点标记，不插值、不写 0。
+    expect(options).toContain('connectNulls: false')
+    expect(options).toContain('probeNumber(')
+    expect(options).not.toMatch(/\?\?\s*0\b/)
+    expect(options).not.toContain('interpolateNullsLinear')
+    expect(options).not.toContain('cutPeakValues')
+    expect(rows).toContain('point: null')
+    expect(rows).not.toMatch(/\?\?\s*0\b/)
   })
 
   it('lays the detail page out with the Komari top navigation bar', () => {

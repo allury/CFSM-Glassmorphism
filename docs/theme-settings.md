@@ -44,7 +44,7 @@
 | 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 1:1 |
 | 12 | `hideGeneralCard` | switch / `false` | 控制头部/总览区 | ✅ 1:1 |
 | 13 | `visitorInfoEnabled` | switch / `true` | CFSM 公开主题 API 不提供访客 IP 或审计能力；强制关闭 | 🔴 不支持 |
-| 14 | `glassColorPreset` | select / `翡翠` | 保留翡翠/柔和/高对比/午夜/自定义 | ✅ 1:1 |
+| 14 | `glassColorPreset` | select / `翡翠` | 保留翡翠/柔和/高对比/午夜/自定义。文字色逐字取自上游 `glassTheme.ts`，且与上游一样只作用于节点卡；表面色（card / control / border）仍为本主题值（DEFERRED-PRESET-01） | 🟡 部分 |
 | 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 1:1 |
 | 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 1:1 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |

@@ -4,40 +4,32 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
-import HistoryChart from '@/components/detail/HistoryChart.vue'
+import LoadChart from '@/components/detail/LoadChart.vue'
+import PingChart from '@/components/detail/PingChart.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTabs, { type AppTabItem } from '@/components/ui/AppTabs.vue'
+import AppTooltip from '@/components/ui/AppTooltip.vue'
 import type { IconName } from '@/constants/icons'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
+import { issueCopy } from '@/domain/issue-copy'
+import { resolveNodeProvider } from '@/domain/provider'
+import { buildDetailCards, parseTrafficLimitBytes } from '@/domain/theme-presentation'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
-import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
-import {
-  activeProbeTargets,
-  buildMetricHistoryCharts,
-  buildProbeHistoryCharts,
-} from '@/domain/server-detail'
-import { buildDetailCards, filterChartsBySettings, parseTrafficLimitBytes } from '@/domain/theme-presentation'
-import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useServerDetailStore } from '@/stores/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
-import { getChartSeriesPalette, getLoadChartPalette } from '@/utils/chart-palette'
-import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
   formatCount,
   formatDetailUptime,
   formatDisplayBytes,
   formatDisplayMebibytes,
   formatDisplaySpeed,
-  formatLatency,
-  formatPercent,
-  formatProbePercent,
 } from '@/utils/format'
 
 const route = useRoute()
@@ -50,12 +42,10 @@ const serverStore = useServersStore()
 const {
   server,
   sourceConfig,
-  historyHours,
-  historyPoints,
   state,
   historyState,
+  pingHistoryState,
   issue,
-  historyIssue,
   refreshIssue,
   fallbackActive,
   timedOut,
@@ -69,25 +59,11 @@ const routeId = computed(() => (
 const requestedSource = computed(() => (
   typeof route.query.source === 'string' ? route.query.source : undefined
 ))
-const labels = computed(() => sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS)
-/*
- * 上游 `LoadChart` / `PingChart` 的做法：调色板由 store 的色觉设置派生，
- * 再作为具体色值传进图表；切换设置时整组序列颜色一起更新。
- */
-const accessibleCharts = computed(() => theme.runtime.colorVisionMode === '色觉友好')
-const chartPalette = computed(() => getChartSeriesPalette(accessibleCharts.value))
-const loadChartPalette = computed(() => getLoadChartPalette(accessibleCharts.value))
-const historyCharts = computed(() => filterChartsBySettings(
-  buildMetricHistoryCharts(historyPoints.value, loadChartPalette.value),
-  buildProbeHistoryCharts(historyPoints.value, labels.value, chartPalette.value),
-  theme.runtime,
-))
-const probeTargets = computed(() => (
-  server.value ? activeProbeTargets(server.value, historyPoints.value) : []
-))
 const siteTitle = computed(() => sourceConfig.value?.siteTitle ?? app.config?.siteTitle ?? 'CF Server Monitor')
 const pageLoading = computed(() => state.value === 'loading' && server.value === null)
-const refreshing = computed(() => state.value === 'loading' || historyState.value === 'loading')
+const refreshing = computed(() => (
+  state.value === 'loading' || historyState.value === 'loading' || pingHistoryState.value === 'loading'
+))
 const headerTotal = computed(() => serverStore.servers.length || (server.value ? 1 : 0))
 const headerOnline = computed(() => (
   serverStore.servers.length > 0
@@ -155,18 +131,6 @@ const detailCards = computed(() => {
     return true
   })
 })
-const historyLabels: Record<HistoryHours, string> = {
-  0.167: '10 分钟',
-  0.5: '30 分钟',
-  1: '1 小时',
-  6: '6 小时',
-  12: '12 小时',
-  24: '24 小时',
-  48: '2 天',
-  96: '4 天',
-  168: '7 天',
-}
-const historyOptions = HISTORY_HOURS.map((value) => ({ value, label: historyLabels[value] }))
 
 /*
  * 与 Komari 详情页顶部工具条一致：收藏 + 上一台 / 节点选择 / 下一台。
@@ -185,6 +149,16 @@ const isFavorite = computed(() => (
   favoriteKey.value !== null && preferences.isFavorite(favoriteKey.value)
 ))
 const regionCode = computed(() => resolveRegionCoordinates(server.value?.region ?? null)?.code ?? null)
+
+/*
+ * 厂商：上游在顶栏右侧放一个厂商标识，并在系统信息卡第四格显示「城市 · 厂商 · ASN」。
+ * CFSM 没有厂商字段也不公开 IP，这里只从运营者自己填写的文本里识别——
+ * 节点名称、分组、地区、普通标签，以及约定的 `asn` / `org` 标签（见 `domain/provider.ts`）。
+ * 识别不到时与上游一样显示 `-`。原先这一格的数据源名称移到它的 title 里。
+ */
+const provider = computed(() => (
+  server.value ? resolveNodeProvider(server.value, theme.runtime.providerAliases) : null
+))
 
 function toggleFavorite(): void {
   if (favoriteKey.value) preferences.toggleFavorite(favoriteKey.value)
@@ -225,8 +199,6 @@ function meterWidth(value: number | null): string {
  * 详情分区 Tab。上游 `InstanceDetail` 在 `nodeDetailSectionTabsEnabled` 打开时
  * 把页面切成 概览 / 负载 / 延迟 三段：概览是指标卡与四张信息卡，
  * 负载是 LoadChart，延迟是 PingChart。关闭时全部堆叠显示（上游默认关闭）。
- * CFSM 的历史区同时承载指标图与探针图，因此按图表 key 拆分到对应分区，
- * 探针当前值卡片跟随「延迟」，磁盘 IO 与 GPU 属于「概览」。
  */
 const DETAIL_SECTIONS: readonly AppTabItem[] = [
   { value: 'overview', label: '概览', icon: 'tabler:layout-dashboard' },
@@ -237,15 +209,8 @@ const detailSections = DETAIL_SECTIONS
 const activeSection = ref('overview')
 const sectionTabs = computed(() => theme.runtime.nodeDetailSectionTabsEnabled)
 const overviewVisible = computed(() => !sectionTabs.value || activeSection.value === 'overview')
+const loadVisible = computed(() => !sectionTabs.value || activeSection.value === 'load')
 const pingVisible = computed(() => !sectionTabs.value || activeSection.value === 'ping')
-const PROBE_CHART_KEYS = new Set(['ping', 'loss'])
-const loadCharts = computed(() => historyCharts.value.filter((chart) => !PROBE_CHART_KEYS.has(chart.key)))
-const pingCharts = computed(() => historyCharts.value.filter((chart) => PROBE_CHART_KEYS.has(chart.key)))
-const visibleHistoryCharts = computed(() => {
-  if (!sectionTabs.value) return historyCharts.value
-  return activeSection.value === 'ping' ? pingCharts.value : loadCharts.value
-})
-const historyVisible = computed(() => !sectionTabs.value || activeSection.value !== 'overview')
 
 watch(() => server.value?.id, () => {
   activeSection.value = 'overview'
@@ -273,6 +238,7 @@ interface InfoItem {
   label: string
   value: string
   icon: IconName
+  title?: string
 }
 
 /*
@@ -301,7 +267,12 @@ const systemItems = computed<InfoItem[]>(() => {
     { label: '操作系统', value: current.operatingSystem ?? '-', icon: 'icon-park-outline:computer' },
     { label: '内核版本', value: current.kernelVersion ?? '-', icon: 'icon-park-outline:code' },
     { label: '运行时间', value: formatDetailUptime(current.bootTime), icon: 'icon-park-outline:timer' },
-    { label: '数据源', value: current.source.label, icon: 'icon-park-outline:server' },
+    {
+      label: '厂商',
+      value: provider.value?.display ?? '-',
+      icon: provider.value?.icon ?? 'icon-park-outline:server',
+      title: [provider.value?.tooltip, `数据源：${current.source.label}`].filter(Boolean).join('\n'),
+    },
   ]
 })
 
@@ -346,62 +317,6 @@ const trafficProgressTone = computed(() => {
   return 'is-ok'
 })
 
-function issueCopy(current: CfsmRequestIssue | null, context: 'detail' | 'history'): {
-  title: string
-  body: string
-} {
-  if (!current) return { title: '请求失败', body: '无法读取 CFSM 数据。' }
-  if (current.kind === 'unauthorized') {
-    return {
-      title: '需要登录授权',
-      body: context === 'history'
-        ? '当前时间范围需要有效的 CFSM 登录状态。请登录后重试，现有节点快照不会被替换。'
-        : '此节点需要有效的 CFSM 登录状态才能查看。',
-    }
-  }
-  if (current.kind === 'forbidden') {
-    return {
-      title: '访问被拒绝',
-      body: 'CFSM 返回 403。Turnstile 或当前登录权限需要重新验证，现有真实快照会保留。',
-    }
-  }
-  if (current.kind === 'not-found') {
-    return { title: '节点不存在', body: '目标数据源未返回这个节点，节点可能已被移除或链接无效。' }
-  }
-  if (current.kind === 'upgrade-required') {
-    return { title: '历史数据库需要升级', body: 'CFSM 返回 databaseUpgradeRequired；升级完成前无法读取这段历史。' }
-  }
-  if (current.kind === 'unavailable') {
-    return { title: '服务暂不可用', body: 'CFSM 返回 503。页面不会使用模拟数据代替真实结果。' }
-  }
-  if (current.kind === 'server-error') {
-    return { title: '服务端请求失败', body: `CFSM 返回 HTTP ${current.status ?? '5xx'}。请稍后重试，页面不会生成替代数据。` }
-  }
-  if (current.kind === 'network') {
-    return { title: '网络请求失败', body: '无法连接所属 CFSM 数据源，请检查网络后重试。' }
-  }
-  if (current.kind === 'invalid-request') {
-    return { title: '请求参数无效', body: 'CFSM 拒绝了当前节点或时间范围参数。' }
-  }
-  return { title: '读取失败', body: current.message }
-}
-
-function probeLabel(target: ProbeTarget): string {
-  return labels.value[target]
-}
-
-function probeHistoryStatus(target: ProbeTarget): string {
-  const values = historyPoints.value.flatMap((point) => [
-    point.latency[target],
-    point.packetLoss[target],
-  ])
-  const valid = values.filter((value) => typeof value === 'number').length
-  const timedOutValues = values.filter((value) => value === null).length
-  if (valid === 0 && timedOutValues > 0) return `历史仅含 ${timedOutValues} 个超时点`
-  if (valid > 0) return `历史含 ${valid} 个有效值`
-  return '未配置或未上报'
-}
-
 async function loadCurrent(): Promise<void> {
   if (!mounted.value || routeId.value === '') return
   if (app.apiBases.length === 0) await app.initialize()
@@ -410,10 +325,6 @@ async function loadCurrent(): Promise<void> {
 
 async function refresh(): Promise<void> {
   await detail.refresh()
-}
-
-function selectHistory(hours: HistoryHours): void {
-  void detail.loadHistory(hours)
 }
 
 onMounted(async () => {
@@ -565,6 +476,15 @@ onUnmounted(() => detail.close())
                 <AppIcon name="tabler:chevron-right" :size="14" />
               </button>
             </div>
+
+            <div v-if="provider?.provider" class="detail-provider">
+              <AppTooltip :content="provider.tooltip" placement="bottom">
+                <span class="detail-provider__chip">
+                  <AppIcon :name="provider.provider.primary.icon" :size="14" />
+                  <span>{{ provider.provider.displayName }}</span>
+                </span>
+              </AppTooltip>
+            </div>
           </div>
 
           <div v-if="timedOut" class="notice notice--warning notice--choice" role="status">
@@ -667,7 +587,7 @@ onUnmounted(() => detail.close())
             <article class="detail-info-card detail-info-card--system">
               <header><h2>系统信息</h2></header>
               <div class="detail-fact-grid">
-                <div v-for="item in systemItems" :key="item.label" class="detail-fact">
+                <div v-for="item in systemItems" :key="item.label" class="detail-fact" :title="item.title">
                   <span><AppIcon :name="item.icon" :size="14" />{{ item.label }}</span>
                   <strong>
                     <img
@@ -727,102 +647,8 @@ onUnmounted(() => detail.close())
             </article>
           </section>
 
-          <section v-if="pingVisible && probeTargets.length" class="detail-section">
-            <header class="detail-section__header">
-              <div><span class="eyebrow">PROBES</span><h2>Ping / Loss</h2></div>
-              <span>旧四线路与 Node 1–4</span>
-            </header>
-            <div class="probe-detail-grid">
-              <article v-for="target in probeTargets" :key="target" class="probe-detail-card">
-                <span>{{ probeLabel(target) }}</span>
-                <strong>{{ formatLatency(server.latency[target]) }}</strong>
-                <small>Loss {{ formatProbePercent(server.packetLoss[target]) }}</small>
-                <em v-if="server.latency[target] === false && server.packetLoss[target] === false">{{ probeHistoryStatus(target) }}</em>
-                <em v-else-if="server.latency[target] === null || server.packetLoss[target] === null">本轮存在超时</em>
-              </article>
-            </div>
-          </section>
-
-          <section v-if="overviewVisible && server.diskIo" class="detail-section">
-            <header class="detail-section__header">
-              <div><span class="eyebrow">DISK IO</span><h2>磁盘 IO</h2></div><span>仅在真实 disk 存在时显示</span>
-            </header>
-            <div class="detail-stat-grid">
-              <article>
-                <span>读取</span><strong>{{ formatDisplaySpeed(server.diskIo.readBps) }}</strong>
-              </article>
-              <article>
-                <span>写入</span><strong>{{ formatDisplaySpeed(server.diskIo.writeBps) }}</strong>
-              </article>
-              <article>
-                <span>读 IOPS</span><strong>{{ formatCount(server.diskIo.readIops) }}</strong>
-              </article>
-              <article>
-                <span>写 IOPS</span><strong>{{ formatCount(server.diskIo.writeIops) }}</strong>
-              </article>
-              <article>
-                <span>Await</span><strong>{{ server.diskIo.awaitMs.toFixed(1) }} ms</strong>
-              </article>
-              <article>
-                <span>Util</span><strong>{{ formatPercent(server.diskIo.utilization) }}</strong>
-              </article>
-            </div>
-          </section>
-
-          <section v-if="overviewVisible && server.gpus.length" class="detail-section">
-            <header class="detail-section__header">
-              <div><span class="eyebrow">GPU</span><h2>图形加速器</h2></div><span>来自 gpu_info</span>
-            </header>
-            <div class="gpu-detail-grid">
-              <article v-for="gpu in server.gpus" :key="gpu.id" class="gpu-detail-card">
-                <span>{{ gpu.name }}</span><strong>{{ formatPercent(gpu.utilization) }}</strong>
-                <div class="detail-meter">
-                  <i :style="{ width: meterWidth(gpu.utilization) }" />
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section v-if="historyVisible" class="detail-section detail-history">
-            <header class="detail-section__header detail-history__header">
-              <div><span class="eyebrow">HISTORY</span><h2>历史趋势</h2><p>只展示 /api/history/all 返回的真实采样。</p></div>
-              <div class="history-range" aria-label="历史时间范围">
-                <button
-                  v-for="option in historyOptions"
-                  :key="option.value"
-                  type="button"
-                  :class="{ 'is-active': historyHours === option.value }"
-                  :disabled="historyState === 'loading'"
-                  @click="selectHistory(option.value)"
-                >
-                  {{ option.label }}
-                </button>
-              </div>
-            </header>
-
-            <div v-if="historyState === 'loading'" class="history-loading">
-              <span v-for="index in 4" :key="index" class="skeleton" />
-            </div>
-            <div v-else-if="historyState === 'error'" class="history-state" role="alert">
-              <strong>{{ issueCopy(historyIssue, 'history').title }}</strong>
-              <p>{{ issueCopy(historyIssue, 'history').body }}</p>
-              <small v-if="historyIssue?.status">HTTP {{ historyIssue.status }} · {{ historyIssue.message }}</small>
-              <button type="button" @click="detail.loadHistory(historyHours)">
-                重试历史请求
-              </button>
-            </div>
-            <div v-else-if="historyState === 'empty'" class="history-state">
-              <strong>暂无历史数据</strong>
-              <p>CFSM 返回了空数组。页面不会复制当前指标生成伪造趋势。</p>
-            </div>
-            <div v-else-if="historyState === 'ready' && visibleHistoryCharts.length === 0" class="history-state">
-              <strong>没有可绘制的数值</strong>
-              <p>后端返回了历史行，但其中没有有效的数值序列。</p>
-            </div>
-            <div v-else class="history-chart-grid">
-              <HistoryChart v-for="chart in visibleHistoryCharts" :key="chart.key" :chart="chart" />
-            </div>
-          </section>
+          <LoadChart v-if="loadVisible" />
+          <PingChart v-if="pingVisible" />
         </template>
       </main>
 

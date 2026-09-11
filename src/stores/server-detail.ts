@@ -27,10 +27,19 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const sourceConfig = shallowRef<SiteConfig | null>(null)
   const history = shallowRef<HistorySeries | null>(null)
   const historyHours = ref<HistoryHours>(24)
+  /*
+   * 上游负载图与延迟图各有一条时间范围选择（LoadChart 默认「实时」、
+   * PingChart 默认「1 小时」），两者互不影响。CFSM 只有一个 `/api/history/all`，
+   * 这里为延迟区单独保存一份历史，默认取上游同样的 1 小时。
+   */
+  const pingHistory = shallowRef<HistorySeries | null>(null)
+  const pingHistoryHours = ref<HistoryHours>(1)
   const state = ref<DetailLoadState>('idle')
   const historyState = ref<HistoryLoadState>('idle')
+  const pingHistoryState = ref<HistoryLoadState>('idle')
   const issue = ref<CfsmRequestIssue | null>(null)
   const historyIssue = ref<CfsmRequestIssue | null>(null)
+  const pingHistoryIssue = ref<CfsmRequestIssue | null>(null)
   const refreshIssue = ref<CfsmRequestIssue | null>(null)
   const socketState = ref<CfsmSocketState>('idle')
   const fallbackActive = ref(false)
@@ -43,6 +52,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
 
   const sourceBase = computed(() => server.value?.source.base ?? null)
   const historyPoints = computed(() => history.value?.points ?? [])
+  const pingHistoryPoints = computed(() => pingHistory.value?.points ?? [])
 
   function stopRealtime(): void {
     realtime?.dispose()
@@ -140,6 +150,29 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     }
   }
 
+  async function loadPingHistory(hours = pingHistoryHours.value): Promise<void> {
+    const current = server.value
+    const controller = requestController
+    if (!current || !controller) return
+    pingHistoryHours.value = hours
+    pingHistoryState.value = 'loading'
+    pingHistoryIssue.value = null
+    const expectedRevision = revision
+    try {
+      const result = await fetchHistory(current.id, hours, current.source.base, {
+        signal: controller.signal,
+      })
+      if (controller.signal.aborted || expectedRevision !== revision || pingHistoryHours.value !== hours) return
+      pingHistory.value = result
+      pingHistoryState.value = result.points.length > 0 ? 'ready' : 'empty'
+    } catch (error) {
+      if (controller.signal.aborted || expectedRevision !== revision || pingHistoryHours.value !== hours) return
+      pingHistory.value = null
+      pingHistoryState.value = 'error'
+      pingHistoryIssue.value = classifyCfsmRequestError(error)
+    }
+  }
+
   async function loadSourceConfig(expectedRevision: number): Promise<void> {
     const current = server.value
     const controller = requestController
@@ -165,10 +198,13 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     server.value = null
     sourceConfig.value = null
     history.value = null
+    pingHistory.value = null
     issue.value = null
     historyIssue.value = null
+    pingHistoryIssue.value = null
     refreshIssue.value = null
     historyState.value = 'idle'
+    pingHistoryState.value = 'idle'
     lastRealtimeAt.value = null
     state.value = 'loading'
 
@@ -181,10 +217,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       state.value = 'ready'
       const configPromise = loadSourceConfig(expectedRevision)
       const historyPromise = loadHistory(historyHours.value)
+      const pingHistoryPromise = loadPingHistory(pingHistoryHours.value)
       await configPromise
       if (requestController.signal.aborted || expectedRevision !== revision) return
       startRealtime()
-      await historyPromise
+      await Promise.all([historyPromise, pingHistoryPromise])
     } catch (error) {
       if (requestController.signal.aborted || expectedRevision !== revision) return
       issue.value = classifyCfsmRequestError(error)
@@ -193,7 +230,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   }
 
   async function refresh(): Promise<void> {
-    await Promise.allSettled([refreshServer(), loadHistory(historyHours.value)])
+    await Promise.allSettled([
+      refreshServer(),
+      loadHistory(historyHours.value),
+      loadPingHistory(pingHistoryHours.value),
+    ])
   }
 
   function continueAfterTimeout(): void {
@@ -221,11 +262,16 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     history,
     historyHours,
     historyPoints,
+    pingHistory,
+    pingHistoryHours,
+    pingHistoryPoints,
     sourceBase,
     state,
     historyState,
+    pingHistoryState,
     issue,
     historyIssue,
+    pingHistoryIssue,
     refreshIssue,
     socketState,
     fallbackActive,
@@ -235,6 +281,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     open,
     refresh,
     loadHistory,
+    loadPingHistory,
     continueAfterTimeout,
     pauseAfterTimeout,
     resume,

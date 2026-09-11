@@ -444,7 +444,6 @@ onUnmounted(() => realtime.stop())
                 :show-source="showSource"
                 :density="theme.runtime.nodeCardSize"
                 :favorite="preferences.isFavorite(server.key)"
-                :high-load-threshold="theme.runtime.homeHighLoadThreshold"
                 :price-visible="priceVisible"
                 :style="cardStyle(index)"
                 @open="openServer(server)"
