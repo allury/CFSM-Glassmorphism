@@ -94,9 +94,14 @@
 
 :root {
   color-scheme: light;
-  /* 与 Komari `--font-sans` 一致，以系统字体优先，不强制 Inter。 */
+  /*
+   * 逐字照抄 Komari 的 `--font-sans`，不额外追加字族。
+   * 此前多写了一个 `"Microsoft YaHei"`：在中文 Windows 上 `system-ui` 本来就解析成
+   * 微软雅黑（实测同串宽度完全相同），这一项永远轮不到，等于白写；
+   * 而在 `system-ui` 不是雅黑的系统上，它又会让本主题和上游选到不同的中文字族。
+   */
   font-family:
-    system-ui, -apple-system, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+    system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --page: #dfe9f4;
   --page-soft: #eef4f9;
   --ink: #101722;
@@ -166,13 +171,18 @@
   scrollbar-width: thin;
 }
 
+/*
+ * `font-synthesis: none` 与 `text-rendering: optimizeLegibility` 是 Vite Vue 模板
+ * 自带的默认样式，上游 Komari 两条都没有（其 `@layer base` 只设 background 与
+ * font-family）。前者会关掉合成粗体——一旦某个字族缺少 Bold 实体字面，本主题就会
+ * 比上游细一档；后者在 Chrome 上等价于 auto，但同样属于上游没有的声明。
+ * 本轮按「上游令牌逐字照抄」的规则删除，实测两串宽度均无变化。
+ */
 html {
   min-width: 320px;
   min-height: 100%;
   background: var(--page);
   color: var(--ink);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
 }
 
 body {
@@ -341,6 +351,12 @@ a {
   cursor: not-allowed;
 }
 
+/*
+ * 上游 `badgeVariants` 的排版是 `h-5 … px-2 py-0.5 text-xs font-medium`：
+ * 12px / 500 / line-height 16px，连同 2px 内边距与 1px 边框正好是 `h-5`(20px)。
+ * 这里此前写成 11px / 600 / 1.5，字号小 1px、字重又被匹配到 Bold，
+ * 详情页顶栏的「在线」「生产」等徽章因此比上游更小更粗。
+ */
 .app-badge {
   display: inline-flex;
   max-width: 100%;
@@ -350,9 +366,9 @@ a {
   overflow: hidden;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1.5;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -500,11 +516,11 @@ a {
   gap: 1px;
 }
 
+/* 上游站点名是 `<h1 class="m-0 text-lg font-semibold">`：18px / 600 / 无负字距。 */
 .brand__copy strong {
   overflow: hidden;
   font-size: 18px;
-  font-weight: 720;
-  letter-spacing: -0.015em;
+  font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1309,9 +1325,15 @@ a {
   color: var(--violet);
 }
 
+/*
+ * 上游 `NodeCard` 的指标数值是 `tabular-nums font-medium`——**500**，不是 600。
+ * Segoe UI / 微软雅黑 只有 Regular 与 Bold 两档实体字面，CSS 字重匹配会把
+ * 500 落到 Regular、把 600 落到 Bold，于是这里多写的 100 直接让整列数字变粗体：
+ * 12px「17.0%」实测 36.8px（600）对 34.68px（500）。字重要照抄上游。
+ */
 .node-metric__value {
   flex: none;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1432,10 +1454,14 @@ a {
   line-height: 1;
 }
 
+/*
+ * 上游延迟 / 丢包面板的数值是 `<span class="font-medium">`：**500**，且**没有**
+ * `tabular-nums`，颜色也走继承的 foreground。这里此前写成 600 + tabular-nums，
+ * 600 会被字重匹配落到 Bold，11px「21.0 ms」实测 43.01px 对 40.66px。
+ */
 .node-probe__value {
   color: var(--ink);
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 /*
@@ -2390,11 +2416,16 @@ a {
   margin-bottom: 13px;
 }
 
+/*
+ * 上游分区标题是 `truncate text-sm font-semibold sm:text-base`：16px / 600 / 无负字距。
+ * 这里此前靠 `h2` 的浏览器默认粗体（700）加 `-0.025em`，在只有 Regular/Bold 的
+ * 字族上看不出来，但在带 Semibold 实体字面的系统上会比上游粗一档。
+ */
 .detail-section__header h2,
 .history-chart h3 {
   margin: 0;
   font-size: 16px;
-  letter-spacing: -0.025em;
+  font-weight: 600;
 }
 
 /* CardX 头部标题是 `font-medium`，16px，不加负字距。 */

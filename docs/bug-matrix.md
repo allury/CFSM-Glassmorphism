@@ -42,7 +42,70 @@
 | D-01 | 延迟 / 丢包面板主数值的口径 | CFSM 标量是**最新一条上报**（`ORDER BY id DESC LIMIT 1`），窗口是过去 2 小时 20 个桶 | Komari `useNodePingDisplay` 显示的是窗口**平均值**（`avgLatency` / `avgLoss`） | 首页 NodeCard 的延迟/丢包面板标题数值；详情页探针卡同理 | 用户已实际反馈：卡片 `Loss 0.0%` 与历史图有丢包看起来矛盾（实为口径不同，见 N-01）。改成平均值可消除这种反差并更贴近上游 | ① 改为窗口平均（更贴近 Komari，但改动第 11 / 13 轮已验收的显示数值）；② 保持当前值并在 tooltip 注明口径（不改数值，但 tooltip 内容上游没有）；③ 维持现状 | DEFERRED-UI-CONFLICT |
 | D-02 | 总览卡片长数值在 768px 档仍会截断 | 6 列栅格下单卡内容宽度约 90px，`455.0` + `GB / 1.56 TB` 放不下 | 上游同宽度同样截断（实测 `258.6` → `w38/sw63`） | 首页总览卡片 | 修完 BUG-004 后两版空间分配已一致，残余截断属上游同等行为 | 要让长值完整可见必须改动已验收的 6 列几何或缩小字号，两者都会破坏 1:1 基线 | DEFERRED-UI-CONFLICT |
 
-## 终态
+---
+
+# 第 15 轮（第二正式版收口）
+
+基线：`v1.1.0-test.5` / `961a4edb1683e72b6bd615e3d0b8c69783d4eccc`
+Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
+真实部署本轮实测版本：Worker **`2.8.5 Beta5`**（第 14 轮时是 Beta2，数据库已完成迁移）
+
+## 本轮确认并修复
+
+| ID | 页面 / 链路 | 现象 | 证据 | 根因 | 分类 | 修复位置 | 测试 | 状态 |
+|---|---|---|---|---|---|---|---|---|
+| CHART-001 | 详情页全部历史图 | 多条折线呈黑色，与 tooltip 色点、底部摘要色点不一致 | 画布像素采样：9 张图绘图区**只有** `0,0,0`；修复后为 `#FF6B6B` / `#4ECDC4` / `#A78BFA` / `#60A5FA` / `#FFB347`，与 HTML 色点逐一相等；上游同位取样同色 | 序列颜色写成 `var(--emerald)` 等 CSS 变量，而 ECharts 走 CanvasRenderer，**canvas 不解析 CSS 变量**，赋值被丢弃 | BUG-CONFIRMED | 新增 `utils/chart-palette.ts`（移植上游 `chartPalette.ts`）+ `domain/server-detail.ts` 改按调色板取色 + `ServerDetailView` 按色觉设置派生调色板 | `tests/chart-colors.test.ts` | 已修复 |
+| CHART-002 | 详情页全部历史图 | 浅色模式下图内图例文字偏白、可读性不足 | 图例条带修复前为不透明 `255,255,255`；修复后浅色 `rgba(0,0,0,0.55)`、深色 `rgba(255,255,255,0.55)`，与上游同位取样一致 | 同 CHART-001：图例 / 坐标轴 / 网格线颜色同样是 CSS 变量 | BUG-CONFIRMED | `HistoryChart.vue` 改用移植自上游 `chartThemeColors` 的 `getChartThemeColors(dark)` | 同上 | 已修复 |
+| F-01 | 首页节点卡指标数值 | 数值比上游粗一档 | 该字族只有 Regular / Bold 两档，500 落 Regular、600 落 Bold；12px「17.0%」36.8px 对 34.68px | `.node-metric__value` 写 600，上游是 `font-medium`（500） | BUG-CONFIRMED | `main.css` | `tests/typography-contract.test.ts` | 已修复 |
+| F-02 | 首页延迟 / 丢包面板数值 | 同上 | 11px「21.0 ms」43.01px 对 40.66px | `.node-probe__value` 写 600 + 上游没有的 `tabular-nums` | BUG-CONFIRMED | `main.css` | 同上 | 已修复 |
+| F-03 | 详情页徽章 | 比上游更小更粗，高度也差 0.5px | 「在线」22px（11px/Bold）对 24px（12px/Regular）；徽章高 20.5 → **20**，与上游 `h-5` 相等 | `.app-badge` 写 11px / 600 / lh 1.5，上游是 `text-xs font-medium` = 12px / 500 / 16px | BUG-CONFIRMED | `main.css` | 同上 | 已修复 |
+| F-04 / F-05 | 站点名、详情分区标题 | 声明字重高于上游，并多了负字距 | 本机同落 Bold 故无渲染差异，但带 Semibold 字面的系统会粗一档；字距差 −0.27px / −0.4px | 自造的 720 / `h2` 默认 700 + `-0.015em` / `-0.025em` | BUG-CONFIRMED | `main.css` | 同上 | 已修复 |
+| F-06 | 历史图表 tooltip | 字号比上游小 1px | 上游 `MetricSeriesChartCard` 是 `fontSize: 12` | 写成 11 | BUG-CONFIRMED | `HistoryChart.vue` | 同上 | 已修复 |
+| U-05→FIXED | 详情页冷启动的站点开关 | 直接粘贴详情链接时 `show_price` / `show_expire` / `show_tf` 完全失效 | 实测 `showPrice=0&showExpire=0&showTf=0` 直达详情：修复前 8 张指标卡全在；修复后只剩「累计流量 / 运行时间 / 连接数」，`/api/servers` 恰好 1 次 | store 为空时取不到顶层 `sysConfig`；第 14 轮以「不引入新请求形态」记为上游限制 | BUG-CONFIRMED（推翻第 14 轮结论） | `ServerDetailView`：store 为空时补一次**已有的** `serverStore.load()`；开关未知时先隐藏 | `tests/cfsm-data-contract.test.ts` 新增两条 | 已修复 |
+| D-02→FIXED | 总览卡片长数值 | 768px 下 `455.0` 被截成 `45…`，完整值无从读取 | CFSM 主数值 43/63、单位 48/71；上游 `258.6` 38/63、单位 48/80，**截得更狠且这三张卡根本没有 tooltip** | 上游在该位置未提供任何可访问路径 | BUG-CONFIRMED（不按「上游同等行为」放行） | `theme-presentation.ts`：内存 / 硬盘 / 交换内存的 tooltip 改为「完整已用 / 总量 + 占比」；系统分布 / 地区分布改用上游 `formatDistributionTooltip` 的完整列表 | `tests/typography-contract.test.ts` | 已修复 |
+
+## 本轮复核后的既有遗留项
+
+| ID | 项 | 本轮结论 |
+|---|---|---|
+| D-01 | 延迟 / 丢包面板主数值口径（当前值 vs 窗口平均） | **维持当前值**。已复核：标量确实来自 `getLatestMetrics()` 的最新一条上报，历史来自逐桶采样，来源与时间范围都正确，无 stale value、无错 source，`null` / `false` / 缺失均未变成 0。上游显示的是窗口平均，属展示语义差异；改口径需要先定义窗口、采样与加权规则，且会改动第 11 / 13 轮已验收的数值，本轮不实施。发布说明已写明该语义差异。面板已有原生 `title` 提示，但**未新增占布局空间的固定说明文字**，也未新增上游没有的交互——因此「口径歧义已消除」这一点**不成立**，作为未解决的展示冲突继续登记。 |
+| D-02 | 768px 长数值截断 | 截断本身与上游同等（本主题分给主数值的宽度反而更多：43 对 38），保留；**完整值不可读**这一半已按上述修复。 |
+| U-03 | 探针首轮空串经 `Number("")` 变成真实 0 | 真实部署（Beta5）全量 `/api/servers` 响应中 **`ping_*` 标量为 0 的出现次数 = 0**，没有观察到该污染。结论仍只能由源码推导，影响范围限于「节点或探测目标刚配置好、尚未完成首轮探测」的那一个上报窗口。非阻塞，保留记录。 |
+| U-01 / U-02 / U-04 / U-06 | 窗口 20 点 2 小时、旧库 4 key、详情端点删字段、无温度 | 维持第 14 轮结论。其中 U-02 在本轮真实部署上已不再触发（见下）。 |
+
+## NEEDS-EVIDENCE 三项的本轮结论
+
+| 项 | 结论 |
+|---|---|
+| 探针 `""` → `0` | **仍无实机证据**，但真实部署未观察到任何 `ping_*: 0`。非阻塞。 |
+| `node_1..4` 在已迁移数据库上的窗口表现 | **已解决**。真实部署升级到 Beta5 且已迁移，`/api/servers` 的窗口点现在是完整 8 个 key：`{ts, ct, cu, cm, bd, node_1..node_4}`，未配置目标取值 `false`。第 14 轮 BUG-002 的修复据此在真实数据上得到验证。 |
+| History 对 `node_1..4` 的聚合策略 | **仍未确认**：该部署的 node_1..4 全部未配置（`false`），无法观察聚合行为。非阻塞，继续记录。 |
+
+## 本轮新增的已记录差异（不计为 PASS）
+
+| ID | 项 | 数据事实 | 为什么本轮不改 |
+|---|---|---|---|
+| DEFERRED-TYPO-01 | `line-height` 广泛使用 `normal`，上游是 Tailwind 具体值（12px→16、14px→20、11px→15.7143、16px→24、18px→28） | 本主题文字行盒每行小 1~2.5px，但被更大的 padding / gap 抵消：1440 节点卡高 Komari `331.81`、CFSM `333.77`；**把上游行高逐项注入后卡高变 `335.34`**，误差反而从 1.96px 扩大到 3.53px | 单独对齐行高会让容器几何离上游更远；正确做法是连同 padding / gap 从上游重新推导整张卡的盒模型，等于重做第 11 / 13 轮已验收几何 |
+| DEFERRED-CHART-01 | 上游 `LoadChart` 内联的 CPU / 内存 / 磁盘 / 网络 / GPU 图带 `areaStyle` 渐变填充且线宽 1.5 + `cap: round`；本主题统一走 `MetricSeriesChartCard` 形态（纯折线、1.6） | 见 `docs/chart-parity.md` 的逐图对照表 | 属「一个组件覆盖全部分族」的既有结构选择，改动会波及第 13 轮已验收的详情几何 |
+| CHART-003 | 悬浮网络图曲线消失 | **未复现**：1440 / 375、浅色、三个横向悬浮位置 + 移出，两条序列像素数恒为 `#4ECDC4`×649 / `#60A5FA`×528。相关事实：tooltip 为 `confine: true`（上游 `LoadChart` 是 `false`），气泡覆盖绘图区 1440 约 11%、375 约 21% | 无法复现即无法确认根因；颜色修复已消除「赋值无效 → 重绘沿用上一次样式」这一不确定来源。等待实际应用反馈 |
+
+## 证据缺口（单列，不计为已验证）
+
+- DevTools「Rendered Fonts」面板不可用，实际字形归属用同浏览器 Range 宽度指纹判定。
+- Browser 面板隐藏导致截图返回空白，视觉证据一律改用 `getImageData` 直接读画布像素。
+- 图表**图例点击开关**未能用合成指针事件驱动，仅做结构性验证。
+
+## 第 15 轮终态
+
+- **P0 = 0 ｜ P1 = 0 ｜ 未解决的发布阻塞项 = 0**
+- BUG-CONFIRMED 10 项，全部已修复并有回归测试
+- DEFERRED 3 项（TYPO-01 / CHART-01 / CHART-003），均写明数据事实与不改的理由
+- NEEDS-EVIDENCE 由 3 项减为 2 项
+- 证据缺口 3 项，逐条单列
+
+---
+
+## 第 14 轮终态
 
 - **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0**
 - BUG-CONFIRMED 4 项，全部已修复并有对应回归测试

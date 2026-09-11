@@ -182,6 +182,25 @@ describe('站点级展示开关下发到每台节点（BUG-003 回归）', () =>
     expect(detailView).toContain("visibilityFlag('showTraffic')")
     expect(detailView).toContain("card.key === 'remainingValue'")
   })
+
+  /*
+   * 第 15 轮补上冷启动那一半（原 U-05）：直接粘贴详情链接时 store 是空的，
+   * 站点开关拿不到，运营方关掉的价格 / 到期 / 流量照常显示。
+   * 浏览器实测（`showPrice=0&showExpire=0&showTf=0` 直达详情）：
+   * 修复前 8 张指标卡全在，修复后只剩「累计流量 / 运行时间 / 连接数」，
+   * `/api/servers` 恰好 1 次，节点选择器也随之补齐到 10 项。
+   */
+  it('详情冷启动补一次已有的列表请求，且只在 store 为空时触发', () => {
+    expect(detailView).toContain('if (serverStore.collections.length === 0) await serverStore.load()')
+    // 不允许出现轮询或定时重取站点开关。
+    expect(detailView).not.toMatch(/setInterval\([^)]*serverStore\.load/)
+  })
+
+  it('站点开关未知时先隐藏，拿到之后再决定，避免把已关闭的价格闪出来', () => {
+    expect(detailView).toContain('const siteVisibilityKnown = computed(')
+    expect(detailView).toContain('if (!siteVisibilityKnown.value) return false')
+    expect(detailView).toContain('serverStore.loadedAt !== null')
+  })
 })
 
 describe('总览卡片单位不再抢占主数值的宽度（BUG-004 回归）', () => {

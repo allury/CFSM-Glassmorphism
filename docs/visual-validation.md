@@ -1,5 +1,44 @@
 # 视觉与响应式验证
 
+## 第 15 轮 · v1.1.0：字体一致性与图表配色
+
+逐项结论见 [`font-audit.md`](font-audit.md) 与 [`chart-parity.md`](chart-parity.md)，
+这里只记录本轮新增、以后还会踩到的量测方法与陷阱。
+
+### 判定「实际渲染字体」
+
+CSS `font-family` 相同、`document.fonts.check` 通过，都**不等于**字形一样。
+本轮用同一浏览器内的 Range 宽度指纹判定：把同一串文本分别用页面字体栈和
+候选字族单独渲染再量宽度，宽度逐串相等才算同一字族。
+实测中文 Windows 上 `system-ui` = 微软雅黑（与 `"Segoe UI"` / `sans-serif` / `Arial` 都不同）。
+没有 DevTools「Rendered Fonts」面板时，这是可用的替代证据，但必须在报告里单列为证据缺口。
+
+### 判定字重是否真的落在不同字面上
+
+先用同样的方法测一遍字重台阶。本机（雅黑）只有 Regular 与 Bold：
+`300 < 400 = 500 < 550 = 600 = 650 = 700 = 800`。
+因此「600 写成 500」在这里是**肉眼可见**的粗细差，而「700 写成 720」没有任何差异。
+换平台（有 Semibold 字面）结论会变，别把某一台机器的结论当成通用结论。
+
+### canvas 内的东西只能读像素
+
+ECharts 走 `CanvasRenderer`，画布里的折线、坐标轴文字、图例文字都不在 DOM 里，
+`getComputedStyle` 完全看不到。读法是直接 `getImageData` 统计颜色分布，
+按 alpha 区分实色与抗锯齿边缘（例如 `rgba(0,0,0,0.55)` 的峰值 alpha 是 140）。
+这也是本轮定位「折线全黑」的唯一手段。
+
+### Browser 面板隐藏时截图是空白
+
+面板隐藏时 `computer{action:"screenshot"}` 返回整块背景色，看不出任何内容，
+但 DOM 与画布都是正常的。此时不要用截图作为证据，改用
+`read_page` / `get_page_text` / `getImageData`。
+
+### 合成指针事件只能驱动一部分 zrender 交互
+
+`pointermove` / `mousemove` 能触发 tooltip 与 emphasis 高亮（高亮色确实会变），
+但 zrender 的**图例点击开关**在本轮没能被合成事件驱动。
+这类交互要么用真实输入，要么在报告里如实标注为未验证。
+
 ## 第 13 轮 · v1.1.0-test.4：详情页两版逐项对照
 
 基线 `72b9cce`（v1.1.0-test.3），上游 `bf83765`。启动方式与第 11 轮相同

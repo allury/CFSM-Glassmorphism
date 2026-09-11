@@ -27,6 +27,7 @@ import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useServerDetailStore } from '@/stores/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
+import { getChartSeriesPalette } from '@/utils/chart-palette'
 import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
   formatCount,
@@ -69,9 +70,14 @@ const requestedSource = computed(() => (
   typeof route.query.source === 'string' ? route.query.source : undefined
 ))
 const labels = computed(() => sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS)
+/*
+ * 上游 `LoadChart` / `PingChart` 的做法：调色板由 store 的色觉设置派生，
+ * 再作为具体色值传进图表；切换设置时整组序列颜色一起更新。
+ */
+const chartPalette = computed(() => getChartSeriesPalette(theme.runtime.colorVisionMode === '色觉友好'))
 const historyCharts = computed(() => filterChartsBySettings(
-  buildMetricHistoryCharts(historyPoints.value),
-  buildProbeHistoryCharts(historyPoints.value, labels.value),
+  buildMetricHistoryCharts(historyPoints.value, chartPalette.value),
+  buildProbeHistoryCharts(historyPoints.value, labels.value, chartPalette.value),
   theme.runtime,
 ))
 const probeTargets = computed(() => (
@@ -101,7 +107,19 @@ const visibleAdminUrl = computed(() => (
 const siteVisibility = computed(() => (
   server.value ? serverStore.siteVisibility(server.value.source.base) : undefined
 ))
+/*
+ * 站点开关还没拿到时先按「隐藏」处理，等列表响应回来再决定。
+ * 反过来（先显示再隐藏）会把运营方明确关掉的价格闪一下，那是真实的信息泄露；
+ * 隐藏先行最多是晚一点出现。store 已经加载过（哪怕这个源没返回开关）就按可见处理，
+ * 与之前的行为一致。
+ */
+const siteVisibilityKnown = computed(() => (
+  server.value?.systemConfig !== undefined
+  || siteVisibility.value !== undefined
+  || serverStore.loadedAt !== null
+))
 function visibilityFlag(flag: 'showPrice' | 'showExpire' | 'showTraffic'): boolean {
+  if (!siteVisibilityKnown.value) return false
   return (server.value?.systemConfig?.[flag] ?? siteVisibility.value?.[flag]) !== false
 }
 const showPrice = computed(() => {
@@ -400,6 +418,16 @@ onMounted(async () => {
   if (app.state === 'idle') await app.initialize()
   mounted.value = true
   await loadCurrent()
+  /*
+   * 站点级 show_price / show_expire / show_tf 只出现在 `/api/servers` 的顶层
+   * `sysConfig`，`/api/server` 没有。从首页点进来时 store 里已经有这份数据，
+   * 但直接粘贴详情链接冷启动时没有，运营方隐藏的价格 / 到期 / 流量会照常显示。
+   *
+   * 这里补一次**已有的**列表请求（首页用的同一个 store action、同一个端点），
+   * 不新增请求形态，也不轮询：只在 store 为空时触发一次。
+   * 顺带把顶部的上一台 / 选择器 / 下一台在冷启动时也补齐。
+   */
+  if (serverStore.collections.length === 0) await serverStore.load()
 })
 
 watch([routeId, requestedSource], () => {

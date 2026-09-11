@@ -3,6 +3,7 @@ import { computed } from 'vue'
 import VChart from 'vue-echarts'
 import type { DetailChartModel, DetailChartPoint } from '@/domain/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
+import { ACCESSIBLE_LINE_TYPES, type ChartLineType, getChartThemeColors } from '@/utils/chart-palette'
 import {
   formatBytes,
   formatCount,
@@ -53,11 +54,23 @@ function formatMetric(value: number | null | false): string {
   return formatCount(value)
 }
 
-/** 色觉友好模式下用线型区分序列，不只依赖颜色。 */
-function seriesDash(index: number): number[] | undefined {
-  if (theme.runtime.colorVisionMode !== '色觉友好') return undefined
-  return [undefined, [8, 4], [3, 3], [10, 3, 2, 3], [2, 4]][index % 5]
+/**
+ * 色觉友好模式下再用线型区分一层，取上游 `ACCESSIBLE_LINE_TYPES`
+ * （`solid` / `dashed` / `dotted`），不自创虚线段长。
+ */
+function seriesLineType(index: number): ChartLineType {
+  if (theme.runtime.colorVisionMode !== '色觉友好') return 'solid'
+  return ACCESSIBLE_LINE_TYPES[index % ACCESSIBLE_LINE_TYPES.length] as ChartLineType
 }
+
+/*
+ * 图表内的文字、坐标轴、网格与 tooltip 底色必须是**具体色值**：
+ * ECharts 用 CanvasRenderer，canvas 2D 不解析 `var(--x)`，赋值会被直接丢弃。
+ * 此前这里全是 CSS 变量，实测坐标轴文字被画成纯黑、图例文字被画成纯白
+ * （浅色模式下几乎看不见）。改用上游 `chartThemeColors` 的同一组 rgba，
+ * 随浅色 / 深色切换重新计算。
+ */
+const chartTheme = computed(() => getChartThemeColors(theme.resolvedTheme === 'dark'))
 
 const seriesSummary = computed(() => props.chart.series.map((item) => ({
   key: item.key,
@@ -75,10 +88,17 @@ const chartOption = computed(() => ({
   tooltip: {
     trigger: 'axis',
     confine: true,
-    backgroundColor: 'var(--glass-strong)',
-    borderColor: 'var(--glass-border)',
-    borderWidth: 1,
-    textStyle: { color: 'var(--ink)', fontSize: 11 },
+    backgroundColor: chartTheme.value.tooltipBg,
+    borderColor: 'transparent',
+    borderWidth: 0,
+    // 上游 `MetricSeriesChartCard` 的 tooltip 是 `textStyle: { fontSize: 12 }`。
+    // canvas 内文字不受页面 CSS 影响，只能在 option 里对齐。
+    textStyle: { color: chartTheme.value.text, fontSize: 12 },
+    // 上游 `LoadChart` / `PingChart` 的指示线配置：十字线用 textTertiary。
+    axisPointer: {
+      type: 'line' as const,
+      lineStyle: { color: chartTheme.value.crosshairColor },
+    },
     formatter: (params: unknown) => {
       const items = params as Array<{
         axisValueLabel?: string
@@ -94,7 +114,7 @@ const chartOption = computed(() => ({
         + `<strong style="margin-left:auto;padding-left:12px">${formatMetric(item.data?.[1] ?? null)}</strong>`
         + `</div>`
       )).join('')
-      return `<div style="margin-bottom:6px;color:var(--muted)">${items[0]?.axisValueLabel ?? ''}</div>`
+      return `<div style="margin-bottom:6px;color:${chartTheme.value.textSecondary}">${items[0]?.axisValueLabel ?? ''}</div>`
         + `<div style="display:flex;flex-direction:column;gap:4px">${rows}</div>`
     },
   },
@@ -103,14 +123,14 @@ const chartOption = computed(() => ({
     bottom: 2,
     itemWidth: 10,
     itemHeight: 8,
-    textStyle: { color: 'var(--muted)', fontSize: 10 },
+    textStyle: { color: chartTheme.value.textSecondary, fontSize: 10 },
   },
   grid: { top: 20, right: 18, bottom: 48, left: 58 },
   xAxis: {
     type: 'time',
-    axisLine: { lineStyle: { color: 'var(--line)' } },
+    axisLine: { lineStyle: { color: chartTheme.value.borderColor } },
     axisTick: { show: false },
-    axisLabel: { color: 'var(--muted)', fontSize: 10, hideOverlap: true },
+    axisLabel: { color: chartTheme.value.textSecondary, fontSize: 10, hideOverlap: true },
     splitLine: { show: false },
   },
   yAxis: {
@@ -120,11 +140,11 @@ const chartOption = computed(() => ({
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: {
-      color: 'var(--muted)',
+      color: chartTheme.value.textSecondary,
       fontSize: 10,
       formatter: (value: number) => formatMetric(value),
     },
-    splitLine: { lineStyle: { color: 'var(--line)', opacity: 0.45 } },
+    splitLine: { lineStyle: { color: chartTheme.value.splitLineColor } },
   },
   series: props.chart.series.map((item, index) => ({
     name: item.label,
@@ -136,9 +156,12 @@ const chartOption = computed(() => ({
     smooth: false,
     lineStyle: {
       width: 1.6,
+      type: seriesLineType(index),
       color: item.color,
-      ...(seriesDash(index) ? { type: seriesDash(index) } : {}),
     },
+    // 上游 `PingChart` 显式写 `itemStyle: { color }`「确保 symbol 颜色一致」，
+    // 图例小标记取的也是这个值；这里一并写死，避免图例与折线取到不同来源。
+    itemStyle: { color: item.color },
   })),
 }))
 </script>

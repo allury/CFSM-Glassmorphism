@@ -310,19 +310,24 @@ function peakSpeedNode(servers: GlassServer[]): { name: string, value: number } 
   return best
 }
 
-/** 出现次数最多的取值，对应 Komari `getDistribution` 的首项。 */
-function topDistribution(values: Array<string | null>): { label: string, count: number } | null {
+/** 按出现次数降序的取值分布，对应 Komari `getDistribution`。 */
+function distribution(values: Array<string | null>): Array<{ label: string, count: number }> {
   const counters = new Map<string, number>()
   for (const value of values) {
     const label = value?.trim()
     if (!label) continue
     counters.set(label, (counters.get(label) ?? 0) + 1)
   }
-  let best: { label: string, count: number } | null = null
-  for (const [label, count] of counters) {
-    if (best === null || count > best.count) best = { label, count }
-  }
-  return best
+  return [...counters].map(([label, count]) => ({ label, count })).sort((l, r) => r.count - l.count)
+}
+
+/**
+ * 对应 Komari `formatDistributionTooltip`：最多列出前 8 项 `名称: N 台`。
+ * 卡片主数值只放占比最高的一项且会被截断，完整名称靠这个 tooltip 读出来。
+ */
+function distributionTooltip(entries: Array<{ label: string, count: number }>): string {
+  if (entries.length === 0) return '暂无数据'
+  return entries.slice(0, 8).map((entry) => `${entry.label}: ${entry.count} 台`).join('\n')
 }
 
 /*
@@ -356,7 +361,14 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
       label,
       value: used.value,
       unit: `${used.unit} / ${total.value} ${total.unit}`,
-      hint: formatPercent(metric.percentage),
+      /*
+       * 六列栅格下这张卡的内容宽度只有 90 多 px，`455.0` + `GB / 1.56 TB` 一定放不下：
+       * 768px 实测主数值被截成 `45…`、单位被截成 `GB / 1.5…`。上游在同宽度下截得更狠
+       * （`258.6` 只剩 38px），而且这三张卡**根本没有 tooltip**，完整值无从读取。
+       * 这里沿用本主题已有的 tooltip，把同一数据源格式化出的完整「已用 / 总量」
+       * 与占比一起放进气泡：不改几何、不加新元素，只是让被截断的值仍然可读。
+       */
+      hint: `${used.value} ${used.unit} / ${total.value} ${total.unit}\n${formatPercent(metric.percentage)}`,
       percentage: metric.percentage,
     }
   }
@@ -381,8 +393,10 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
   const connectionCount = tcpCount === null && udpCount === null ? null : (tcpCount ?? 0) + (udpCount ?? 0)
   const coreCount = sum(servers.map((server) => server.cpuCores))
   const gpuNodeCount = servers.filter((server) => server.gpus.length > 0).length
-  const regions = new Set(servers.map((server) => server.region?.trim()).filter(Boolean)).size
-  const topSystem = topDistribution(servers.map((server) => server.operatingSystem))
+  const regionEntries = distribution(servers.map((server) => server.region ?? null))
+  const regions = regionEntries.length
+  const systemEntries = distribution(servers.map((server) => server.operatingSystem))
+  const topSystem = systemEntries[0] ?? null
   const highLoadCount = servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length
   const expiringCount = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length
   const trafficWarningCount = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length
@@ -413,8 +427,10 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
     highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadCount), unit: `/ ${formatCount(online.length)}`, hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
     expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringCount), unit: '台', hint: `${settings.homeExpiringDays} 天内` },
     trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningCount), unit: '台', hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
-    regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: formatCount(regions), unit: '个', hint: '有真实 region 的地区数' },
-    systemDistribution: { key: 'systemDistribution', icon: 'tabler:device-desktop', label: '系统分布', value: topSystem?.label ?? '-', unit: topSystem ? `${formatCount(topSystem.count)} 台` : undefined, hint: '有真实 OS 的节点中占比最高的系统' },
+    regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: formatCount(regions), unit: '个', hint: distributionTooltip(regionEntries) },
+    // 上游这张卡的 tooltip 是 `formatDistributionTooltip`，会列出完整的系统名与台数；
+    // 此前这里放的是一句说明文字，长系统名（`Ubuntu 24.04.4 LTS`）被截断后就读不回来了。
+    systemDistribution: { key: 'systemDistribution', icon: 'tabler:device-desktop', label: '系统分布', value: topSystem?.label ?? '-', unit: topSystem ? `${formatCount(topSystem.count)} 台` : undefined, hint: distributionTooltip(systemEntries) },
   }
   return resolveGeneralCardKeys(settings).flatMap((key) => values[key] ? [values[key] as PresentationCard] : [])
 }

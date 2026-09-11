@@ -134,6 +134,13 @@ Durable Object MetricsBroadcaster ─► /api/ws batchUpdate ─► latestReport
 
 | 项 | 现状 | 需要什么证据 |
 |---|---|---|
-| 探针 `""`（探测文件尚未生成）经 `Number("")` 变成 `0` | 源码可推导：`coerceNumericMetricFields` 会把空串转成 `0`，于是「尚未测量」在服务端变成真实的 `0 ms / 0%` | 需要一台刚启动、探针尚未完成首轮探测的节点的真实响应 |
-| `node_1..4` 在已迁移数据库上的窗口表现 | 手头真实部署是 Beta2 且未迁移，窗口只有 4 个 key | 需要一台 Beta5 且已执行 `updateDatabase` 的部署 |
-| History 对 `node_1..4` 的聚合策略 | `HISTORY_METRIC_AGGREGATION_POLICY` 只列了 ct/cu/cm/bd 的 avg，node_1..4 未列入 | 需要长时间窗口 + 已配置 node 探测点的真实历史 |
+| 探针 `""`（探测文件尚未生成）经 `Number("")` 变成 `0` | 源码可推导：`coerceNumericMetricFields` 会把空串转成 `0`，于是「尚未测量」在服务端变成真实的 `0 ms / 0%`。**第 15 轮复核**：真实部署（Beta5）全量 `/api/servers` 响应里 `ping_*` 标量为 `0` 的出现次数 = 0，未观察到该污染 | 需要一台刚启动、探针尚未完成首轮探测的节点的真实响应 |
+| ~~`node_1..4` 在已迁移数据库上的窗口表现~~ | **第 15 轮已解决**：真实部署升级到 `2.8.5 Beta5` 且已迁移，`/api/servers` 的窗口点现在是完整 8 个 key——实测 `{"ts":…,"ct":152,"cu":154,"cm":149,"bd":false,"node_1":false,"node_2":false,"node_3":false,"node_4":false}`，未配置目标取值 `false`。`/api/config` 也返回了 `node_1_name`～`node_4_name` | — |
+| History 对 `node_1..4` 的聚合策略 | `HISTORY_METRIC_AGGREGATION_POLICY` 只列了 ct/cu/cm/bd 的 avg，node_1..4 未列入。该部署的 node_1..4 全部未配置，无法观察 | 需要长时间窗口 + 已配置 node 探测点的真实历史 |
+
+## 真实部署版本记录
+
+| 轮次 | 观测到的 Worker 版本 | 窗口形态 | 备注 |
+|---|---|---|---|
+| 第 14 轮 | `2.8.5 Beta2` | 4 个 key（`ts/ct/cu/cm/bd`） | 旧库未迁移，走 `LEGACY_DASHBOARD_LATENCY_COLUMNS` |
+| 第 15 轮 | `2.8.5 Beta5` | 8 个 key | 已迁移；顶层 `sysConfig` 仍含三个 `show_*` 与 `latency_window {points:20,hours:2}` |
