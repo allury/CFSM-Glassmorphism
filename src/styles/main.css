@@ -1159,6 +1159,39 @@ a {
   box-shadow: var(--card-surface-shadow-hover);
 }
 
+/*
+ * 上游节点卡的盒模型（1440 实测）：卡片本身 padding 0、无 gap，
+ * 头部是 `px-4 py-3`（12px 16px，min-height 44），主体是 `p-4 pt-0`（0 16px 16px）。
+ * 本主题此前用卡片级 14px 内边距 + 12px gap 近似，横向内容宽度因此比上游多 4px，
+ * 纵向也靠这份多余内边距去抵消偏小的文字行盒。行盒补齐后必须同步改回上游的盒模型，
+ * 否则卡片总高会从 +1.94px 变成 +8.88px。其余尺寸档（comfortable / large）仍用旧值，
+ * 留待 Test 2 一并处理。
+ */
+.node-card--compact {
+  gap: 0;
+  padding: 0;
+}
+
+.node-card--compact .node-card__header {
+  min-height: 44px;
+  padding: 12px 16px;
+}
+
+/* 上游头部内容高 20px（旗帜 size-5、收藏按钮 size-5）。 */
+.node-card--compact .favorite-button {
+  width: 20px;
+  height: 20px;
+}
+
+.node-card--compact .node-card__body {
+  padding: 0 16px 16px;
+}
+
+/* 上游这一行带 `-mt-1`（-4px），mini 档早就照抄了，compact 档漏了。 */
+.node-card--compact .node-card__chips {
+  margin-top: -4px;
+}
+
 .node-card--offline {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--red) 30%, transparent);
 }
@@ -1294,8 +1327,16 @@ a {
   font-size: 12px;
 }
 
+/*
+ * 第二阶段 Test 1：节点卡内部逐行对照上游（1440 浅色，同一浏览器）。
+ * 上游各行高 19 / 97.41 / 45.41 / 44 / 20，本主题原为 18.84 / 92 / 45.41 / 45 / 18.5——
+ * gap 早已一致，差的是文字行盒：上游 12px 文本 line-height 16、11px 文本 15.7143，
+ * 本主题写的是 normal（15 与 14）。这里成组补齐这几条行高与徽章高度，
+ * 不做全局 normal 替换，也不用 transform / 负 margin 抵消。
+ */
 .node-metric__label {
   display: inline-flex;
+  line-height: 16px;
   overflow: hidden;
   min-width: 0;
   align-items: center;
@@ -1334,6 +1375,7 @@ a {
 .node-metric__value {
   flex: none;
   font-weight: 500;
+  line-height: 16px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1341,6 +1383,7 @@ a {
   overflow: hidden;
   color: var(--faint);
   font-size: 11px;
+  line-height: 15.7143px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1419,13 +1462,14 @@ a {
   gap: 6px;
 }
 
+/* 上游延迟/丢包面板：padding 8px、gap 6px、头部与柱区各 11px，总高 44。 */
 .node-probe {
   display: flex;
   min-width: 0;
-  min-height: 42px;
+  min-height: 44px;
   flex-direction: column;
-  gap: 4px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 8px;
   border-radius: 8px;
   background: color-mix(in srgb, var(--muted) 6%, transparent);
 }
@@ -1468,13 +1512,14 @@ a {
  * 与 Komari 一致：柱子满高、等宽，数值由 signal 色阶表达。
  * hover 时整条面板提亮，单根柱纵向放大，和上游的 scale-y-160 一致。
  */
+/* 上游柱区实测 11px 高（面板 44 = 8+11+6+11+8）。 */
 .node-probe__bars {
   display: grid;
   min-width: 0;
   flex: 1;
   align-items: end;
   gap: 1px;
-  min-height: 18px;
+  min-height: 11px;
   opacity: 0.8;
 }
 
@@ -1529,8 +1574,10 @@ a {
   overflow: hidden;
 }
 
+/* 上游节点卡标签是 Badge 的 `h-5`：固定 20px 高。 */
 .node-tag {
   display: inline-flex;
+  height: 20px;
   max-width: 150px;
   align-items: center;
   padding: 0 8px;

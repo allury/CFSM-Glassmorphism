@@ -18,6 +18,13 @@
 它移植自 `MetricSeriesChartCard`，因此**只能说与那一条路径同形**，
 不能据此宣称所有详情图都已 1:1。逐图对照如下。
 
+> **第二阶段 Test 1 修订**：下表原先把 `LoadChart` 内联的图一概写成「带渐变填充」，
+> 这是**不准确的概括**。逐条核对 series 配置后确认：只有 CPU、RAM、磁盘已用、进程数带
+> `areaStyle`，**网络图两条线都没有填充**；并且内联图取色用的是
+> `getLoadChartPalette()` 的角色板（primary / secondary / tertiary / quaternary /
+> quinary / senary），不是 8 色序列板。逐序列映射与修复前后对照见
+> [`phase2-test1.md`](phase2-test1.md) 第 4 节，本轮已按角色逐条对齐。
+
 ## 逐图对照表
 
 | CFSM 图 | 上游对应 | 序列配色 | 线宽 / 线型 | 图例 | 坐标轴 / 网格 | tooltip | 指示线 | 差异说明 |

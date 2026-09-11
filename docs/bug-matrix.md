@@ -44,6 +44,51 @@
 
 ---
 
+# 第二阶段 Test 1
+
+基线：`v1.1.0` / `bec06b9`　候选：`v1.1.1-test.1`　详细过程见 [`phase2-test1.md`](phase2-test1.md)
+
+状态口径：FIXED-LOCAL / CANDIDATE-VERIFIED / DEPLOYED-VERIFIED / NOT-REPRODUCED / DEFERRED / UPSTREAM-LIMITATION / NEEDS-EVIDENCE。
+
+## v1.1.0 线上验收（只读实测）
+
+| 项 | 线上结果 | 状态 |
+|---|---|---|
+| CHART-001 / CHART-002 | 8 张图 0 张黑线；轴与图例文字 `rgba(0,0,0,α≤140)` | DEPLOYED-VERIFIED |
+| F-01～F-06 | 字重、字体栈、`font-synthesis` / `text-rendering` 逐项为修复后取值 | DEPLOYED-VERIFIED |
+| U-05 | 冷启动直达详情：`/api/servers` 恰 1 次，节点选择器 5 项，指标卡按站点开关显示 | DEPLOYED-VERIFIED |
+| 第 14 轮窗口契约 | 20 点 × 8 key，`false` 未显示成 0，首页 20 根柱 | DEPLOYED-VERIFIED |
+| 资产溯源 | 线上 CSS / JS 与 v1.1.0 发布包**逐字节一致** | DEPLOYED-VERIFIED |
+
+## 本轮新问题与处置
+
+| ID | 现象 | 根因 | 状态 | 修复位置 | 测试 |
+|---|---|---|---|---|---|
+| S2-T1-001 | 历史图序列颜色与上游同名序列对不上（内存 RAM、磁盘、网络、流量、GPU、负载） | 上游内联图用的是 `getLoadChartPalette()` 角色板，第 15 轮只移植了 8 色序列板 | CANDIDATE-VERIFIED | `utils/chart-palette.ts` + `domain/server-detail.ts` | `tests/chart-colors.test.ts`「逐序列对照上游 LoadChart」 |
+| S2-T1-002 | 面积填充与线宽一刀切 | 第 15 轮把内联图概括为「带渐变填充」，实际只有 CPU / RAM / 磁盘已用 / 进程数有，网络图没有；线宽分 1.5+round 与 1.6 两族 | CANDIDATE-VERIFIED | 同上 + `HistoryChart.vue` | 同上 |
+| S2-T1-003 | 节点卡行盒偏小、再由卡片内边距抵消 | 12px / 11px 文本行高写成 `normal`，卡片用 14px 内边距近似上游的头部与主体分层 | CANDIDATE-VERIFIED | `styles/main.css` | `tests/typography-contract.test.ts`「节点卡盒模型照抄上游」 |
+
+## 遗留项本轮结论
+
+| ID | 状态 | 说明 |
+|---|---|---|
+| CHART-003 | **NOT-REPRODUCED** | 真实指针覆盖 1440 深浅两色、悬浮与移出、图例隐藏与恢复，曲线均正常绘制。相关事实：tooltip 为 `confine: true`，气泡遮挡绘图区 11%～21%。未覆盖移动端真实触摸与长时实时更新，交 Test 2，不改判 NOT-A-BUG |
+| DEFERRED-CHART-01 | **已修复** | 见 S2-T1-001 / S2-T1-002 |
+| DEFERRED-TYPO-01 | **主卡片已修复** | 节点卡 333.75 → 331.69（上游 331.81）。`comfortable` / `large` 档与详情页其余组件未动，交 Test 2 |
+| D-01 | DEFERRED | 维持最新上报值；来源已复核正确，但口径歧义未消除 |
+| 探针首轮空串转 0 | NEEDS-EVIDENCE | 线上 `ping_*` 标量为 0 的出现次数 = 0，但稳态无现象不等于首轮无问题 |
+| node_1..4 长窗口聚合 | NEEDS-EVIDENCE | 线上 8 个 key 全为 `false`，只证明 schema 兼容 |
+
+## 证据缺口
+
+| 项 | 状态 |
+|---|---|
+| 真实页面截图 | **部分补齐**：面板可见时正常；**页面滚动后截图返回纯背景色**，图表截图改用详情分区 Tab 置于首屏取得；面板隐藏时绘制类动作超时 |
+| Rendered Fonts | **未补齐**：仍为同浏览器 Range 宽度指纹，结论限本机 |
+| 图例真实点击 | **已补齐**：真实指针双向切换，有截图与像素证据 |
+
+---
+
 # 第 15 轮（第二正式版收口）
 
 基线：`v1.1.0-test.5` / `961a4edb1683e72b6bd615e3d0b8c69783d4eccc`

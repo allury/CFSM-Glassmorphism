@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildMetricHistoryCharts, buildProbeHistoryCharts } from '@/domain/server-detail'
-import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette, getChartThemeColors } from '@/utils/chart-palette'
+import { ACCESSIBLE_LINE_TYPES, getChartSeriesPalette, getChartThemeColors, getLoadChartPalette } from '@/utils/chart-palette'
 import type { HistoryPoint } from '@/types/cfsm'
 
 const historyChart = readFileSync(new URL('../src/components/detail/HistoryChart.vue', import.meta.url), 'utf8')
@@ -72,9 +72,9 @@ describe('进入 canvas 的颜色必须是具体色值', () => {
     }
   })
 
-  it('序列颜色全部来自调色板，不出现调色板之外的自造色', () => {
-    const palette = new Set(getChartSeriesPalette(false))
-    for (const item of allSeries()) expect(palette.has(item.color), `${item.chart}/${item.key} = ${item.color}`).toBe(true)
+  it('序列颜色全部来自两块调色板，不出现调色板之外的自造色', () => {
+    const allowed = new Set([...getChartSeriesPalette(false), ...Object.values(getLoadChartPalette(false))])
+    for (const item of allSeries()) expect(allowed.has(item.color), `${item.chart}/${item.key} = ${item.color}`).toBe(true)
   })
 
   it('图表主题色在深浅两种模式下都是具体 rgba，且逐项不同', () => {
@@ -92,6 +92,79 @@ describe('进入 canvas 的颜色必须是具体色值', () => {
   it('图表组件的 option 里不再出现任何 CSS 变量', () => {
     const option = historyChart.slice(historyChart.indexOf('const chartOption'), historyChart.indexOf('</script>'))
     expect(option).not.toMatch(CSS_VAR)
+  })
+})
+
+/*
+ * 第二阶段 Test 1：逐序列对照上游，而不是「都来自调色板」就算对齐。
+ * 取值直接读自 Komari `bf83765` 的 `LoadChart.vue`：
+ *   CPU     CPU=primary(+area) / 负载=secondary(第二根轴)
+ *   memory  RAM=primary(+area) / Swap=secondary
+ *   disk    磁盘已用=tertiary(+area)
+ *   network 下载=quinary / 上传=quaternary，**两条都没有 areaStyle**
+ *   gpu     GPU 使用率=senary
+ *   traffic 累计下载=quinary / 累计上传=quaternary（走 MetricSeriesChartCard）
+ * 内联图线形是 `width: 1.5` + `cap: 'round'`，卡片图是 `width: 1.6` 且无 cap。
+ */
+describe('逐序列对照上游 LoadChart', () => {
+  const load = getLoadChartPalette(false)
+  const charts = Object.fromEntries(buildMetricHistoryCharts(points).map((c) => [c.key, c]))
+  function pick(chartKey: string, seriesKey: string) {
+    const item = charts[chartKey]?.series.find((s) => s.key === seriesKey)
+    expect(item, `${chartKey}/${seriesKey} 缺失`).toBeDefined()
+    return item!
+  }
+
+  it('语义序列取到上游同名序列的角色色', () => {
+    expect(pick('cpu', 'cpu').color).toBe(load.primary)
+    expect(pick('memory', 'ram').color).toBe(load.primary)
+    expect(pick('memory', 'swap').color).toBe(load.secondary)
+    expect(pick('disk', 'disk').color).toBe(load.tertiary)
+    expect(pick('network-speed', 'network-in').color).toBe(load.quinary)
+    expect(pick('network-speed', 'network-out').color).toBe(load.quaternary)
+    expect(pick('traffic', 'network-rx').color).toBe(load.quinary)
+    expect(pick('traffic', 'network-tx').color).toBe(load.quaternary)
+    expect(pick('gpu', 'gpu-0').color).toBe(load.senary)
+  })
+
+  it('只有上游确有 areaStyle 的序列才带填充', () => {
+    expect(pick('cpu', 'cpu').area).toEqual({ strong: load.primaryAreaStrong, faint: load.primaryAreaFaint })
+    expect(pick('memory', 'ram').area).toEqual({ strong: load.primaryAreaStrong, faint: load.primaryAreaFaint })
+    expect(pick('disk', 'disk').area).toEqual({ strong: load.tertiaryAreaStrong, faint: load.tertiaryAreaFaint })
+    // 上游网络图、Swap、流量、探针都没有填充——不能一刀切给所有内联图加 areaStyle。
+    expect(pick('memory', 'swap').area).toBeUndefined()
+    expect(pick('network-speed', 'network-in').area).toBeUndefined()
+    expect(pick('network-speed', 'network-out').area).toBeUndefined()
+    expect(pick('traffic', 'network-rx').area).toBeUndefined()
+    for (const item of buildProbeHistoryCharts(points).flatMap((c) => c.series)) {
+      expect(item.area, item.key).toBeUndefined()
+    }
+  })
+
+  it('线宽与线帽按所对应的上游组件区分', () => {
+    for (const key of ['cpu', 'load', 'memory', 'disk', 'network-speed', 'gpu']) {
+      for (const item of charts[key]?.series ?? []) {
+        expect(item.lineWidth, `${key}/${item.key}`).toBe(1.5)
+        expect(item.roundCap, `${key}/${item.key}`).toBe(true)
+      }
+    }
+    for (const key of ['traffic', 'disk-io']) {
+      for (const item of charts[key]?.series ?? []) {
+        expect(item.lineWidth, `${key}/${item.key}`).toBe(1.6)
+        expect(item.roundCap, `${key}/${item.key}`).toBe(false)
+      }
+    }
+    for (const item of buildProbeHistoryCharts(points).flatMap((c) => c.series)) {
+      expect(item.lineWidth, item.key).toBe(1.6)
+      expect(item.roundCap, item.key).toBe(false)
+    }
+  })
+
+  it('图表组件按序列自身的线形与填充渲染', () => {
+    expect(historyChart).toContain('width: item.lineWidth')
+    expect(historyChart).toContain("item.roundCap ? { cap: 'round' as const } : {}")
+    expect(historyChart).toContain('item.area')
+    expect(historyChart).toContain('colorStops')
   })
 })
 
@@ -115,11 +188,18 @@ describe('色觉友好模式', () => {
     for (const color of accessible) expect(color).toMatch(/^#[0-9A-Fa-f]{6}$/)
   })
 
-  it('调色板传进构建器后，序列颜色整体跟着切换', () => {
-    const accessible = getChartSeriesPalette(true)
-    const charts = buildMetricHistoryCharts(points, accessible)
-    const used = new Set(charts.flatMap((chart) => chart.series.map((item) => item.color)))
-    for (const color of used) expect(accessible).toContain(color)
+  it('指标图按角色板切换，探针图按序列板切换', () => {
+    const accessibleLoad = getLoadChartPalette(true)
+    const loadRoles = new Set(Object.values(accessibleLoad))
+    const metric = buildMetricHistoryCharts(points, accessibleLoad)
+    for (const item of metric.flatMap((chart) => chart.series)) {
+      expect(loadRoles.has(item.color), `${item.key} = ${item.color}`).toBe(true)
+    }
+    const accessibleSeries = getChartSeriesPalette(true)
+    const probe = buildProbeHistoryCharts(points, undefined, accessibleSeries)
+    for (const item of probe.flatMap((chart) => chart.series)) {
+      expect(accessibleSeries).toContain(item.color)
+    }
   })
 
   it('线型取上游 ACCESSIBLE_LINE_TYPES，不自造虚线段长', () => {

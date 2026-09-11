@@ -32,6 +32,44 @@ const ACCESSIBLE_SERIES_PALETTE = [
   '#6B7280',
 ]
 
+/*
+ * 上游 `LoadChartPalette`：详情页内联图（CPU、内存、磁盘、网络、GPU、连接数、进程）
+ * 用的是这套**按语义角色命名**的调色板，而不是上面那 8 色序列板。
+ * 第 15 轮只移植了序列板，于是内存、磁盘、网络等图的颜色虽然「都来自调色板」，
+ * 但和上游同名序列对不上——本轮按角色逐条对齐。
+ */
+const DEFAULT_LOAD_CHART_PALETTE = {
+  primary: '#FF6B6B',
+  primaryAreaStrong: 'rgba(255, 107, 107, 0.25)',
+  primaryAreaFaint: 'rgba(255, 107, 107, 0.02)',
+  secondary: '#FFB347',
+  tertiary: '#4ECDC4',
+  tertiaryAreaStrong: 'rgba(78, 205, 196, 0.25)',
+  tertiaryAreaFaint: 'rgba(78, 205, 196, 0.02)',
+  quaternary: '#A78BFA',
+  quinary: '#60A5FA',
+  senary: '#34D399',
+}
+
+const ACCESSIBLE_LOAD_CHART_PALETTE = {
+  primary: '#D55E00',
+  primaryAreaStrong: 'rgba(213, 94, 0, 0.25)',
+  primaryAreaFaint: 'rgba(213, 94, 0, 0.02)',
+  secondary: '#E69F00',
+  tertiary: '#009E73',
+  tertiaryAreaStrong: 'rgba(0, 158, 115, 0.25)',
+  tertiaryAreaFaint: 'rgba(0, 158, 115, 0.02)',
+  quaternary: '#CC79A7',
+  quinary: '#0072B2',
+  senary: '#56B4E9',
+}
+
+export type LoadChartPalette = typeof DEFAULT_LOAD_CHART_PALETTE
+
+export function getLoadChartPalette(accessible: boolean): LoadChartPalette {
+  return { ...(accessible ? ACCESSIBLE_LOAD_CHART_PALETTE : DEFAULT_LOAD_CHART_PALETTE) }
+}
+
 /** 上游 `ACCESSIBLE_LINE_TYPES`：色觉友好模式下再用线型区分一层。 */
 export const ACCESSIBLE_LINE_TYPES = ['solid', 'dashed', 'dotted'] as const
 

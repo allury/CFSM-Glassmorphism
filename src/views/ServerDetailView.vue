@@ -27,7 +27,7 @@ import { HISTORY_HOURS, type HistoryHours } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useServerDetailStore } from '@/stores/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
-import { getChartSeriesPalette } from '@/utils/chart-palette'
+import { getChartSeriesPalette, getLoadChartPalette } from '@/utils/chart-palette'
 import type { CfsmRequestIssue, ProbeTarget } from '@/types/cfsm'
 import {
   formatCount,
@@ -74,9 +74,11 @@ const labels = computed(() => sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_L
  * 上游 `LoadChart` / `PingChart` 的做法：调色板由 store 的色觉设置派生，
  * 再作为具体色值传进图表；切换设置时整组序列颜色一起更新。
  */
-const chartPalette = computed(() => getChartSeriesPalette(theme.runtime.colorVisionMode === '色觉友好'))
+const accessibleCharts = computed(() => theme.runtime.colorVisionMode === '色觉友好')
+const chartPalette = computed(() => getChartSeriesPalette(accessibleCharts.value))
+const loadChartPalette = computed(() => getLoadChartPalette(accessibleCharts.value))
 const historyCharts = computed(() => filterChartsBySettings(
-  buildMetricHistoryCharts(historyPoints.value, chartPalette.value),
+  buildMetricHistoryCharts(historyPoints.value, loadChartPalette.value),
   buildProbeHistoryCharts(historyPoints.value, labels.value, chartPalette.value),
   theme.runtime,
 ))

@@ -155,10 +155,30 @@ const chartOption = computed(() => ({
     showSymbol: false,
     smooth: false,
     lineStyle: {
-      width: 1.6,
+      // 线宽与线帽按序列所对应的上游组件给定：内联图 1.5 + round，卡片图 1.6 无 cap。
+      width: item.lineWidth,
       type: seriesLineType(index),
       color: item.color,
+      ...(item.roundCap ? { cap: 'round' as const } : {}),
     },
+    // 仅上游确有 areaStyle 的序列才填充，且照抄其自上而下的线性渐变。
+    ...(item.area
+      ? {
+          areaStyle: {
+            color: {
+              type: 'linear' as const,
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                { offset: 0, color: item.area.strong },
+                { offset: 1, color: item.area.faint },
+              ],
+            },
+          },
+        }
+      : {}),
     // 上游 `PingChart` 显式写 `itemStyle: { color }`「确保 symbol 颜色一致」，
     // 图例小标记取的也是这个值；这里一并写死，避免图例与折线取到不同来源。
     itemStyle: { color: item.color },

@@ -170,3 +170,52 @@ describe('被截断的总览数值仍然可读（D-02）', () => {
     expect(cards.find((card) => card.key === 'systemDistribution')?.hint).toBe('暂无数据')
   })
 })
+
+/*
+ * 第二阶段 Test 1：节点卡盒模型逐行对齐（1440 浅色，同一浏览器，同一时刻）。
+ *
+ * 上游 `bf83765` 实测：卡片 padding 0 / 无 gap / 边框 1px，头部 `px-4 py-3`
+ * （12px 16px，高 44），主体 `p-4 pt-0`（0 16px 16px，高 285.81），
+ * 五行高度 19 / 97.41 / 45.41 / 44 / 20，延迟面板 padding 8 + gap 6、高 44、柱区 11。
+ *
+ * 修复前后（本主题，同一环境）：
+ *   行高   18.84 / 92 / 45.41 / 45 / 18.5  →  18.84 / 97.44 / 45.41 / 44 / 20
+ *   卡片   333.75（+1.94）                 →  331.69（−0.12）
+ *   头部   24（卡片级 14px 内边距近似）     →  44
+ *   内容宽 273（比上游多 4px）             →  269
+ * 375 与 768 档同步复测：卡片 x/y/宽、总览卡片几何、页面无横向溢出均未变化。
+ */
+describe('节点卡盒模型照抄上游，而不是用内边距抵消行盒误差', () => {
+  // 必须按行首匹配：`.node-probe__bars {` 也是 `.node-card--mini .node-probe__bars {` 的子串。
+  function block(selector: string): string {
+    const start = stylesheet.indexOf(`
+${selector} {`)
+    expect(start, `未找到 ${selector}`).toBeGreaterThan(-1)
+    return stylesheet.slice(start, stylesheet.indexOf('}', start))
+  }
+
+  it('卡片本身不再自带内边距与 gap，改由头部与主体各自承担', () => {
+    const card = block('.node-card--compact')
+    expect(card).toContain('padding: 0')
+    expect(card).toContain('gap: 0')
+    expect(block('.node-card--compact .node-card__header')).toContain('padding: 12px 16px')
+    expect(block('.node-card--compact .node-card__body')).toContain('padding: 0 16px 16px')
+    // 上游这一行带 -mt-1，mini 档早就有，compact 档本轮补上。
+    expect(block('.node-card--compact .node-card__chips')).toContain('margin-top: -4px')
+  })
+
+  it('卡内文字行盒取上游的具体行高，不是 normal', () => {
+    expect(block('.node-metric__label')).toContain('line-height: 16px')
+    expect(block('.node-metric__value')).toContain('line-height: 16px')
+    expect(block('.node-metric__hint')).toContain('line-height: 15.7143px')
+    expect(block('.node-tag')).toContain('height: 20px')
+  })
+
+  it('延迟 / 丢包面板的盒模型与上游一致', () => {
+    const probe = block('.node-probe')
+    expect(probe).toContain('padding: 8px')
+    expect(probe).toContain('gap: 6px')
+    expect(probe).toContain('min-height: 44px')
+    expect(block('.node-probe__bars')).toContain('min-height: 11px')
+  })
+})
