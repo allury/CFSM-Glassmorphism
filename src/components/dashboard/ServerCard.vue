@@ -96,6 +96,10 @@ const expiryInfo = computed(() => {
     tone: days <= 5 ? 'danger' : days <= 10 ? 'warning' : 'neutral',
   }
 })
+const expiryFullText = computed(() => {
+  const info = expiryInfo.value
+  return info.text || `${info.prefix} ${info.value} ${info.unit}`
+})
 const remainingValueText = computed(() => {
   if (!props.priceVisible || !props.server.showPrice) return ''
   const rawPrice = props.server.price?.trim()
@@ -351,9 +355,15 @@ function hideMissingImage(event: Event): void {
         </div>
         <div class="node-box">
           <template v-if="expireVisible">
+            <!--
+              上游这两行用的是 `gap-0.5`（2px），不是前两个盒子的 `gap-1`（4px）。
+              三个间隙差 6px，在 303px 卡片上足以让「剩余 1653 天」被切掉。
+              整行另挂原生 title，超出时至少还能读回完整值。
+            -->
             <span
-              class="node-box__row"
+              class="node-box__row node-box__row--remaining"
               :class="`node-box__row--${expiryInfo.tone}`"
+              :title="expiryFullText"
             >
               <AppIcon name="tabler:calendar-stats" :size="11" />
               <span v-if="expiryInfo.text" class="node-box__text">{{ expiryInfo.text }}</span>
@@ -363,7 +373,11 @@ function hideMissingImage(event: Event): void {
                 <span class="node-box__fixed-text">{{ expiryInfo.unit }}</span>
               </template>
             </span>
-            <span v-if="remainingValueText" class="node-box__row">
+            <span
+              v-if="remainingValueText"
+              class="node-box__row node-box__row--remaining"
+              :title="remainingValueText"
+            >
               <AppIcon name="tabler:coins" :size="11" />
               <span class="node-box__text">{{ remainingValueText }}</span>
             </span>

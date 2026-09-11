@@ -1448,6 +1448,16 @@ a {
   padding: 6px;
 }
 
+/*
+ * 上游第三个盒子（剩余天数 / 剩余价值）的两行用 `gap-0.5`（2px），
+ * 前两个盒子才是 `gap-1`（4px）。本主题原先三个盒子统一 4px，
+ * 三个间隙多占 6px——303px 卡片上「剩余 1653 天」需 81.81px 而只有 74px 可用，
+ * 四个 span 又都是 `flex: 0 0 auto` 且无省略号，于是直接切在字形中间。
+ */
+.node-box__row--remaining {
+  gap: 2px;
+}
+
 .node-box__row--up {
   color: var(--emerald);
 }

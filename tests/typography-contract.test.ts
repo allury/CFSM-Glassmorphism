@@ -10,6 +10,7 @@ import type { GlassServer } from '@/types/glassmorphism'
  */
 const stylesheet = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')
+const serverCard = readFileSync(new URL('../src/components/dashboard/ServerCard.vue', import.meta.url), 'utf8')
 const historyChart = readFileSync(new URL('../src/components/detail/HistoryChart.vue', import.meta.url), 'utf8')
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/\/\/.*$/gm, '')
@@ -217,5 +218,39 @@ ${selector} {`)
     expect(probe).toContain('gap: 6px')
     expect(probe).toContain('min-height: 44px')
     expect(block('.node-probe__bars')).toContain('min-height: 11px')
+  })
+})
+
+/*
+ * 第二阶段 Test 1 rc2：节点卡第三个盒子「剩余 N 天」被切在字形中间。
+ *
+ * 线上（test.1）实测，303px 卡片下该行可用宽 74px：
+ *   剩余 78 天   68.91px  放得下
+ *   剩余 662 天  75.36px  溢出 1.36px
+ *   剩余 1653 天 81.81px  溢出 7.81px
+ * 四个 span 全是 `flex: 0 0 auto` 且无省略号，overflow: hidden 直接切在字形中间。
+ *
+ * 上游这两行用的是 `gap-0.5`（2px），只有前两个盒子才是 `gap-1`（4px）；
+ * 本主题三个盒子统一 4px，三个间隙多占 6px。改回 2px 后：
+ *   剩余 401 天  69.36px  放得下（余 4.64px）
+ *   剩余 1655 天 75.81px  仍溢出 1.81px —— 该数值与上游同一算法得数相同
+ * 因此整行另挂原生 title，超出时仍可读回完整值。
+ */
+describe('剩余天数行按上游收紧间隙', () => {
+  function block(selector: string): string {
+    const start = stylesheet.indexOf(`\n${selector} {`)
+    expect(start, `未找到 ${selector}`).toBeGreaterThan(-1)
+    return stylesheet.slice(start, stylesheet.indexOf('}', start))
+  }
+
+  it('第三个盒子的行间隙是上游的 2px，前两个盒子仍是 4px', () => {
+    expect(block('.node-box__row--remaining')).toContain('gap: 2px')
+    expect(block('.node-box__row')).toContain('gap: 4px')
+  })
+
+  it('整行挂完整文本的 title，超出时仍可读回', () => {
+    expect(serverCard).toContain('node-box__row--remaining')
+    expect(serverCard).toContain(':title="expiryFullText"')
+    expect(serverCard).toContain(':title="remainingValueText"')
   })
 })
