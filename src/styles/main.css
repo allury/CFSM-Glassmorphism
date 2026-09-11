@@ -1405,9 +1405,15 @@ a {
   background: color-mix(in srgb, var(--muted) 6%, transparent);
 }
 
+/*
+ * 上游只有盒子（`.node-box`）带 `overflow-hidden`，行本身**不裁切**；
+ * 单文本行由内部文字 span 自己 `truncate`（这里是 `.node-box__text`）。
+ * 本主题此前在行上多加了一层 `overflow: hidden`，于是行内容一旦超出 74px
+ * 的行宽就在行边上被裁掉，而上游允许它伸进盒子右侧 6px 内边距、
+ * 到盒子内边距外沿才裁——「剩余 1653 天」在上游完整、在本主题被削掉「天」的右半。
+ */
 .node-box__row {
   display: flex;
-  overflow: hidden;
   align-items: center;
   gap: 4px;
   color: var(--muted);

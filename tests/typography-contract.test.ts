@@ -248,6 +248,23 @@ describe('剩余天数行按上游收紧间隙', () => {
     expect(block('.node-box__row')).toContain('gap: 4px')
   })
 
+  /*
+   * rc2 之后用户仍能看到「天」被削掉一截，而 Komari 原版完整。两边 scrollWidth 都是 76、
+   * 行宽都是 74——差别在**哪一层裁切**：上游行本身 overflow: visible，溢出部分伸进盒子
+   * 右侧 6px 内边距、到盒子内边距外沿才裁；本主题行上多一层 overflow: hidden，在行边就裁。
+   * 实测 1440：上游裁切边 x=376.98、「天」墨迹止于 374.14，削掉 0；
+   * 本主题裁切边 x=370.98，削掉 3.16px。
+   */
+  it('行本身不裁切，裁切只发生在盒子层，与上游一致', () => {
+    expect(block('.node-box__row')).not.toContain('overflow: hidden')
+    expect(block('.node-box')).toContain('overflow: hidden')
+    // 单文本行的截断仍由文字 span 自己负责（上游 truncate min-w-0 overflow-hidden）。
+    const text = block('.node-box__text')
+    expect(text).toContain('overflow: hidden')
+    expect(text).toContain('text-overflow: ellipsis')
+    expect(text).toContain('min-width: 0')
+  })
+
   it('整行挂完整文本的 title，超出时仍可读回', () => {
     expect(serverCard).toContain('node-box__row--remaining')
     expect(serverCard).toContain(':title="expiryFullText"')
