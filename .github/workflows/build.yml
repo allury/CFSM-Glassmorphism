@@ -193,3 +193,46 @@ jobs:
           ${{ steps.release.outputs.flags }}
           --title "CFSM Glassmorphism $GITHUB_REF_NAME"
           --notes-file "${{ steps.release.outputs.notes }}"
+
+  # Release body 只在 `gh release create` 那一刻写入，之后改 docs/releases/*.md
+  # 不会回写到已发布的 Release 页面。这个 job 让仓库文件成为唯一事实来源：
+  # 每次 main 有推送就把已发布 Release 的正文与对应文件对齐，
+  # 用的是 Actions 自带的 GITHUB_TOKEN，不需要任何人另外提供 PAT。
+  # 只改正文，不碰 tag、附件、prerelease/latest 标记与 theme-dist。
+  release-notes:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Sync published release bodies with docs/releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          updated=0
+          for notes in docs/releases/*.md; do
+            tag="$(basename "$notes" .md)"
+            if ! gh release view "$tag" --json tagName >/dev/null 2>&1; then
+              echo "skip    $tag (not published yet)"
+              continue
+            fi
+            # GitHub 存的正文是 CRLF，文件是 LF，比较前统一去掉 CR，
+            # 否则每次都会判定为「有变化」而白改一遍。
+            current="$(gh release view "$tag" --json body --jq .body | tr -d '\r')"
+            desired="$(cat "$notes")"
+            if [[ "$current" == "$desired" ]]; then
+              echo "current $tag"
+              continue
+            fi
+            gh release edit "$tag" --notes-file "$notes"
+            echo "updated $tag"
+            updated=$((updated + 1))
+          done
+          echo "release notes synced; $updated release(s) updated"
