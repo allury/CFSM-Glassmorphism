@@ -15,13 +15,13 @@ import { cloneThemeSettings, DEFAULT_THEME_SETTINGS, THEME_SETTING_KEYS } from '
 const UPSTREAM_GROUPS: ReadonlyArray<{ title: string, keys: readonly string[] }> = [
   {
     title: '01 · 基础与外观',
-    keys: ['themeMode', 'dataUpdateInterval', 'rpcTransportMode', 'defaultViewMode', 'nodeCardSize'],
+    keys: ['themeMode', 'dataUpdateInterval', 'defaultViewMode', 'nodeCardSize'],
   },
   {
     title: '02 · 首页布局',
     keys: [
       'alertEnabled', 'alertTitle', 'alertContent', 'stopEarth', 'earthRenderer',
-      'hideEarth', 'hideGeneralCard', 'visitorInfoEnabled', 'glassColorPreset',
+      'hideEarth', 'hideGeneralCard', 'glassColorPreset',
       'colorVisionMode', 'glassCustomColors',
     ],
   },
@@ -62,8 +62,12 @@ const UPSTREAM_GROUPS: ReadonlyArray<{ title: string, keys: readonly string[] }>
   },
 ]
 
-/** CFSM 公开接口确实不提供的两项，见各自 `unsupported` 里的复核依据。 */
-const UNSUPPORTED_KEYS = ['rpcTransportMode', 'visitorInfoEnabled']
+/*
+ * CFSM 公开接口确实不提供的两项：设置页不渲染，避免出现点了没反应的控件。
+ * 它们仍留在 48 项 schema 与保存快照中——保存协议要求发送完整对象。
+ * 正式版待办见 `docs/todo.md` TODO-02。
+ */
+const BACKLOG_KEYS: readonly string[] = ['rpcTransportMode', 'visitorInfoEnabled']
 
 describe('设置页字段注册表与上游清单一致', () => {
   it('分组标题与顺序逐条对应 komari-theme.json', () => {
@@ -78,11 +82,18 @@ describe('设置页字段注册表与上游清单一致', () => {
     }
   })
 
-  it('48 项设置每一项都有且只有一个控件', () => {
-    const keys = THEME_FORM_FIELDS.map((field) => field.key)
-    expect(keys).toHaveLength(THEME_SETTING_KEYS.length)
-    expect(new Set(keys).size).toBe(THEME_SETTING_KEYS.length)
-    for (const key of THEME_SETTING_KEYS) expect(keys).toContain(key)
+  it('除两项待办外，每项设置都有且只有一个控件', () => {
+    const keys: string[] = THEME_FORM_FIELDS.map((field) => field.key)
+    expect(keys).toHaveLength(THEME_SETTING_KEYS.length - BACKLOG_KEYS.length)
+    expect(new Set(keys).size).toBe(keys.length)
+    for (const key of THEME_SETTING_KEYS) {
+      if (BACKLOG_KEYS.includes(key)) expect(keys).not.toContain(key)
+      else expect(keys).toContain(key)
+    }
+  })
+
+  it('两项待办仍留在 schema 里，保存快照不会因此缺项', () => {
+    for (const key of BACKLOG_KEYS) expect(THEME_SETTING_KEYS).toContain(key)
   })
 
   it('每一项都写了说明，不留空白控件', () => {
@@ -93,15 +104,6 @@ describe('设置页字段注册表与上游清单一致', () => {
         expect(typeof field.min).toBe('number')
         expect(typeof field.max).toBe('number')
       }
-    }
-  })
-
-  it('只有 CFSM 确实不支持的两项是只读，且写明了复核依据', () => {
-    const unsupported = THEME_FORM_FIELDS.filter((field) => field.unsupported !== undefined)
-    expect(unsupported.map((field) => field.key)).toEqual(UNSUPPORTED_KEYS)
-    for (const field of unsupported) {
-      expect(field.unsupported?.length).toBeGreaterThan(0)
-      expect(isFieldEnabled(field, DEFAULT_THEME_SETTINGS)).toBe(false)
     }
   })
 

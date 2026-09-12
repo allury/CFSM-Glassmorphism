@@ -4110,25 +4110,6 @@ a {
   line-height: 1.45;
 }
 
-/* CFSM 公开接口确实不提供的能力：控件只读，标题旁挂一枚说明徽标。 */
-.settings-badge {
-  margin-left: 6px;
-  padding: 2px 6px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  color: var(--faint);
-  font-size: 8px;
-  font-style: normal;
-  font-weight: 750;
-  letter-spacing: 0.04em;
-  white-space: nowrap;
-}
-
-.settings-field.is-unsupported,
-.settings-switch.is-unsupported {
-  opacity: 0.72;
-}
-
 /* 与上游行为不同之处的补充说明，接在该项说明之后。 */
 .settings-note {
   color: var(--faint);

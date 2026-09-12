@@ -36,7 +36,9 @@
 
 `rpcTransportMode` 与 `visitorInfoEnabled` 经复核确属 CFSM 不提供（后端源码与
 `theme-develop.md` 中既没有 RPC 传输层，也没有任何把访客 IP 或审计数据交给主题的接口），
-在页面上保留为只读项并写明复核依据，不做成点了没反应的开关。
+因此设置页**不呈现**这两项，避免出现点了没反应的控件。两项仍保留在 48 项 schema 与
+`POST /api/theme_options` 的完整快照中——保存协议要求发送完整对象；是否连同 schema 一并
+移除，作为正式版待办记录在 `docs/todo.md` TODO-02。设置页因此渲染 46 个控件。
 
 ## 状态定义
 

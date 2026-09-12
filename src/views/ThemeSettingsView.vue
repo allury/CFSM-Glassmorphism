@@ -251,7 +251,7 @@ onMounted(async () => {
                   <label
                     v-if="field.kind === 'switch'"
                     class="settings-switch"
-                    :class="{ 'settings-field--wide': field.wide, 'is-unsupported': field.unsupported }"
+                    :class="{ 'settings-field--wide': field.wide }"
                   >
                     <input
                       type="checkbox"
@@ -260,24 +260,18 @@ onMounted(async () => {
                       @change="onSwitch(field.key, $event)"
                     >
                     <span>
-                      <strong>
-                        {{ field.label }}
-                        <em v-if="field.unsupported" class="settings-badge">CFSM 不支持</em>
-                      </strong>
-                      <small>{{ field.unsupported ?? field.help }}</small>
-                      <small v-if="!field.unsupported && field.note" class="settings-note">{{ field.note }}</small>
+                      <strong>{{ field.label }}</strong>
+                      <small>{{ field.help }}</small>
+                      <small v-if="field.note" class="settings-note">{{ field.note }}</small>
                     </span>
                   </label>
 
                   <label
                     v-else
                     class="settings-field"
-                    :class="{ 'settings-field--wide': field.wide, 'is-unsupported': field.unsupported }"
+                    :class="{ 'settings-field--wide': field.wide }"
                   >
-                    <span>
-                      {{ field.label }}
-                      <em v-if="field.unsupported" class="settings-badge">CFSM 不支持</em>
-                    </span>
+                    <span>{{ field.label }}</span>
 
                     <select
                       v-if="field.kind === 'select'"
@@ -321,9 +315,9 @@ onMounted(async () => {
                     >
 
                     <small :class="{ 'is-error': issueFor(field.key) }">
-                      {{ issueFor(field.key) ?? field.unsupported ?? field.help }}
+                      {{ issueFor(field.key) ?? field.help }}
                     </small>
-                    <small v-if="!field.unsupported && field.note" class="settings-note">{{ field.note }}</small>
+                    <small v-if="field.note" class="settings-note">{{ field.note }}</small>
                   </label>
                 </template>
               </div>

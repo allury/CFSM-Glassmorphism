@@ -10,8 +10,11 @@ import type { ThemeSettings } from '@/theme/settings'
  * 分组标题、分组顺序、每项的中文名与项内顺序逐条对应上游 `configuration.data`。
  *
  * 说明文字（`help`）以上游同名条目为底稿，只在 CFSM 与 Komari 事实不同的地方改写，
- * 并在 `note` 里写明差异；`unsupported` 不为空的项表示 CFSM 公开接口确实不提供，
- * 控件只读，值固定，不做成一个点了没反应的开关。
+ * 并在 `note` 里写明差异。
+ *
+ * CFSM 公开接口确实不提供的两项（`rpcTransportMode`、`visitorInfoEnabled`）不在这张表里：
+ * 设置页不渲染它们，避免出现点了没反应的控件。两项仍留在 `theme/settings.ts` 的 48 项
+ * schema 与保存快照中（保存协议要求发送完整对象），正式版待办见 `docs/todo.md` TODO-02。
  */
 
 export type ThemeFieldKind = 'select' | 'switch' | 'text' | 'password' | 'number' | 'textarea'
@@ -35,8 +38,6 @@ export interface ThemeField {
   rows?: number
   /** 占满整行的宽字段（长文本、key 列表）。 */
   wide?: boolean
-  /** CFSM 不提供该能力时的说明；非空即只读。 */
-  unsupported?: string
   /** 与上游行为不同的地方，显示在说明后面。 */
   note?: string
   /** 依赖其它设置；返回 false 时控件禁用。 */
@@ -119,14 +120,6 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         note: 'CFSM 的实时数据由服务端 WebSocket 推送（约 5 秒一批），主题改不了推送节奏；低于 5 秒按 5 秒执行，避免重复拉取同一份快照。',
       },
       {
-        key: 'rpcTransportMode',
-        label: 'RPC 连接模式',
-        kind: 'select',
-        options: [{ value: 'http', label: 'HTTP（REST + WebSocket）' }],
-        help: '固定使用 CFSM 官方的 REST + WebSocket。',
-        unsupported: 'CFSM 没有 Komari 那套 HTTP / WebSocket RPC 二选一：公开接口只有 REST 与 /api/ws，theme-develop.md 与后端源码中都不存在 RPC 传输层。',
-      },
-      {
         key: 'defaultViewMode',
         label: '默认视图模式',
         kind: 'select',
@@ -195,13 +188,6 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         label: '隐藏头部',
         kind: 'switch',
         help: '隐藏地球和总览卡片。',
-      },
-      {
-        key: 'visitorInfoEnabled',
-        label: '显示访客信息',
-        kind: 'switch',
-        help: '底部访客 IP 条与访客详情卡片。',
-        unsupported: 'CFSM 公开接口不返回访客 IP，也没有审计日志：后端源码里没有任何把 CF-Connecting-IP 或访客信息交给主题的接口，因此强制关闭，不生成占位信息。',
       },
       {
         key: 'glassColorPreset',
@@ -517,6 +503,5 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
 export const THEME_FORM_FIELDS: readonly ThemeField[] = THEME_SETTINGS_FORM.flatMap((group) => group.fields)
 
 export function isFieldEnabled(field: ThemeField, settings: ThemeSettings): boolean {
-  if (field.unsupported !== undefined) return false
   return field.enabled ? field.enabled(settings) : true
 }
