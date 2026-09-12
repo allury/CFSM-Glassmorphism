@@ -75,4 +75,16 @@
 - **处理（已完成）**：详情页链接改由 `src/router/links.ts` 的 `serverDetailLocation` 统一生成，首页点击与详情页上一个 / 下一个节点都走它；只有 `hasMultipleSources(app.apiBases)` 为真时才写入 `source`。读取端在单后端时直接忽略该参数，因此剥离它不会让 `watch([routeId, requestedSource])` 重复触发加载；多来源部署的归属信息一字未动。
 - **旧链接兼容**：带 `?source=` 的地址照旧能打开，进入后用 `router.replace` 抹掉该参数并保留其余查询参数，不额外增加返回记录。
 - **本地回归（1440，模拟数据）**：首页点击 → `#/server/<id>` 无 source、历史 +1；上一个 / 下一个连续切换 04 → 05 → 04 正确且无 source；旧链接 `?source=…&keep=1` → `#/server/…?keep=1`（source 去除、keep 保留、历史 +1）；前进 / 后退正常；节点名与该 ID 的接口数据一致。
-- **待办**：新候选应用后在真实环境重跑上述五条路径。
+- **真实环境回归（新候选，独立于 TODO-05 的旧候选结论）**：验收对象为产物 `fbe35bdb8b554cf9e407ccabdfee5beb99765f82`（源码 `3baf452`），线上 `assets/index-CbDFiT57.js` 与 `assets/index-JhAy0QYE.css` 的 sha256 与候选逐字节相同。1440 实测五台真实节点：
+
+  | 路径 | 结果 |
+  |---|---|
+  | 首页点击进入详情 | `#/server/0ad0c79f…`（DMIT），无 source，历史 +1，7 张负载图卡；请求基线 1× `/api/server` + 1× `/api/config` + 2× `/api/history/all` |
+  | 上一个 / 下一个连续切换 | DMIT → V.PS → 绿云 →（上一个）V.PS，顺序正确，全程无 source，每页 7 卡 / 8 canvas |
+  | 无 source 深链接直开 | 绿云，UI 名称与 `/api/server?id=` 返回一致，7 卡 / 8 canvas、三条真实线路（电信 96ms·1.37% / 联通 98ms·0% / 移动 84ms·2.74%），无错误框、无溢出 |
+  | 同一深链接刷新 | 结果一致，无 source |
+  | 旧带 source 链接兼容 | `?source=…&keep=1` → `?keep=1`；source 去除、keep 保留、**历史仅 +1**；请求清单与基线**完全相同**（1 server + 1 config + 2 history），没有重复加载 |
+  | 前进 / 后退 | 后退回上一节点、前进回到规范化后的地址，均无 source |
+
+  控制台：读取时无 error 级日志（平台在导航时清空历史，不作为整段会话零错误的结论）。
+- **未覆盖**：线上只有单后端，多 `apiBase` 下 `source` 必须保留这条分支只有单元测试与本地覆盖，没有真实环境证据。
