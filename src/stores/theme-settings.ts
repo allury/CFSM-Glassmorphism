@@ -17,7 +17,6 @@ import {
   LEGACY_DASHBOARD_STORAGE_KEY,
   legacyDashboardOverrides,
   normalizeThemeSettingsLayer,
-  parseGlassCustomColors,
   parseThemeStorageSnapshot,
   resolveThemeMode,
   resolveThemeSettings,
@@ -26,12 +25,15 @@ import {
   themeSettingsEqual,
   themeStorageSnapshot,
   validateThemeSettingsDraft,
-  type GlassColorPreset,
-  type GlassCustomColors,
   type ThemeDraftIssue,
   type ThemeMode,
   type ThemeSettings,
 } from '@/theme/settings'
+import {
+  glassSurfaceTokens,
+  resolveGlassSurfaces,
+  type GlassSurfaces,
+} from '@/domain/glass-surfaces'
 
 export type ThemeSaveState = 'idle' | 'saving' | 'success' | 'error'
 export type ThemeSaveErrorKind = 'invalid-format' | 'unauthorized' | 'forbidden' | 'network' | 'unknown'
@@ -55,65 +57,6 @@ export interface ThemeSaveOutcome {
   refetchWarning: string | null
 }
 
-/*
- * 文字色（`*Text` / `*MutedText`）逐字取自 Komari `utils/glassTheme.ts` 的
- * emerald / soft / contrast / midnight：它们只在节点卡内部生效（见 `applyRuntime`），
- * 上游节点卡的正文、标签、提示行实测就是这几个值。此前这里是自拟的
- * `#101722` / `#536274` 等，节点卡文字因此比上游浅且偏蓝。
- *
- * 表面色（card / control / border）仍是本主题的值：它们驱动顶栏、提示框、面板等
- * 上游没有一一对应的界面，整表替换会波及这些界面，单列为已知差异。
- */
-const PRESET_COLORS: Record<Exclude<GlassColorPreset, '自定义'>, GlassCustomColors> = {
-  翡翠: {
-    lightCard: '#f6f9fcb8',
-    lightControl: '#eaf1f89e',
-    lightText: '#10151c',
-    lightMutedText: '#374151',
-    lightBorder: '#ffffffbd',
-    darkCard: '#0b111bc2',
-    darkControl: '#121b29a3',
-    darkText: '#f8fafc',
-    darkMutedText: '#d6dae4',
-    darkBorder: '#ffffff21',
-  },
-  柔和: {
-    lightCard: '#f8f5f2c7',
-    lightControl: '#eee8e3ad',
-    lightText: '#14151a',
-    lightMutedText: '#4b5563',
-    lightBorder: '#ffffffc9',
-    darkCard: '#171416d9',
-    darkControl: '#211d21c2',
-    darkText: '#f8fafc',
-    darkMutedText: '#cbd5e1',
-    darkBorder: '#ffffff24',
-  },
-  高对比: {
-    lightCard: '#fffffff2',
-    lightControl: '#edf1f5f2',
-    lightText: '#080b12',
-    lightMutedText: '#1f2937',
-    lightBorder: '#70809070',
-    darkCard: '#05070af2',
-    darkControl: '#111722f2',
-    darkText: '#ffffff',
-    darkMutedText: '#e5e7eb',
-    darkBorder: '#ffffff52',
-  },
-  午夜: {
-    lightCard: '#e9eef8d9',
-    lightControl: '#dce5f4cc',
-    lightText: '#0f172a',
-    lightMutedText: '#334155',
-    lightBorder: '#ffffffbd',
-    darkCard: '#080b18e6',
-    darkControl: '#0f1529d9',
-    darkText: '#eaf2ff',
-    darkMutedText: '#c7d2fe',
-    darkBorder: '#9cb6ff33',
-  },
-}
 
 function recordValue(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -198,11 +141,11 @@ function saveFailure(error: unknown): ThemeSaveFailure {
   }
 }
 
-function activeColors(settings: ThemeSettings): GlassCustomColors {
-  if (settings.glassColorPreset === '自定义') {
-    return parseGlassCustomColors(settings.glassCustomColors) ?? PRESET_COLORS.翡翠
-  }
-  return PRESET_COLORS[settings.glassColorPreset]
+function activeSurfaces(settings: ThemeSettings, dark: boolean): GlassSurfaces {
+  return resolveGlassSurfaces(
+    glassSurfaceTokens(settings.glassColorPreset, settings.glassCustomColors),
+    dark,
+  )
 }
 
 export const useThemeSettingsStore = defineStore('theme-settings', () => {
@@ -244,33 +187,32 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   function applyRuntime(): void {
     if (typeof document === 'undefined') return
     const root = document.documentElement
-    const colors = activeColors(runtime.value)
     const dark = resolvedTheme.value === 'dark'
-    const card = dark ? colors.darkCard : colors.lightCard
-    const control = dark ? colors.darkControl : colors.lightControl
-    const text = dark ? colors.darkText : colors.lightText
-    const muted = dark ? colors.darkMutedText : colors.lightMutedText
-    const border = dark ? colors.darkBorder : colors.lightBorder
+    const surfaces = activeSurfaces(runtime.value, dark)
 
     root.dataset.theme = resolvedTheme.value
     root.dataset.colorVision = runtime.value.colorVisionMode === '色觉友好' ? 'friendly' : 'standard'
     root.dataset.motion = runtime.value.disablePageAnimation ? 'reduced' : 'full'
     root.style.colorScheme = resolvedTheme.value
-    root.style.setProperty('--glass', card)
-    root.style.setProperty('--glass-strong', card)
-    root.style.setProperty('--glass-soft', control)
-    root.style.setProperty('--glass-hover', control)
-    root.style.setProperty('--glass-border', border)
     /*
-     * 上游 `Provider.vue` 把预设的文字色写进 `--glass-*-text` / `--glass-*-muted-text`，
-     * 只在玻璃卡片内部生效；全局 `--foreground` / `--muted-foreground` 不受预设影响。
-     * 这里此前直接覆盖了全局 `--ink` / `--muted`，总览卡与详情页因此都跟着预设变色。
-     * 节点卡内部如何接管见 `styles/main.css` 的 `.node-card`。
+     * 预设的表面色只驱动节点卡这一组变量，对应上游 `.node-card, .bg-card,
+     * [data-slot='card']` 那条规则；文字色同样只在节点卡内部接管。
      */
-    root.style.setProperty('--glass-text', text)
-    root.style.setProperty('--glass-muted-text', muted)
-    root.style.removeProperty('--ink')
-    root.style.removeProperty('--muted')
+    root.style.setProperty('--node-card-surface', surfaces.card)
+    root.style.setProperty('--node-card-surface-hover', surfaces.cardHover)
+    root.style.setProperty('--node-card-border', surfaces.border)
+    root.style.setProperty('--node-card-shadow', surfaces.shadow)
+    root.style.setProperty('--glass-text', surfaces.text)
+    root.style.setProperty('--glass-muted-text', surfaces.mutedText)
+    /*
+     * 顶栏、面板、提示框与弹层保持本主题在 `:root` 里已验证的表面色。上游的预设
+     * 只有卡片、`header` 与顶部统计栏三处规则，其余界面上游没有对应项；由 JS 整表
+     * 覆盖全局 `--glass*` 会把预设差异扩散到上游没有的界面上。未对齐范围见
+     * `docs/todo.md` TODO-03。
+     */
+    for (const name of ['--glass', '--glass-strong', '--glass-soft', '--glass-hover', '--glass-border', '--ink', '--muted']) {
+      root.style.removeProperty(name)
+    }
   }
 
   function rebuildFromLayers(reseedDraft = false): void {

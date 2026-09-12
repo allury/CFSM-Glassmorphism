@@ -140,6 +140,7 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 4. **NECESSARY-CFSM-DIFFERENCE**：上游的磁盘预测还用于首页健康面板的磁盘风险榜，需要逐节点历史；CFSM 首页不具备该数据，不复刻该榜单。
 5. **首页延迟 / 丢包口径**（D-01 → PASS）：上游首页卡片显示的是窗口平均——`useNodePingDisplay` 的 `latencyDisplay` / `lossDisplay` 取自 `pingStats.avgLatency` / `avgLoss`，而不是最近一次采样。本主题据此改为对 `/api/servers` 已返回的窗口（最近 2 小时、最多 20 个真实采样）取平均，`null`（该桶无采样）与 `false`（未配置）都不参与；不产生额外请求。上游按每个任务的探测次数加权，CFSM 不返回探测次数，因此落在上游没有 metric stats 时的同一形态。站点关闭三网详情时窗口为空数组，回落到最新一次上报并在标题写明口径。
 6. **「平滑峰值」改称「曲线平滑」**（有意偏离上游文案）：上游同名开关执行 `cutPeakValues`——EWMA 削峰并填补空洞，而本主题只改折线曲率、不触碰采样值。沿用上游名称会让用户以为尖峰已被处理，因此改名并在提示中写明「只改变点与点之间的画法」。极高值本身的可读性方案见 `docs/todo.md` TODO-01。
+7. **配色预设的表面色**（P2 → 部分 PASS）：上游预设的 16 个值只由三组选择器消费——卡片、`header` 与顶部统计栏。本轮把节点卡这一组接到独立变量 `--node-card-surface` / `-hover` / `--node-card-border` / `--node-card-shadow`，取值逐字移植上游 `PRESET_TOKENS`；同时停止把预设整表写进全局 `--glass*`，避免差异扩散到上游没有对应规则的提示框、面板与弹层。顶栏与顶部统计栏两处仍未对齐（本主题顶栏是滚动后才上玻璃，结构与上游不同），逐项记录在 `docs/todo.md` TODO-03，不笼统宣称预设已全部 1:1。
 
 ## 保留的 P2
 

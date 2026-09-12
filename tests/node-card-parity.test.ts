@@ -17,6 +17,7 @@ const stylesheet = strip(readFileSync(new URL('../src/styles/main.css', import.m
 const serverCard = readFileSync(new URL('../src/components/dashboard/ServerCard.vue', import.meta.url), 'utf8')
 const homeView = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8')
 const themeStore = readFileSync(new URL('../src/stores/theme-settings.ts', import.meta.url), 'utf8')
+const glassSurfaces = readFileSync(new URL('../src/domain/glass-surfaces.ts', import.meta.url), 'utf8')
 
 function block(selector: string): string {
   const start = stylesheet.indexOf(`\n${selector} {`)
@@ -124,8 +125,8 @@ describe('离线卡照上游实际页面', () => {
 
 describe('配色预设的文字色只在节点卡内部生效', () => {
   it('运行时只写 --glass-text / --glass-muted-text，不再覆盖全局 --ink / --muted', () => {
-    expect(themeStore).toContain("root.style.setProperty('--glass-text', text)")
-    expect(themeStore).toContain("root.style.setProperty('--glass-muted-text', muted)")
+    expect(themeStore).toContain("root.style.setProperty('--glass-text', surfaces.text)")
+    expect(themeStore).toContain("root.style.setProperty('--glass-muted-text', surfaces.mutedText)")
     expect(themeStore).not.toContain("setProperty('--ink'")
     expect(themeStore).not.toContain("setProperty('--muted'")
   })
@@ -139,6 +140,7 @@ describe('配色预设的文字色只在节点卡内部生效', () => {
     expect(root).toContain('--muted: oklch(0.34 0.02 285.938)')
   })
 
+  // 预设表格第 13 轮起在 `domain/glass-surfaces.ts`（与上游 PRESET_TOKENS 同构）。
   it('预设文字色逐字取自上游 glassTheme.ts', () => {
     for (const pair of [
       ["lightText: '#10151c'", "lightMutedText: '#374151'"],
@@ -146,7 +148,7 @@ describe('配色预设的文字色只在节点卡内部生效', () => {
       ["lightText: '#080b12'", "lightMutedText: '#1f2937'"],
       ["lightText: '#0f172a'", "lightMutedText: '#334155'"],
     ]) {
-      for (const entry of pair) expect(themeStore).toContain(entry)
+      for (const entry of pair) expect(glassSurfaces).toContain(entry)
     }
   })
 })

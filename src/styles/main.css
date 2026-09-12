@@ -1177,11 +1177,11 @@ a {
   gap: 12px;
   padding: 14px;
   overflow: hidden;
-  border: 1px solid var(--card-surface-border);
+  border: 1px solid var(--node-card-border, var(--card-surface-border));
   /* Komari NodeCard 用 rounded-xl，即 --radius + 4px = 14px。 */
   border-radius: 14px;
-  background: var(--card-surface);
-  box-shadow: var(--card-surface-shadow);
+  background: var(--node-card-surface, var(--card-surface));
+  box-shadow: var(--node-card-shadow, var(--card-surface-shadow));
   cursor: pointer;
   transition: box-shadow 200ms ease, background-color 200ms ease, transform 200ms ease;
   backdrop-filter: blur(14px) saturate(145%);
@@ -1192,8 +1192,8 @@ a {
 
 .node-card:hover,
 .node-card:focus-visible {
-  background: var(--card-surface-hover);
-  box-shadow: var(--card-surface-shadow-hover);
+  background: var(--node-card-surface-hover, var(--card-surface-hover));
+  box-shadow: var(--node-card-shadow, var(--card-surface-shadow-hover));
 }
 
 /*

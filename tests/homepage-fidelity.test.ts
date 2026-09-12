@@ -295,7 +295,7 @@ describe('浏览器实测得到的卡片表面契约', () => {
     const card = stylesheet.slice(stylesheet.indexOf('.node-card {'), stylesheet.indexOf('.node-card:hover'))
     expect(card).toContain('border-radius: 14px')
     expect(card).toContain('backdrop-filter: blur(14px) saturate(145%)')
-    expect(card).toContain('box-shadow: var(--card-surface-shadow)')
+    expect(card).toContain('box-shadow: var(--node-card-shadow, var(--card-surface-shadow))')
   })
 
   it('hover 阴影与常态一致（上游 fallback 永远不生效）', () => {
