@@ -5,7 +5,7 @@ import type { NodeCardSize } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
-import { probeSeriesFor, type ProbeSeriesMap } from '@/domain/probe-window'
+import { probeSeriesFor, windowAverage, type ProbeSeriesMap } from '@/domain/probe-window'
 import { daysUntilExpiry, remainingValue, trafficUsage } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
@@ -174,6 +174,45 @@ function emptyBars(metric: string): PingBar[] {
 }
 
 const primaryProbe = computed(() => props.server.latency[0] ?? null)
+
+/*
+ * 延迟与丢包显示的是**窗口平均**，与上游一致：Komari `useNodePingDisplay` 的
+ * `latencyDisplay` / `lossDisplay` 取的是 `pingStats.avgLatency` / `avgLoss`，
+ * 不是最近一次采样。窗口就是 `/api/servers` 已经返回的 `ping` / `loss`
+ * （最近 2 小时、最多 20 个真实采样），因此不需要任何额外请求。
+ *
+ * 站点关闭三网详情时后端返回空数组，此时回落到本次上报的最新值，并在标题里
+ * 说明口径，不把"没有窗口"伪装成平均值。
+ */
+const latencyWindow = computed(() => {
+  const target = primaryProbe.value?.target
+  return target ? windowAverage(props.server.history.latencySeries, target) : { value: null, samples: 0 }
+})
+const lossWindow = computed(() => {
+  const target = primaryProbe.value?.target
+  return target ? windowAverage(props.server.history.packetLossSeries, target) : { value: null, samples: 0 }
+})
+const latencyText = computed(() => (
+  latencyWindow.value.value === null
+    ? formatLatency(primaryProbe.value?.latency ?? false)
+    : formatLatency(latencyWindow.value.value)
+))
+const lossText = computed(() => (
+  lossWindow.value.value === null
+    ? formatProbePercent(primaryProbe.value?.packetLoss ?? false)
+    : formatProbePercent(lossWindow.value.value)
+))
+
+function probeTitle(label: string, samples: number): string | undefined {
+  const probe = primaryProbe.value
+  if (!probe) return undefined
+  return samples === 0
+    ? `${probe.label} 最近一次上报`
+    : `${probe.label} ${label}：按窗口内 ${samples} 个真实采样计算`
+}
+
+const latencyTitle = computed(() => probeTitle('平均延迟', latencyWindow.value.samples))
+const lossTitle = computed(() => probeTitle('平均丢包', lossWindow.value.samples))
 
 /*
  * 一根柱子 = 一个时间桶，与 Komari `useNodePingDisplay.buildPingBars` 一致
@@ -464,9 +503,9 @@ function hideMissingImage(event: Event): void {
 
       <div v-if="primaryProbe" class="node-probes">
         <div class="node-probe">
-          <div class="node-probe__head">
+          <div class="node-probe__head" :title="latencyTitle">
             <span>延迟</span>
-            <span class="node-probe__value">{{ formatLatency(primaryProbe.latency) }}</span>
+            <span class="node-probe__value">{{ latencyText }}</span>
           </div>
           <div
             class="node-probe__bars"
@@ -476,9 +515,9 @@ function hideMissingImage(event: Event): void {
           </div>
         </div>
         <div class="node-probe">
-          <div class="node-probe__head">
+          <div class="node-probe__head" :title="lossTitle">
             <span>丢包</span>
-            <span class="node-probe__value">{{ formatProbePercent(primaryProbe.packetLoss) }}</span>
+            <span class="node-probe__value">{{ lossText }}</span>
           </div>
           <div
             class="node-probe__bars"

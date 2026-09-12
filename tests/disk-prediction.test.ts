@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   analyzeDiskPrediction,
@@ -120,5 +121,21 @@ describe('磁盘耗尽预测', () => {
 
   it('关闭时由调用方跳过，函数本身对空历史保持沉默', () => {
     expect(diskPredictionSummary(analyzeDiskPrediction([]), 30)).toEqual({ text: '暂无趋势', warning: false })
+  })
+})
+
+describe('磁盘预警色的样式规则', () => {
+  const stylesheet = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
+
+  /*
+   * 两条规则同为单类选择器、权重相同，因此顺序就是胜负：预警色必须写在基础规则之后。
+   * 隐藏的浏览器面板会冻结样式重算，这条颜色无法在无头环境里可靠实测，用源码顺序兜底。
+   */
+  it('预警色规则位于基础规则之后并指向 --destructive', () => {
+    const base = stylesheet.indexOf('.metric-chart-header__subtitle {')
+    const alert = stylesheet.indexOf('.metric-chart-header__subtitle--alert {')
+    expect(base).toBeGreaterThan(-1)
+    expect(alert).toBeGreaterThan(base)
+    expect(stylesheet.slice(alert, alert + 140)).toContain('color: var(--destructive)')
   })
 })

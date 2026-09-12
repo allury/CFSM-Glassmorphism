@@ -4,6 +4,7 @@ import type { GlassServer } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
+import { windowAverage } from '@/domain/probe-window'
 import { matchProvider, trafficUsage, type ProviderAlias } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
@@ -114,10 +115,16 @@ function metadataBadges(server: GlassServer): MetadataBadge[] {
   return badges
 }
 
+/*
+ * 与节点卡、上游一致：显示 `/api/servers` 已返回的窗口平均延迟，而不是最近一次采样
+ * （上游 `useNodePingDisplay` 的 `latencyDisplay` 取的是 `pingStats.avgLatency`）。
+ * 站点关闭三网详情时窗口为空，回落到本次上报的最新值。
+ */
 function probeText(server: GlassServer): string {
   const probe = server.latency[0]
   if (!probe) return '—'
-  return `${probe.label} ${formatLatency(probe.latency)}`
+  const average = windowAverage(server.history.latencySeries, probe.target)
+  return `${probe.label} ${formatLatency(average.value ?? probe.latency)}`
 }
 
 function trafficPercent(server: GlassServer): number | null {

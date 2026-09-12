@@ -178,7 +178,7 @@ Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
 | HOME-005 | BUG-CONFIRMED | 提示行、网速、流量百分比、盒子表面与上游不同 | 均为自拟色 | 已按上游实测值修复 |
 | HOME-006 | BUG-CONFIRMED | 配色预设文字色与上游不同 | 预设色值自拟，与 `glassTheme.ts` 不符 | 文字色逐字对齐上游 |
 | DEFERRED-CHART-01 | 已解决 | 内联图的填充与线形 | Test 2 按上游 `LoadChart` 逐图移植 | 关闭 |
-| D-01 | 待裁决 | 首页丢包口径 | 本主题显示最新一桶；上游是窗口加权平均（真实部署：V.PS 1.60%、绿云 0.80%、NETCUP 3.20%） | 等待裁决 |
+| D-01 | 已裁决 | 首页丢包口径 | 本主题显示最新一桶；上游是窗口加权平均（真实部署：V.PS 1.60%、绿云 0.80%、NETCUP 3.20%） | Test 3 按上游口径改为窗口平均，见 SET-008 |
 | DEFERRED-PRESET-01 | DEFERRED | 配色预设的表面色 | 驱动顶栏、提示框等上游无一一对应的界面 | 单列，另行处理 |
 
 ### Test 2 终态
@@ -203,10 +203,11 @@ Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
 | SET-005 | NOT-A-BUG | `rpcTransportMode`、`visitorInfoEnabled` | 复核后端源码与 `theme-develop.md`：没有 RPC 传输层，也没有任何把访客 IP 或审计数据交给主题的接口 | 页面保留为只读项并写明复核依据，不做成点了没反应的开关 |
 | SET-006 | NECESSARY-CFSM-DIFFERENCE | 首页健康面板的磁盘风险榜 | 上游按逐节点历史排名；CFSM 首页没有逐节点历史，复刻需为每台节点各发一次 `/api/history/all` | 不复刻，磁盘预测只落在详情页 |
 | SET-007 | P2 | `.node-box` 在 compact / mini 档的横向内边距 | 上游 compact 是 `px-1.5`(6px)、mini 是 `px-1`(4px)，本主题统一 8px；只影响盒内文字可用宽度，不改变卡片几何 | 记录，不改 |
+| SET-008 | 已裁决（D-01） | 首页延迟 / 丢包显示口径 | 上游 `useNodePingDisplay` 显示 `pingStats.avgLatency` / `avgLoss`（窗口平均），本主题显示最近一次采样 | 改为对 `/api/servers` 已返回的窗口（最近 2 小时、最多 20 个真实采样）取平均；不额外请求，窗口为空时回落最新值并在标题写明口径 |
 
 ### Test 3 终态
 
 - **P0 = 0 ｜ P1 = 0**
 - BUG-CONFIRMED 5 项，全部已修复并有回归测试（新增 `theme-settings-form.test.ts`、`disk-prediction.test.ts`，扩写 `dashboard-realtime.test.ts`）
 - NOT-A-BUG 1 项、NECESSARY-CFSM-DIFFERENCE 1 项、P2 1 项
-- 上一轮的 D-01（首页丢包口径）仍待裁决
+- 上一轮的 D-01（首页丢包口径）已按上游口径裁决并落地，见 SET-008

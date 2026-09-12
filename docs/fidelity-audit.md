@@ -138,6 +138,7 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 2. **四处配置无行为**（P1 → PASS）：`dataUpdateInterval`、`diskPredictionEnabled`、`diskPredictionThresholdDays` 此前在 schema 之外零消费，`nodeDetailSectionTabsEnabled` 有实现无入口，本轮全部接线。
 3. **卡片密度盒模型**（P1 → PASS）：舒适与宽松两档此前沿用旧盒模型，1440 实测分别比上游高 4px、矮 36px。补齐后四档在 1440 与 375 下与上游逐项相同，包含头部高度、主体内边距、内容行距与延迟面板高度。
 4. **NECESSARY-CFSM-DIFFERENCE**：上游的磁盘预测还用于首页健康面板的磁盘风险榜，需要逐节点历史；CFSM 首页不具备该数据，不复刻该榜单。
+5. **首页延迟 / 丢包口径**（D-01 → PASS）：上游首页卡片显示的是窗口平均——`useNodePingDisplay` 的 `latencyDisplay` / `lossDisplay` 取自 `pingStats.avgLatency` / `avgLoss`，而不是最近一次采样。本主题据此改为对 `/api/servers` 已返回的窗口（最近 2 小时、最多 20 个真实采样）取平均，`null`（该桶无采样）与 `false`（未配置）都不参与；不产生额外请求。上游按每个任务的探测次数加权，CFSM 不返回探测次数，因此落在上游没有 metric stats 时的同一形态。站点关闭三网详情时窗口为空数组，回落到最新一次上报并在标题写明口径。
 
 ## 保留的 P2
 

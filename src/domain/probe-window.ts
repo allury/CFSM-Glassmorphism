@@ -41,6 +41,37 @@ export function numericWindowSamples(series: ProbeSeriesMap): number[] {
   ))
 }
 
+export interface ProbeWindowAverage {
+  /** 窗口内真实采样的平均值；没有任何真实采样时为 null。 */
+  value: number | null
+  /** 参与平均的真实采样数，用于在提示里说明口径。 */
+  samples: number
+}
+
+/*
+ * 单个探测目标在窗口内的平均值。
+ *
+ * 对应上游 `useNodePingStats` 的 `avgLatency` / `avgLoss`：Komari 首页卡片显示的是
+ * 窗口平均，而不是最近一次采样（`useNodePingDisplay` 的 `latencyDisplay` /
+ * `lossDisplay` 都取 stats 的平均值）。上游按每个任务的探测次数加权，CFSM 的
+ * `/api/servers` 只返回按时间桶抽样的数值、不返回探测次数，因此落在上游没有
+ * metric stats 时的同一形态——对该目标窗口内的真实采样取平均。
+ *
+ * `null`（该桶无采样）与 `false`（该探测点未配置）都不参与平均：平均值只能由
+ * 真实采样构成，把它们当成 0 会把"没数据"说成"零延迟 / 零丢包"。
+ */
+export function windowAverage(series: ProbeSeriesMap, target: ProbeTarget): ProbeWindowAverage {
+  let sum = 0
+  let samples = 0
+  for (const point of probeSeriesFor(series, target)) {
+    const value = point.value
+    if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) continue
+    sum += value
+    samples += 1
+  }
+  return { value: samples === 0 ? null : sum / samples, samples }
+}
+
 /** 深拷贝窗口序列，用于快照导出。 */
 export function cloneProbeSeries(series: ProbeSeriesMap): ProbeSeriesMap {
   return Object.fromEntries(
