@@ -25,6 +25,7 @@ import {
   resolveQuickControlKeys,
   type QuickControlKey,
 } from '@/domain/theme-presentation'
+import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { createGlassServerMapper } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
@@ -177,14 +178,16 @@ async function refresh(): Promise<void> {
 /**
  * 与 Komari 的 NodeCard / NodeList 主路径一致：卡片或列表行的主点击直接进入节点详情，
  * 中间不插入快速预览、二次确认或任何其它中间层。
- * 多 apiBase 场景必须带上该节点的 owning source，避免把节点解析到错误的后端。
+ *
+ * 链接由 `router/links` 统一生成：多 apiBase 场景仍然带上该节点的 owning source，
+ * 避免把节点解析到错误的后端；单后端站点上该参数恒等于当前同源地址，予以省略。
  */
 function openServer(server: GlassServer): void {
-  void router.push({
-    name: 'server-detail',
-    params: { id: server.id },
-    query: { source: server.sourceBase },
-  })
+  void router.push(serverDetailLocation(
+    server.id,
+    server.sourceBase,
+    hasMultipleSources(app.apiBases),
+  ))
 }
 
 function cardStyle(index: number): Record<string, string> {

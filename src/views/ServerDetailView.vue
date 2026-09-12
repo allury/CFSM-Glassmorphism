@@ -16,6 +16,7 @@ import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { issueCopy } from '@/domain/issue-copy'
 import { resolveNodeProvider } from '@/domain/provider'
 import { buildDetailCards, parseTrafficLimitBytes } from '@/domain/theme-presentation'
+import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
@@ -56,9 +57,17 @@ const mounted = ref(false)
 const routeId = computed(() => (
   typeof route.params.id === 'string' ? route.params.id.trim() : ''
 ))
-const requestedSource = computed(() => (
-  typeof route.query.source === 'string' ? route.query.source : undefined
-))
+const multiSource = computed(() => hasMultipleSources(app.apiBases))
+/*
+ * 只有多来源部署才采用 URL 里的 `source`。单后端时它是冗余值，这里直接忽略——
+ * 这样下面剥离该参数的 `router.replace` 不会让 `watch([routeId, requestedSource])`
+ * 再触发一次加载，也就不会多发一轮请求。节点归属本身不受影响：单后端时
+ * `fetchServerFromSources` 只有一个 base 可用。
+ */
+const requestedSource = computed(() => {
+  const source = route.query.source
+  return typeof source === 'string' && multiSource.value ? source : undefined
+})
 const siteTitle = computed(() => sourceConfig.value?.siteTitle ?? app.config?.siteTitle ?? 'CF Server Monitor')
 const pageLoading = computed(() => state.value === 'loading' && server.value === null)
 const refreshing = computed(() => (
@@ -166,11 +175,19 @@ function toggleFavorite(): void {
 
 function openNode(target: { id: string, source: { base: string } } | undefined): void {
   if (!target) return
-  void router.push({
-    name: 'server-detail',
-    params: { id: target.id },
-    query: { source: target.source.base },
-  })
+  void router.push(serverDetailLocation(target.id, target.source.base, multiSource.value))
+}
+
+/*
+ * 旧链接兼容：带 `?source=` 的地址照旧能打开，进入后把这个冗余参数抹掉。
+ * 用 `replace` 而不是 `push`，不额外增加一条返回记录；其余查询参数原样保留。
+ * 多来源部署不动这个参数——那里它是必需信息。
+ */
+function normalizeSourceQuery(): void {
+  if (multiSource.value || typeof route.query.source !== 'string') return
+  const query = { ...route.query }
+  delete query.source
+  void router.replace({ name: 'server-detail', params: { ...route.params }, query })
 }
 
 function navigateNode(step: number): void {
@@ -330,6 +347,7 @@ async function refresh(): Promise<void> {
 onMounted(async () => {
   if (app.state === 'idle') await app.initialize()
   mounted.value = true
+  normalizeSourceQuery()
   await loadCurrent()
   /*
    * 站点级 show_price / show_expire / show_tf 只出现在 `/api/servers` 的顶层
@@ -345,6 +363,11 @@ onMounted(async () => {
 
 watch([routeId, requestedSource], () => {
   if (mounted.value) void loadCurrent()
+})
+
+/* 前进 / 后退回到旧的带 source 链接时同样规范化；抹掉后再次进入本回调会直接返回。 */
+watch(() => route.query.source, () => {
+  if (mounted.value) normalizeSourceQuery()
 })
 
 watch([server, siteTitle], () => {

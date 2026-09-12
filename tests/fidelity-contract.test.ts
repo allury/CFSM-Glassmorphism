@@ -23,8 +23,11 @@ describe('Komari fidelity contracts', () => {
 
     // 主点击路径直接进入详情，并保留 owning source，避免多 apiBase 串节点。
     expect(home).toContain('function openServer')
-    expect(home).toContain('name: \'server-detail\'')
-    expect(home).toContain('query: { source: server.sourceBase }')
+    expect(home).toContain('serverDetailLocation(')
+    // 归属信息仍由调用方传入；单后端时才省略冗余的 source 查询参数，
+    // 生成规则本身由 tests/router-links.test.ts 锁定。
+    expect(home).toContain('hasMultipleSources(app.apiBases)')
+    expect(home).toContain('server.sourceBase')
 
     // 卡片与列表行的主点击都只发一个 open 事件，由 HomeView 直接导航。
     expect(card).toContain('@click="emit(\'open\')"')
@@ -386,7 +389,7 @@ describe('Komari fidelity contracts', () => {
     expect(detail).not.toContain('SERVER DETAIL')
     // 上一台/下一台只复用首页已加载的索引，详情页仍只订阅单节点。
     expect(detail).toContain('serverStore.servers')
-    expect(detail).toContain('query: { source: target.source.base }')
+    expect(detail).toContain('serverDetailLocation(target.id, target.source.base, multiSource.value)')
   })
 
   it('shares the released header and Komari information-card order on detail pages', () => {
