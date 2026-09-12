@@ -34,13 +34,18 @@ import '@/utils/echarts'
 /*
  * 移植自 Komari `components/PingChart.vue`（bf83765）：左侧时间范围、右侧全选 / 全不选，
  * 下面是可点击开关的任务卡（平均延迟 · 丢包率 · 波动率，信息按钮展开统计），
- * 然后是「平滑峰值」开关与 320px 的延迟大图。
+ * 然后是「曲线平滑」开关与 320px 的延迟大图。
  *
  * 上游的任务来自后端 Ping 任务，CFSM 对应的是旧四线路与 Node 1–4 这 8 个探测目标；
  * 时间范围取上游同样的 1 小时 / 6 小时 / 12 小时 / 1 天，外加 CFSM 最长的 7 天。
  */
 const PING_RANGES: readonly HistoryHours[] = [1, 6, 12, 24, 168]
-const SMOOTH_HINT = '只调整折线的绘制平滑度，不改写、不过滤任何采样值'
+/*
+ * 上游同名开关叫「平滑峰值」，而它真的会削峰：先把偏离邻域均值超过 30% 的点置空，
+ * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题不改写采样，只改折线曲率，
+ * 沿用上游的名字会让人以为尖峰已被处理，因此这里改称「曲线平滑」。
+ */
+const SMOOTH_HINT = '只改变点与点之间的画法（折线曲率），不改写、不过滤、不插值任何采样值；尖峰仍是真实数值'
 
 interface PingTask extends PingTaskLine {
   stats: ProbeStats
@@ -297,7 +302,7 @@ function retry(): void {
         <div class="ping-chart__options">
           <div class="ping-chart__smooth">
             <button type="button" class="ping-chart__button" :class="{ 'is-active': smooth }" @click="smooth = !smooth">
-              平滑峰值
+              曲线平滑
             </button>
             <AppTooltip :content="SMOOTH_HINT">
               <span class="ping-task__info" aria-hidden="true">

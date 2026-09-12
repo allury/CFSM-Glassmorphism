@@ -202,7 +202,7 @@ Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
 | SIZE-001 | BUG-CONFIRMED | 舒适档比上游高 4px、宽松档矮 36px | `--compact` / `--mini` 已改成上游盒模型，注释写明「其余尺寸档留待 Test 2」却未处理；宽松档那条规则针对的 `.node-card--card` 类名从不渲染，一直空转 | 两档补齐上游盒模型（头部 44 / 52、主体 `0 16 16` / `0 24 24`、行距 12 / 16、面板 48 / 56） |
 | SET-005 | NOT-A-BUG | `rpcTransportMode`、`visitorInfoEnabled` | 复核后端源码与 `theme-develop.md`：没有 RPC 传输层，也没有任何把访客 IP 或审计数据交给主题的接口 | 设置页不呈现这两项；仍保留在 48 项 schema 与保存快照中，是否从 schema 移除见 `docs/todo.md` TODO-02 |
 | SET-006 | NECESSARY-CFSM-DIFFERENCE | 首页健康面板的磁盘风险榜 | 上游按逐节点历史排名；CFSM 首页没有逐节点历史，复刻需为每台节点各发一次 `/api/history/all` | 不复刻，磁盘预测只落在详情页 |
-| SET-007 | P2 | `.node-box` 在 compact / mini 档的横向内边距 | 上游 compact 是 `px-1.5`(6px)、mini 是 `px-1`(4px)，本主题统一 8px；只影响盒内文字可用宽度，不改变卡片几何 | 记录，不改 |
+| SET-007 | BUG-CONFIRMED | `.node-box` 在 compact 档的横向内边距 | mini 档此前已是 4px；compact 档沿用基础档的 `6px 8px`，而上游是 `px-1.5 py-1.5`（6px），盒内文字少 4px 可用宽度 | 补 `.node-card--compact .node-box { padding: 6px }`，纵向不变，卡片几何不变 |
 | SET-008 | 已裁决（D-01） | 首页延迟 / 丢包显示口径 | 上游 `useNodePingDisplay` 显示 `pingStats.avgLatency` / `avgLoss`（窗口平均），本主题显示最近一次采样 | 改为对 `/api/servers` 已返回的窗口（最近 2 小时、最多 20 个真实采样）取平均；不额外请求，窗口为空时回落最新值并在标题写明口径 |
 
 ### Test 3 终态

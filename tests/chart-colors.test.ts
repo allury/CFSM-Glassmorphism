@@ -369,7 +369,7 @@ describe('数据语义：不补点、不插值、不写 0', () => {
     expect(seriesOf(memoryChartOption(context(false, false, noSwap))).map((item) => item.name)).toEqual(['RAM', 'RAM 总量'])
   })
 
-  it('「平滑峰值」只改变绘制曲率，数值一点不改', () => {
+  it('「曲线平滑」只改变绘制曲率，数值一点不改', () => {
     const tasks = pingTasks()
     const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false }
     const off = seriesOf(pingChartOption({ ...base, smooth: false }))

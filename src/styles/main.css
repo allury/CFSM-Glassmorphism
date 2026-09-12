@@ -1608,6 +1608,15 @@ a {
   padding: 4px;
 }
 
+/*
+ * 上游 compact 档的指标盒是 `px-1.5 py-1.5`（6px），舒适与宽松是 `px-2 py-1.5`（8px / 6px）。
+ * 本主题此前让 compact 沿用基础档的 8px 横向内边距，盒内文字因此比上游少 4px 可用宽度。
+ * 纵向本来就是 6px，这条只改横向，不影响卡片几何。
+ */
+.node-card--compact .node-box {
+  padding: 6px;
+}
+
 .node-card--compact .node-box {
   padding: 6px;
 }
