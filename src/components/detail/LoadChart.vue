@@ -25,6 +25,7 @@ import {
   visibleLoadCards,
   type LoadChartContext,
 } from '@/domain/detail-chart-options'
+import { analyzeDiskPrediction, diskPredictionSummary } from '@/domain/disk-prediction'
 import { issueCopy } from '@/domain/issue-copy'
 import { activeProbeTargets, buildChartRows, labeledProbeTargets } from '@/domain/server-detail'
 import { resolveChartFamilies, type ChartFamily } from '@/domain/theme-presentation'
@@ -143,6 +144,18 @@ const header = computed(() => {
   }
 })
 
+/*
+ * 磁盘耗尽预测。上游同样把它放在 LoadChart 磁盘卡的副标题上，数据取自它自己的
+ * load records；CFSM 没有对应接口，这里直接用本图已经取回的历史采样，不为预测
+ * 追加任何请求。所以它是否成立取决于当前选中的时间范围——需要跨满两天，
+ * 1 天及以下的范围照上游显示「趋势积累中」。
+ */
+const diskPrediction = computed(() => {
+  if (!theme.runtime.diskPredictionEnabled) return { text: '', warning: false }
+  const state = analyzeDiskPrediction(historyPoints.value, server.value?.diskTotal ?? null)
+  return diskPredictionSummary(state, theme.runtime.diskPredictionThresholdDays)
+})
+
 function retry(): void {
   void detail.loadHistory(historyHours.value)
 }
@@ -205,7 +218,13 @@ function retry(): void {
 
         <article v-if="enabled('disk')" class="metric-chart-card" data-load-chart-card="disk" :style="orderStyle('disk')">
           <header class="metric-chart-card__header">
-            <MetricChartHeader title="磁盘" icon="tabler:device-floppy" tone="emerald">
+            <MetricChartHeader
+              title="磁盘"
+              icon="tabler:device-floppy"
+              tone="emerald"
+              :subtitle="diskPrediction.text"
+              :alert="diskPrediction.warning"
+            >
               <div class="metric-chart-value">
                 <template v-if="header.diskUsed">
                   <span>{{ header.diskUsed.value }}</span><span>{{ header.diskUsed.unit }}</span>

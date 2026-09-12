@@ -6,6 +6,12 @@ import {
 } from './websocket'
 
 const DEFAULT_FALLBACK_INTERVAL_MS = 60_000
+/*
+ * 主题设置「数据更新间隔」驱动这个回退轮询。CFSM 的实时数据是 WebSocket 推送
+ * （服务端 `subscribe=all` 约 5 秒合并一批），只有连接不可用时才会走这条 REST 回退，
+ * 因此下限取与服务端批次相同的 5 秒：比它更密只会重复打同一份快照并消耗 D1 额度。
+ */
+const MIN_FALLBACK_INTERVAL_MS = 5_000
 
 type IntervalHandle = ReturnType<typeof setInterval>
 
@@ -39,7 +45,8 @@ export interface DashboardRealtimeOptions {
   createSocket?: DashboardSocketFactory
   documentRef?: VisibilitySource
   scheduler?: DashboardRealtimeScheduler
-  fallbackIntervalMs?: number
+  /** 固定值，或每次启动回退轮询时读取的取值函数（设置改了无需重建连接）。 */
+  fallbackIntervalMs?: number | (() => number)
 }
 
 export interface DashboardRealtimeController {
@@ -66,10 +73,15 @@ export function createDashboardRealtime(
   const createSocket = options.createSocket ?? createCfsmSocket
   const documentRef = options.documentRef ?? defaultDocument()
   const scheduler = options.scheduler ?? defaultScheduler
-  const fallbackIntervalMs = Math.max(
-    options.fallbackIntervalMs ?? DEFAULT_FALLBACK_INTERVAL_MS,
-    30_000,
-  )
+  function fallbackIntervalMs(): number {
+    const configured = typeof options.fallbackIntervalMs === 'function'
+      ? options.fallbackIntervalMs()
+      : options.fallbackIntervalMs
+    const requested = typeof configured === 'number' && Number.isFinite(configured)
+      ? configured
+      : DEFAULT_FALLBACK_INTERVAL_MS
+    return Math.max(requested, MIN_FALLBACK_INTERVAL_MS)
+  }
   const connections = new Map<string, CfsmSocketConnection>()
   const states = new Map<string, CfsmSocketState>()
   let fallbackTimer: IntervalHandle | null = null
@@ -125,7 +137,7 @@ export function createDashboardRealtime(
     options.onFallbackChange(true)
     fallbackTimer = scheduler.setInterval(() => {
       void refreshAndSync()
-    }, fallbackIntervalMs)
+    }, fallbackIntervalMs())
   }
 
   function closeConnections(): void {

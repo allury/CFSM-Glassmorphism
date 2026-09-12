@@ -13,9 +13,12 @@ withDefaults(defineProps<{
   icon: IconName
   tone?: MetricChartTone
   subtitle?: string
+  /** 副标题转为预警色。上游没有这一状态，见磁盘耗尽预测阈值的说明。 */
+  alert?: boolean
 }>(), {
   tone: 'slate',
   subtitle: '',
+  alert: false,
 })
 </script>
 
@@ -29,7 +32,12 @@ withDefaults(defineProps<{
         <div class="metric-chart-header__title">
           {{ title }}
         </div>
-        <div v-if="subtitle" class="metric-chart-header__subtitle" :title="subtitle">
+        <div
+          v-if="subtitle"
+          class="metric-chart-header__subtitle"
+          :class="{ 'metric-chart-header__subtitle--alert': alert }"
+          :title="subtitle"
+        >
           {{ subtitle }}
         </div>
       </div>

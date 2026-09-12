@@ -132,6 +132,13 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 4. **依赖与体积**：新增 `echarts`、`vue-echarts`、`reka-ui`、`vue-sonner`，版本与上游一致，全部经 Bun 安装并写入 `bun.lock`，运行时不引入任何外部 CDN。`validate:dist` 预算相应上调为 JS 3328 KiB / CSS 128 KiB / 总资源 6656 KiB，并在脚本内注明构成理由；预算仍是硬门槛，超出即失败。
 5. **死代码清理**（§12）：移除旧的手写 SVG 折线实现与其 `history-chart__grid / __line / __time` 样式、旧的 `app-tooltip__bubble--*` 定位样式、`detail-hero*` 全部样式与已无引用的 `.settings-save-alert.is-success`。
 
+## 第 12 轮（Test 3）：设置页与卡片密度
+
+1. **设置页字段覆盖**（P1 → PASS）：上游 48 项设置由 Komari 后台从 `komari-theme.json` 的 managed configuration 渲染，Komari 主题自身没有设置页；CFSM 没有等价机制，第三方主题只能自建页面。此前本主题只渲染 44 项并自拟 5 组，现按上游 8 组的标题与顺序渲染全部 48 项，字段表集中在 `domain/theme-settings-form.ts` 并由 `tests/theme-settings-form.test.ts` 锁定。页面顶栏改用与首页、详情页同一个 `AppHeader`（设置页没有节点数据，状态条关闭而不是显示 0/0）。
+2. **四处配置无行为**（P1 → PASS）：`dataUpdateInterval`、`diskPredictionEnabled`、`diskPredictionThresholdDays` 此前在 schema 之外零消费，`nodeDetailSectionTabsEnabled` 有实现无入口，本轮全部接线。
+3. **卡片密度盒模型**（P1 → PASS）：舒适与宽松两档此前沿用旧盒模型，1440 实测分别比上游高 4px、矮 36px。补齐后四档在 1440 与 375 下与上游逐项相同，包含头部高度、主体内边距、内容行距与延迟面板高度。
+4. **NECESSARY-CFSM-DIFFERENCE**：上游的磁盘预测还用于首页健康面板的磁盘风险榜，需要逐节点历史；CFSM 首页不具备该数据，不复刻该榜单。
+
 ## 保留的 P2
 
 - **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。

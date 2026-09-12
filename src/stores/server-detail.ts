@@ -18,11 +18,13 @@ import {
   type DetailRealtimeController,
   type HistoryHours,
 } from '@/services/cfsm'
+import { useThemeSettingsStore } from './theme-settings'
 
 export type DetailLoadState = 'idle' | 'loading' | 'ready' | 'error'
 export type HistoryLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 export const useServerDetailStore = defineStore('server-detail', () => {
+  const theme = useThemeSettingsStore()
   const server = shallowRef<CfsmServer | null>(null)
   const sourceConfig = shallowRef<SiteConfig | null>(null)
   const history = shallowRef<HistorySeries | null>(null)
@@ -83,6 +85,8 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       base: current.source.base,
       serverId: current.id,
       timeoutMinutes: sourceConfig.value?.frontendWebsocketTimeoutMinutes ?? 0,
+      /* 与首页同一个设置项：只影响 WebSocket 不可用时的 REST 回退刷新间隔。 */
+      fallbackIntervalMs: () => theme.runtime.dataUpdateInterval * 1000,
       refreshRest: refreshServer,
       onSamples: applySamples,
       onState: (nextState) => {

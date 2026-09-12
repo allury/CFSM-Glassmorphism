@@ -20,6 +20,24 @@
 
 第 10 轮 v1.0.0 没有修改 48 项 schema、默认值、保存 body 或三层合并顺序。双版本浏览器审计中的 light/dark/beijing、realistic/cobe/tiled、四种卡片密度和 list 均通过现有 runtime 即时切换；新增的“高级工具是否展开”仅是 `dashboard-view` 会话状态，默认关闭，明确不属于第 48 项设置，也不写入 localStorage 或后端 `theme_options`。
 
+## 第 12 轮（Test 3）设置页重建
+
+48 项 schema、默认值、保存协议与三层合并顺序不变，改的是页面呈现与四处接线。
+
+设置页此前只渲染了 44 项、并成 5 组，且分组与上游不同。第 12 轮起字段表集中在
+`src/domain/theme-settings-form.ts`：分组标题、分组顺序与组内字段顺序逐条对应
+`komari-theme.json` 的 `configuration.data`（8 组，01 基础与外观 … 08 自定义背景），
+页面按这张表渲染，`tests/theme-settings-form.test.ts` 锁定"48 项每项有且只有一个控件"。
+页面顶栏改用与首页、详情页同一个 `AppHeader`（设置页没有节点数据，状态条关闭而不是显示 0/0）。
+
+四处此前"有配置无行为"的项已接线：`dataUpdateInterval` 驱动首页与详情页的 REST 回退
+轮询间隔（下限 5 秒）；`diskPredictionEnabled` / `diskPredictionThresholdDays` 落地为详情页
+负载图磁盘卡的耗尽预测与预警色；`nodeDetailSectionTabsEnabled` 补上设置页开关。
+
+`rpcTransportMode` 与 `visitorInfoEnabled` 经复核确属 CFSM 不提供（后端源码与
+`theme-develop.md` 中既没有 RPC 传输层，也没有任何把访客 IP 或审计数据交给主题的接口），
+在页面上保留为只读项并写明复核依据，不做成点了没反应的开关。
+
 ## 状态定义
 
 - ✅ 1:1：配置含义和用户体验可以原样保留。
@@ -32,7 +50,7 @@
 | # | key | 类型 / 原默认值 | CFSM 处理 | 状态 |
 |---:|---|---|---|---|
 | 1 | `themeMode` | select / `beijing` | 保留 beijing 定时明暗；同时映射 config 的 auto/light/dark 偏好 | 🟢 等价 |
-| 2 | `dataUpdateInterval` | number / `3` | 只控制 REST 补偿刷新与前端派生节流；服务端 WS 批次仍约 5 秒 | 🟡 降级 |
+| 2 | `dataUpdateInterval` | number / `3` | 第 12 轮接入首页与详情页的 REST 回退轮询间隔（下限 5 秒，与服务端推送批次同频）；服务端 WS 批次由 CFSM 决定，主题改不了 | 🟡 降级 |
 | 3 | `rpcTransportMode` | select / `http` | CFSM 无 Komari HTTP/WebSocket RPC 二选一；固定使用官方 REST + WS | 🔴 不支持 |
 | 4 | `defaultViewMode` | select / `card` | 保留 card/list | ✅ 1:1 |
 | 5 | `nodeCardSize` | select / `compact` | 保留 mini/compact/comfortable/large | ✅ 1:1 |
@@ -65,9 +83,9 @@
 | 32 | `homeHighLoadThreshold` | number / `80` | 对 CPU、内存、磁盘真实百分比生效，限制 1–100 | ✅ 1:1 |
 | 33 | `homeTrafficWarningThreshold` | number / `80` | 只在 traffic_limit 可可靠解析时生效，限制 1–100 | ✅ 1:1 |
 | 34 | `homeExpiringDays` | number / `30` | 使用 expire_date，限制 1–3650 | ✅ 1:1 |
-| 35 | `diskPredictionEnabled` | switch / `false` | 改用 CFSM history 的 disk_used/disk_total 序列 | 🟢 等价 |
-| 36 | `diskPredictionThresholdDays` | number / `30` | 保留阈值，样本不足两天或未增长时不显示 | ✅ 1:1 |
-| 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换 | ✅ 1:1 |
+| 35 | `diskPredictionEnabled` | switch / `false` | 第 12 轮落地：对详情页已取回的 `disk_used` / `disk_total` 序列做最小二乘回归，显示在负载图磁盘卡副标题；不为预测追加请求，因此需要把时间范围选到 2 天以上（未登录最多 24 小时）。上游另有首页健康面板的磁盘风险榜，那需要逐节点历史，CFSM 不做 | 🟢 等价 |
+| 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测 | ✅ 1:1 |
+| 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换；第 12 轮补上设置页开关（此前功能已实现但页面上没有入口） | ✅ 1:1 |
 | 38 | `detailMetricCardPreset` | select / `财务` | 预设映射到 CFSM 详情领域模型，保持响应式卡片数量 | 🟢 等价 |
 | 39 | `detailMetricCardKeys` | richtext / nodePrice、monthlyCost、remainingTime、remainingValue、totalTraffic、trafficQuota、uptime、connections | 支持有真实字段的 keys；系统温度、精确配额等按可用性隐藏 | 🟡 降级 |
 | 40 | `gpuChartEnabled` | switch / `false` | 使用 gpu_info 的 id/name/info；无序列自动隐藏 | 🟢 等价 |

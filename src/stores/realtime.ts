@@ -7,6 +7,7 @@ import {
 import type { CfsmSocketState } from '@/types/cfsm'
 import { useAppStore } from './app'
 import { useServersStore } from './servers'
+import { useThemeSettingsStore } from './theme-settings'
 
 export type DashboardRealtimeStatus =
   | 'idle'
@@ -19,6 +20,7 @@ export type DashboardRealtimeStatus =
 export const useRealtimeStore = defineStore('realtime', () => {
   const app = useAppStore()
   const servers = useServersStore()
+  const theme = useThemeSettingsStore()
   const sourceStates = ref<Record<string, CfsmSocketState>>({})
   const fallbackActive = ref(false)
   const timedOut = ref(false)
@@ -60,6 +62,12 @@ export const useRealtimeStore = defineStore('realtime', () => {
         ids: collection.servers.map((server) => server.id),
       })),
       getTimeoutMinutes: () => app.config?.frontendWebsocketTimeoutMinutes ?? 0,
+      /*
+       * 主题设置「数据更新间隔」以秒为单位，只作用于 WebSocket 不可用时的 REST 回退
+       * 轮询；服务端的推送批次由 CFSM 自己决定，主题改不了。取值函数保证设置改动
+       * 下一次回退启动时即生效，不必重建 WebSocket 连接。
+       */
+      fallbackIntervalMs: () => theme.runtime.dataUpdateInterval * 1000,
       refreshRest,
       onSamples: (base, samples) => servers.applyRealtimeSamples(base, samples),
       onSourceState: (base, state) => {

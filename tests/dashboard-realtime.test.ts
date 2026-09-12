@@ -182,4 +182,41 @@ describe('dashboard realtime coordination', () => {
     controller.dispose()
     expect(onFallbackChange).toHaveBeenLastCalledWith(false)
   })
+
+  it('reads the interval when the fallback starts and never polls faster than the push cadence', async () => {
+    vi.useFakeTimers()
+    const factory = connectionFactory()
+    const refreshRest = vi.fn(async () => undefined)
+    // 主题设置「数据更新间隔」以秒为单位；1 秒会被压到与服务端推送批次相同的 5 秒下限。
+    let seconds = 1
+    const controller = createDashboardRealtime({
+      getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
+      getTimeoutMinutes: () => 0,
+      refreshRest,
+      onSamples: vi.fn(),
+      onSourceState: vi.fn(),
+      onFallbackChange: vi.fn(),
+      onTimeoutChange: vi.fn(),
+      onPausedChange: vi.fn(),
+      createSocket: factory.createSocket,
+      fallbackIntervalMs: () => seconds * 1000,
+    })
+
+    controller.start()
+    factory.options[0]?.onState('backoff')
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(refreshRest).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refreshRest).toHaveBeenCalledOnce()
+
+    // 改设置后不必重建连接：下一次回退启动时读到新值。
+    seconds = 20
+    factory.options[0]?.onState('open')
+    factory.options[0]?.onState('backoff')
+    await vi.advanceTimersByTimeAsync(19_999)
+    expect(refreshRest).toHaveBeenCalledOnce()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(refreshRest).toHaveBeenCalledTimes(2)
+    controller.dispose()
+  })
 })

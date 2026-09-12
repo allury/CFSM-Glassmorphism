@@ -8,16 +8,26 @@ import AppTooltip from '@/components/ui/AppTooltip.vue'
  * 与 Komari `Header.vue` 一致：只承载站点身份与全局动作。
  * 首页的高级工具开关属于控制区，不放在 Header 里。
  */
-defineProps<{
+withDefaults(defineProps<{
   title: string
   version: string | null
   loading: boolean
-  online: number
-  total: number
-  sourceCount: number
+  online?: number
+  total?: number
+  sourceCount?: number
   adminUrl: string | null
   themeMode: ThemeMode
-}>()
+  /*
+   * 设置页不订阅节点数据，显示「0/0 在线」会是假状态，因此那里关掉状态条，
+   * 只保留站点身份与全局动作——首页与详情页仍然照旧显示真实计数。
+   */
+  showStatus?: boolean
+}>(), {
+  online: 0,
+  total: 0,
+  sourceCount: 0,
+  showStatus: true,
+})
 
 defineEmits<{
   refresh: []
@@ -54,7 +64,7 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
         </div>
       </div>
 
-      <div class="header-status" aria-label="REST 数据状态">
+      <div v-if="showStatus" class="header-status" aria-label="REST 数据状态">
         <span
           class="status-dot"
           :class="loading ? 'status-dot--pending' : 'status-dot--online'"

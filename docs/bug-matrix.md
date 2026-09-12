@@ -186,3 +186,27 @@ Komari 基准：`bf8376587c720de915ac48789a8a180357c762d6`
 - **P0 = 0 ｜ P1 = 0 ｜ 未解决的发布阻塞项 = 0**
 - BUG-CONFIRMED 10 项，全部已修复并有回归测试
 - 待裁决 1 项（D-01），DEFERRED 1 项（PRESET-01），CHART-003 仍未复现
+
+---
+
+## 第二阶段 Test 3
+
+范围是 `/settings` 的后端对接与前端呈现。证据取自 CFSM 后端源码与 `theme-develop.md`、上游 `komari-theme.json`，以及 1440×900 与 375×812 的同机实测。
+
+| ID | 类型 | 项 | 根因 / 数据事实 | 处理 |
+|---|---|---|---|---|
+| SET-001 | BUG-CONFIRMED | 设置页只渲染 44 项、并成 5 组 | 上游 48 项分 8 组写在 `komari-theme.json` 的 managed configuration 里，由 Komari 后台渲染；CFSM 无等价机制，本主题页面自拟分组并漏掉 4 项 | 字段表移入 `domain/theme-settings-form.ts`，分组标题、顺序与组内字段顺序逐条对应上游；实测 8 组 48 控件 |
+| SET-002 | BUG-CONFIRMED | `dataUpdateInterval` 是死配置 | 审计表写「控制 REST 补偿刷新」，实际回退间隔在 `dashboard-realtime.ts` 写死 60 秒、下限 30 秒，该设置在 `theme/settings.ts` 之外零消费 | 改为取值函数驱动首页与详情页的回退轮询，下限取与服务端推送批次同频的 5 秒 |
+| SET-003 | BUG-CONFIRMED | `diskPredictionEnabled` / `diskPredictionThresholdDays` 是死配置 | 两项同样零消费 | 移植上游最小二乘回归为 `domain/disk-prediction.ts`，接到详情页负载图磁盘卡副标题；阈值控制预警色 |
+| SET-004 | BUG-CONFIRMED | `nodeDetailSectionTabsEnabled` 有实现无入口 | 详情页分区标签页已实现，设置页没有对应控件 | 06 组补上开关 |
+| SIZE-001 | BUG-CONFIRMED | 舒适档比上游高 4px、宽松档矮 36px | `--compact` / `--mini` 已改成上游盒模型，注释写明「其余尺寸档留待 Test 2」却未处理；宽松档那条规则针对的 `.node-card--card` 类名从不渲染，一直空转 | 两档补齐上游盒模型（头部 44 / 52、主体 `0 16 16` / `0 24 24`、行距 12 / 16、面板 48 / 56） |
+| SET-005 | NOT-A-BUG | `rpcTransportMode`、`visitorInfoEnabled` | 复核后端源码与 `theme-develop.md`：没有 RPC 传输层，也没有任何把访客 IP 或审计数据交给主题的接口 | 页面保留为只读项并写明复核依据，不做成点了没反应的开关 |
+| SET-006 | NECESSARY-CFSM-DIFFERENCE | 首页健康面板的磁盘风险榜 | 上游按逐节点历史排名；CFSM 首页没有逐节点历史，复刻需为每台节点各发一次 `/api/history/all` | 不复刻，磁盘预测只落在详情页 |
+| SET-007 | P2 | `.node-box` 在 compact / mini 档的横向内边距 | 上游 compact 是 `px-1.5`(6px)、mini 是 `px-1`(4px)，本主题统一 8px；只影响盒内文字可用宽度，不改变卡片几何 | 记录，不改 |
+
+### Test 3 终态
+
+- **P0 = 0 ｜ P1 = 0**
+- BUG-CONFIRMED 5 项，全部已修复并有回归测试（新增 `theme-settings-form.test.ts`、`disk-prediction.test.ts`，扩写 `dashboard-realtime.test.ts`）
+- NOT-A-BUG 1 项、NECESSARY-CFSM-DIFFERENCE 1 项、P2 1 项
+- 上一轮的 D-01（首页丢包口径）仍待裁决
