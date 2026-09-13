@@ -22,10 +22,6 @@
 
 <img src="docs/screenshots/settings.webp" alt="主题设置" width="100%">
 
-**移动端 · 390px 宽**
-
-<img src="docs/screenshots/mobile.webp" alt="移动端" width="30%">
-
 > 截图使用本地演示数据生成，非真实节点。
 
 ## 特性
