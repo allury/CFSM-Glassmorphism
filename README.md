@@ -6,30 +6,25 @@
 
 ## 预览
 
+**首页 · 浅色**
+
 <img src="docs/screenshots/home-light.webp" alt="首页 · 浅色" width="100%">
 
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/screenshots/home-dark.webp" alt="首页 · 深色"><br>
-      <sub><b>首页 · 深色</b>　地球、总览卡片与节点卡片</sub>
-    </td>
-    <td width="50%" valign="top">
-      <img src="docs/screenshots/detail.webp" alt="节点详情"><br>
-      <sub><b>节点详情</b>　信息卡与历史图表</sub>
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <img src="docs/screenshots/settings.webp" alt="主题设置"><br>
-      <sub><b>主题设置</b>　48 项，改完即时预览</sub>
-    </td>
-    <td width="50%" valign="top" align="center">
-      <img src="docs/screenshots/mobile.webp" alt="移动端" width="52%"><br>
-      <sub><b>移动端</b>　390px 宽</sub>
-    </td>
-  </tr>
-</table>
+**首页 · 深色**
+
+<img src="docs/screenshots/home-dark.webp" alt="首页 · 深色" width="100%">
+
+**节点详情 · 信息卡与历史图表**
+
+<img src="docs/screenshots/detail.webp" alt="节点详情" width="100%">
+
+**主题设置 · 48 项，改完即时预览**
+
+<img src="docs/screenshots/settings.webp" alt="主题设置" width="100%">
+
+**移动端 · 390px 宽**
+
+<img src="docs/screenshots/mobile.webp" alt="移动端" width="30%">
 
 > 截图使用本地演示数据生成，非真实节点。
 
