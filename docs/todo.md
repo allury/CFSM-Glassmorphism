@@ -6,9 +6,21 @@
 |---|---|---|---|---|
 | 2026-09-12 | https://sr.706632.xyz | `theme-v1.1.1` = `81ecb3884f7f2c6e3888680a9e29a38c90c246c9` | `v1.1.1` = `e26af7f` | 线上 `index-D8tgaFpd.js` / `index-JhAy0QYE.css` 与发布 ZIP 内容逐字节相同；入口引用的 5 个懒加载分块全部 200；线上冒烟通过（首页、详情页、链接规范化、旧链接兼容、上一个节点、无控制台错误） |
 
-| 2026-09-13 | https://sr.706632.xyz | 候选 `candidate-3fb26c4` = `30df8b8833871d733f412b00e8f5eab032c47326` | `3fb26c4` | 线上 `index-CDg-FS4G.js` 与 `index-C_NwXGvk.css` 的 sha256 与候选逐字节相同，22 个资源全部 200；index.html 的差异仅为 CFSM 注入的站点标题与 favicon。顶部专项验收见 TODO-07 |
+| 2026-09-13 | https://sr.706632.xyz | `theme-v1.1.2` = `a9b23501dc7c1a685dd5d56ee3dd59756349bb0c`（验收时为候选产物 `30df8b88`） | `v1.1.2` = `a3800bb` | 线上 `index-CDg-FS4G.js` 与 `index-C_NwXGvk.css` 的 sha256 与候选逐字节相同，22 个资源全部 200；index.html 的差异仅为 CFSM 注入的站点标题与 favicon。顶部专项验收见 TODO-07 |
 
-历史记录：TODO-05 的验收对应候选 `2c4ab2c`，TODO-06 的回归对应候选 `fbe35bd`。两份候选已被正式版取代，分支 `candidate-a088ed4` / `candidate-3baf452` 保留作回退入口。发布包与候选的字节差异来源见 `docs/releases/v1.1.1.md` 之外的说明：源码 commit 与 bun 版本相同，差异仅为 Linux CI 与 Windows 本地构建的分块哈希不可跨平台复现，逻辑分块集合一致，并已用发布字节重新冒烟。
+历史记录：TODO-05 的验收对应候选 `2c4ab2c`，TODO-06 的回归对应候选 `fbe35bd`。
+
+五个 `candidate-*` 分支已在 v1.1.2 发布后删除——正式版的不可变标签就是回退入口，候选分支不再承担这个角色。产物 commit 存档如下：
+
+| 分支（已删除） | 产物 commit | 对应源码 |
+|---|---|---|
+| `candidate-a088ed4` | `2c4ab2c89e3e71f82ddad3430596dea87f418863` | `a088ed4` |
+| `candidate-3baf452` | `fbe35bdb8b554cf9e407ccabdfee5beb99765f82` | `3baf452` |
+| `candidate-c15da63` | `3bae821603af1dd2ea90fed089f0eacf84d491ec` | `c15da63`（未应用） |
+| `candidate-6b1b4f2` | `b186db6b8abe68903abd34ef361dd7cdb360bb44` | `6b1b4f2`（未应用） |
+| `candidate-3fb26c4` | `30df8b8833871d733f412b00e8f5eab032c47326` | `3fb26c4`（v1.1.2 的验收对象） |
+
+回退入口：`theme-v1.1.1` / `theme-v1.1.0` 等版本标签，均为不可变。发布包与候选的字节差异来源见 `docs/releases/v1.1.1.md` 之外的说明：源码 commit 与 bun 版本相同，差异仅为 Linux CI 与 Windows 本地构建的分块哈希不可跨平台复现，逻辑分块集合一致，并已用发布字节重新冒烟。
 
 > 本文件只记录**正式版（稳定版）发布前需要处理**的事项，每条写明现状、上游做法与待决策点。
 >
