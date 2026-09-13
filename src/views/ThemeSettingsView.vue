@@ -204,7 +204,7 @@ onMounted(async () => {
             </button>
             <h1>主题设置</h1>
             <p>
-              全部 {{ THEME_SETTING_KEYS.length }} 项与上游主题清单一一对应。修改会立即预览，
+              共 {{ THEME_SETTING_KEYS.length }} 项设置。修改会立即预览，
               只有明确保存后才写入本浏览器或 CFSM 后端。
             </p>
           </div>

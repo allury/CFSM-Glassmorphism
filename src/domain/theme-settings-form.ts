@@ -195,7 +195,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         kind: 'select',
         options: GLASS_PRESET_OPTIONS,
         help: '选择「自定义」后读取下方 JSON。',
-        note: '文字色逐字取自上游预设，且与上游一样只作用于节点卡；表面色仍为本主题取值。',
+        note: '配色方案只作用于节点卡的表面色、边框、阴影与文字色；顶栏、面板、提示框与弹层不受影响。',
       },
       {
         key: 'colorVisionMode',
