@@ -205,10 +205,17 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     root.style.setProperty('--glass-text', surfaces.text)
     root.style.setProperty('--glass-muted-text', surfaces.mutedText)
     /*
-     * 顶栏、面板、提示框与弹层保持本主题在 `:root` 里已验证的表面色。上游的预设
-     * 只有卡片、`header` 与顶部统计栏三处规则，其余界面上游没有对应项；由 JS 整表
-     * 覆盖全局 `--glass*` 会把预设差异扩散到上游没有的界面上。未对齐范围见
-     * `docs/todo.md` TODO-03。
+     * 顶栏、面板、提示框与弹层保持本主题在 `:root` 里已验证的表面色；由 JS 整表覆盖
+     * 全局 `--glass*` 会把预设差异扩散到上游没有对应项的界面上。
+     *
+     * 第 16 轮在同机 Komari 上实测了"上游到底有哪些预设消费者"，纠正了此前按选择器
+     * 推断的结论：上游样式表写了 card / header / control 三组规则，但
+     * `header { … --glass-*-header … }` 匹配不到任何元素（上游 src/ 内没有 <header>，
+     * 运行时实测 0 个），`.bg-background { … --glass-*-control … }` 也匹配不到顶部统计卡
+     * ——那些卡片的类是 `bg-background/50` 与 `hover:bg-background`，类名不同，
+     * 且 CardX 的 tailwind-merge 会把默认的 `bg-card` 合并掉。真正消费 control 令牌的是
+     * 选中态的控制胶囊、对话框输入框与 outline 按钮，首页默认状态下一个都不渲染。
+     * 因此预设只驱动节点卡这一组变量是与上游一致的。详见 docs/todo.md TODO-03。
      */
     for (const name of ['--glass', '--glass-strong', '--glass-soft', '--glass-hover', '--glass-border', '--ink', '--muted']) {
       root.style.removeProperty(name)

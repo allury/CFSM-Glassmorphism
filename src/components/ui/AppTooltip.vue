@@ -16,7 +16,15 @@ import {
  * 样式使用本主题的玻璃层次令牌而非 Tailwind 工具类。
  *
  * 保留原有调用 API（`content` / `placement` / `as`），调用点无需改动。
+ *
+ * `inheritAttrs: false` + 触发器上的 `v-bind="$attrs"`：根节点是 `TooltipProvider`，
+ * 它只渲染插槽（片段根），Vue 无法把透传属性落到任何元素上，调用点写的 `class`
+ * 会被静默丢弃。第 16 轮实测确认总览卡片的 `overview-card__value` 因此命中 0 个
+ * 元素，数值行退回 `.app-tooltip` 的 `inline-flex`，失去 `align-items: baseline`
+ * 与 `gap`，单位基线比主数值高 9px。这里把透传属性交给真正的触发元素。
  */
+defineOptions({ inheritAttrs: false })
+
 withDefaults(defineProps<{
   content: string
   placement?: 'top' | 'bottom' | 'left' | 'right'
@@ -30,7 +38,7 @@ withDefaults(defineProps<{
 <template>
   <TooltipProvider :delay-duration="0">
     <TooltipRoot data-slot="tooltip">
-      <TooltipTrigger :as="as" data-slot="tooltip-trigger" class="app-tooltip">
+      <TooltipTrigger :as="as" data-slot="tooltip-trigger" class="app-tooltip" v-bind="$attrs">
         <slot />
       </TooltipTrigger>
       <TooltipPortal>

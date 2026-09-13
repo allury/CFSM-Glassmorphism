@@ -37,9 +37,17 @@ const cards = computed(() => buildGeneralCards(props.servers, props.settings))
         <span class="overview-card__label">{{ card.label }}</span>
         <AppIcon class="overview-card__icon" :name="card.icon" :size="20" />
       </div>
-      <AppTooltip v-if="card.hint" :content="card.hint" placement="top" as="div" class="overview-card__value">
-        <span class="overview-card__number">{{ card.value }}</span>
-        <span v-if="card.unit" class="overview-card__unit">{{ card.unit }}</span>
+      <AppTooltip
+        v-if="card.hint"
+        :content="card.hint"
+        placement="top"
+        as="div"
+        class="overview-card__value-slot"
+      >
+        <div class="overview-card__value">
+          <span class="overview-card__number">{{ card.value }}</span>
+          <span v-if="card.unit" class="overview-card__unit">{{ card.unit }}</span>
+        </div>
       </AppTooltip>
       <div v-else class="overview-card__value">
         <span class="overview-card__number">{{ card.value }}</span>

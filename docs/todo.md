@@ -30,19 +30,39 @@
 - **复核依据**：CFSM 公开接口只有 REST 与 `/api/ws`，后端源码与 `theme-develop.md` 中都不存在 RPC 传输层；在 CFSM 整个 `src/` 中搜索 `CF-Connecting-IP` / `visitor` / `访客` 零命中，没有任何接口把访客 IP 或审计数据交给主题。
 - **待决策**：正式版是否把这两项一并从 schema 中移除。移除会改变保存快照的键集合，需要先确认与旧版本互相覆盖时的兼容行为（现有「未知后端键原样回传」的规则是否足够）。
 
-## TODO-03 · 配色预设的表面色（本次完成节点卡这一组，其余逐项记录）
+## TODO-03 · 配色预设的表面色（v1.1.2 完成，并更正原结论）
 
-上游把预设的 16 个值写到 `:root`，只由三组选择器消费（上游 `styles/main.css`）：
+上游把预设的 16 个值写到 `:root`，样式表里写了三组选择器。**"写了规则"不等于"有元素消费"**——
+v1.1.2 在同一台机器、同一浏览器里跑固定版本的 Komari（`bf83765`）逐条实测后，前两行的原结论被推翻：
 
-| 上游选择器 | 消费的变量 | 本主题对应 | 本轮状态 |
-|---|---|---|---|
-| `.node-card, .bg-card, [data-slot='card']` | card / card-hover / border / shadow | `.node-card` | **已对齐**：改吃 `--node-card-surface` / `-hover` / `--node-card-border` / `--node-card-shadow`，取值逐字来自上游 `PRESET_TOKENS` |
-| `header` | header | `.app-header` | **未对齐**：上游顶栏常驻预设表面色，本主题顶栏是滚动后才上玻璃（`.app-header--scrolled` 用 `--glass-strong`），结构不同，留待后续 |
-| `.bg-background`（顶部统计栏） | control | 本主题无一一对应的元素 | **未对齐**：需要先确定对应元素再决定，留待后续 |
+| 上游选择器 | 消费的变量 | 上游实际命中的元素 | 本主题对应 | 结论 |
+|---|---|---|---|---|
+| `.node-card, .bg-card, [data-slot='card']` | card / hover / border / shadow | 节点卡（`[data-slot='card']` 在上游命中 0 个，上游没有这个属性） | `.node-card` | **已对齐**（v1.1.1）：取值逐字来自上游 `PRESET_TOKENS` |
+| `header` | header | **0 个**。上游 `src/` 内没有任何 `<header>` 元素，运行时 `document.querySelectorAll('header').length === 0`；顶栏主体是 `div` | `.app-header` | **原结论更正**：不存在"上游顶栏常驻预设表面色"这回事，该规则是死代码，`--glass-*-header` 无人消费 |
+| `.bg-background`（注释写的是"顶部统计栏"） | control | 顶部统计卡**不命中**——它们的类是 `bg-background/50` 与 `hover:bg-background`，类名不同；CardX 的 tailwind-merge 还会把默认的 `bg-card` 合并掉。真正命中的是选中态控制胶囊、对话框输入框、outline 按钮、Alert，首页默认状态下一个都不渲染 | 本主题无一一对应元素 | **原结论更正**：该注释有误导，预设与顶部统计卡无关 |
 
-- **同时修正的一处扩散**：此前 `applyRuntime` 把预设整表写进全局 `--glass` / `-strong` / `-soft` / `-hover` / `-border`，于是预设差异扩散到提示框、面板、弹层等上游根本没有对应规则的界面。现已停止覆盖，这些界面回落到 `:root` 里本主题已验证的取值。
+### 实测取值（1440×900，浅色，五卡无地球；深色两侧取值相同）
+
+| 元素 / 状态 | Komari `bf83765` | 本主题 v1.1.1 | 本主题 v1.1.2 | 结论 |
+|---|---|---|---|---|
+| 顶栏 · 页面顶部 | transparent / none / 1px transparent / none | 同左 | 同左 | 本来就一致 |
+| 顶栏 · 滚动后 | background `rgba(0,0,0,0)`、`blur(16px)`、border `oklab(0.554 -0.0100213 -0.0448951 / 0.1)`、shadow `none` | background `color(srgb .976 .984 .992 / .7744)`、`blur(20px) saturate(1.55)`、border `rgba(78,102,130,.13)`、shadow `rgba(20,40,65,.07) 0 8px 28px` | 与上游逐项相同（`#62748e1a` 即 slate-500/10） | **已修复** |
+| 顶栏 · 回到顶部 | 同"页面顶部" | 同左 | 同左 | 本来就一致 |
+| 顶栏几何 | 57px；内容宽 1280 @ x=75 | 同左 | 同左 | 未改动 |
+| 统计卡 · 常态 | `oklab(0.935 -0.00463525 -0.0142658 / 0.5)`、backdrop none（<768px 为 `blur(8px)`）、border `0px none`、shadow `none`、radius 10px | 逐项相同 | 逐项相同 | 本来就一致 |
+| 统计卡 · 真实悬浮 | `oklch(0.935 0.015 252)`（不透明 `--background`） | 相同 | 相同 | 本来就一致 |
+| 统计卡 · 图标 | 常态 slate-500/20、悬浮 slate-500 | 常态 `--muted` 30%、悬浮 `--muted` | 按上游原样移植为 `#62748e33` / `#62748e` | **已修复** |
+| 统计卡 · 深色 | `oklab(0.141 0.00136333 -0.00481054 / 0.5)`，文字 `oklch(0.985 0 0)` / `oklch(0.86 0.012 286.067)` | 逐项相同 | 逐项相同 | 本来就一致 |
+
+### 预设隔离复测（v1.1.2）
+
+翡翠 / 柔和 / 高对比 / 午夜 / 自定义五种配置逐一重新加载后实测：顶栏三态与统计卡表面色**不随预设变化**（与上游一致），
+`--node-card-surface` 按预设变化（自定义 `#ff000080` → 节点卡 `rgba(255,0,0,0.5)`），
+`--glass-strong` 始终没有被写成行内样式，提示框 / 菜单 / 弹窗 / 设置面板不受预设污染。
+
 - **自定义配色不变**：仍是原来的 10 个键，hover / header / shadow 按上游同样的派生规则补齐，用户不需要多填字段。
-- **仍需**：顶栏与顶部统计栏的对齐（上表两行"未对齐"），以及提示框、菜单、弹窗、portal 浮层在明暗与预设切换下的回归实测（并入 TODO-05）。
+- **未对齐（有意保留）**：本主题的控制胶囊、分段选择器等没有接到 `control` 令牌。上游那些元素确实消费该令牌，
+  但它们不在顶部区域，v1.1.2 是顶部专项，不顺带改动；此处记为待评估，不作为已解决。
 
 ## TODO-04 · 节点卡指标盒的内边距（记录更正，源码原本就是对的）
 
@@ -96,3 +116,21 @@
 
   控制台：读取时无 error 级日志（平台在导航时清空历史，不作为整段会话零错误的结论）。
 - **未覆盖**：线上只有单后端，多 `apiBase` 下 `source` 必须保留这条分支只有单元测试与本地覆盖，没有真实环境证据。
+
+## TODO-07 · 顶部统计卡的数值行结构（v1.1.2 完成）
+
+- **现象**：单位与"已用 / 总量"说明相对主数值上浮，且与主数值贴死没有间距。
+- **根因（实测，不是推断）**：`OverviewCards.vue` 把 `overview-card__value` 作为**透传属性**交给 `AppTooltip`，
+  而 `AppTooltip` 的根节点是只渲染插槽的 `TooltipProvider`（片段根），Vue 无法把透传属性落到任何元素上。
+  浏览器实测该类在页面里命中 **0 个元素**，数值行退回 `.app-tooltip` 的 `inline-flex`
+  （`align-items` 为 stretch、无 `gap`），单位盒被拉伸到 24px。
+- **实测差值（1440×900，浅色）**：修复前单位基线比主数值高 **9px**、间距 **0**；
+  修复后基线差 **0**、间距 **4px**，与 Komari `bf83765` 同位取值逐项相同。
+  375 / 767 / 768 / 1440 / 1920 与深色同样复测通过。
+- **修复**：数值行改为 Tooltip **内部**独立的 `div.overview-card__value`（`display:flex; align-items:baseline; gap:4px`）；
+  `AppTooltip` 改为 `inheritAttrs: false` + 触发器 `v-bind="$attrs"`，让调用点的类真正落到触发元素；
+  包裹层 `.overview-card__value-slot` 为布局中性的 `display:block`（对应上游 DataTooltip 的 `inline-block min-w-0`）。
+  单位与标题补上上游的行高（`text-[11px]` → 1.5 即 16.5px；`md:text-xs` 与 `text-xs` → 16px）。
+  没有使用 `translateY`、负边距、写死宽度或逐卡补丁。
+- **测试**：`tests/overview-value-row.test.ts`（SSR 渲染真实 DOM）。把 `AppTooltip` 的透传修复单独回退后，7 项里有 4 项立即失败，恢复后全通过。
+- **未覆盖**：真实环境（sr.706632.xyz）尚未验收，等候选应用后再做。

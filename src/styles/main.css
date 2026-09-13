@@ -474,12 +474,24 @@ a {
   transition: background-color 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
+/*
+ * 滚动后的顶栏：上游 Header.vue 的顶栏主体是 `div`，滚动时只追加
+ * `!border-slate-500/10 backdrop-blur-lg`，**不上背景色、不上阴影**。
+ * 第 16 轮在同机 Komari 上实测（1440×900，明暗两套取值一致）：
+ *   background      rgba(0, 0, 0, 0)
+ *   backdrop-filter blur(16px)
+ *   border-bottom   1px solid oklab(0.554 -0.0100213 -0.0448951 / 0.1)
+ *   box-shadow      none
+ * 上游样式表里那条 `header { background-color: var(--glass-light-header) … }`
+ * 匹配不到任何元素——上游 src/ 内没有 <header>，运行时实测 0 个。
+ * 结论更正见 docs/todo.md TODO-03。
+ */
 .app-header--scrolled {
-  border-color: var(--line);
-  background: color-mix(in srgb, var(--glass-strong) 88%, transparent);
-  box-shadow: 0 8px 28px rgb(20 40 65 / 7%);
-  backdrop-filter: blur(20px) saturate(155%);
-  -webkit-backdrop-filter: blur(20px) saturate(155%);
+  border-color: oklch(0.554 0.046 257.417 / 0.1);
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .app-header__inner {
@@ -807,26 +819,50 @@ a {
   color: var(--muted);
   font-size: 12px;
   font-weight: 500;
+  line-height: 16px;
   letter-spacing: 0.05em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+/*
+ * 上游图标走的是固定的 `text-slate-500/20` + `group-hover:text-slate-500`，
+ * 没有明暗变体，也不是 --muted。第 16 轮同机实测上游常态
+ * oklab(0.554 -0.0100213 -0.0448951 / 0.2)、悬浮 oklch(0.554 0.046 257.417)，此处原样移植。
+ */
 .overview-card__icon {
   flex: none;
-  color: color-mix(in srgb, var(--muted) 30%, transparent);
+  color: oklch(0.554 0.046 257.417 / 0.2);
   transition: color 160ms ease;
 }
 
 .overview-card:hover .overview-card__icon {
-  color: var(--muted);
+  color: oklch(0.554 0.046 257.417);
 }
 
+/*
+ * 数值行必须是它自己的 flex 容器。上游把 `flex items-baseline gap-1 min-w-0` 写在
+ * DataTooltip **内部**的 div 上，提示层只负责定位；本主题一度把这个类交给 AppTooltip
+ * 的透传属性承担，而 AppTooltip 的根节点是只渲染插槽的 TooltipProvider，属性落不到
+ * 任何元素上——第 16 轮实测该类在页面里命中 0 个元素，数值行退回 .app-tooltip 的
+ * inline-flex（align-items 为 stretch、无 gap），单位基线比主数值高 9px、间距为 0。
+ */
 .overview-card__value {
   display: flex;
   min-width: 0;
   align-items: baseline;
   gap: 4px;
+}
+
+/*
+ * 有提示时 AppTooltip 触发器是数值行外面的一层，必须保持布局中性：
+ * 上游那层是 `relative inline-block min-w-0`，作为 column flex 子项会被块化并拉满整行，
+ * 所以这里用 display: block 覆盖 .app-tooltip 的 inline-flex。
+ * 无提示分支不生成这层，但两条分支的数值行结构与类名完全一致。
+ */
+.overview-card__value-slot {
+  display: block;
+  min-width: 0;
 }
 
 .overview-card__number {
@@ -856,6 +892,8 @@ a {
   color: var(--muted);
   font-size: 11px;
   font-weight: 500;
+  /* 上游 text-[11px] 只设字号、行高按 1.5 解析，实测 16.5px；≥768px 的 text-xs 是 16px。 */
+  line-height: 1.5;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -872,6 +910,7 @@ a {
 
   .overview-card__unit {
     font-size: 12px;
+    line-height: 16px;
   }
 }
 
