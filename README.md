@@ -2,23 +2,36 @@
 
 面向 [CF-Server-Monitor](https://github.com/huilang-me/CF-Server-Monitor) 的第三方毛玻璃风格主题，基于 [Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism) 移植，使用 Vue 3 + TypeScript + Vite 构建。
 
-当前稳定版本 **v1.1.1**。
+当前稳定版本 **v1.1.2**。
 
 ## 预览
 
-首页（浅色）
+<img src="docs/screenshots/home-light.webp" alt="首页 · 浅色" width="100%">
 
-![首页浅色](docs/screenshots/home-light.png)
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/home-dark.webp" alt="首页 · 深色"><br>
+      <sub><b>首页 · 深色</b>　地球、总览卡片与节点卡片</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/detail.webp" alt="节点详情"><br>
+      <sub><b>节点详情</b>　信息卡与历史图表</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/settings.webp" alt="主题设置"><br>
+      <sub><b>主题设置</b>　48 项，改完即时预览</sub>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <img src="docs/screenshots/mobile.webp" alt="移动端" width="52%"><br>
+      <sub><b>移动端</b>　390px 宽</sub>
+    </td>
+  </tr>
+</table>
 
-首页（深色）
-
-![首页深色](docs/screenshots/home-dark.png)
-
-节点详情页
-
-![节点详情](docs/screenshots/detail.png)
-
-> 截图使用本地演示数据生成。
+> 截图使用本地演示数据生成，非真实节点。
 
 ## 特性
 
@@ -57,19 +70,19 @@
 在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，填入下面任一地址后点「应用自定义」：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.1
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.2
 ```
 
 ```text
 https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist
 ```
 
-- `theme-v1.1.1` 是不可变标签，指向该版本已验证的构建产物，推荐日常使用。
+- `theme-v1.1.2` 是不可变标签，指向该版本已验证的构建产物，推荐日常使用。
 - `theme-dist` 是滚动分支，始终跟随最新稳定版。
 
-也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.1.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
+也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.2.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
-如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.0` 重新应用。
+如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.1` 重新应用。
 
 ### 二、调整主题设置
 
