@@ -2,3 +2,9 @@
 
 # Preserve the owner-supplied specification byte-for-byte.
 docs/CODEX_SPEC.md -text
+
+# 截图等二进制文件不做换行转换。
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
