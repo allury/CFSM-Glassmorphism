@@ -106,6 +106,24 @@ jobs:
           test -f "$workdir/index.html"
           test -d "$workdir/assets"
 
+          # 主题商店把 theme-dist 的提交标题当作版本名显示在安装下拉里，
+          # 所以这里不用 `chore: …` 这类对使用者没有意义的前缀。
+          # 发布说明可选地写一行 `<!-- store-label: 简述 -->`（HTML 注释，渲染后不可见），
+          # 写了就显示 `v1.2.3 · 简述`，没写就只显示 `v1.2.3`。
+          # 必须在切到 theme-dist 之前读，那一步会清空源码树。
+          notes_file="docs/releases/${GITHUB_REF_NAME}.md"
+          store_label=""
+          if [[ -f "$notes_file" ]]; then
+            store_label="$(grep -m1 -oP '(?<=<!-- store-label:).*?(?=-->)' "$notes_file" 2>/dev/null || true)"
+            store_label="$(printf '%s' "$store_label" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          fi
+          if [[ -n "$store_label" ]]; then
+            commit_subject="${GITHUB_REF_NAME} · ${store_label}"
+          else
+            commit_subject="${GITHUB_REF_NAME}"
+          fi
+          echo "theme-dist commit subject: $commit_subject"
+
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
@@ -119,7 +137,7 @@ jobs:
           find . -mindepth 1 -maxdepth 1 -not -name .git -exec rm -rf {} +
           cp -r "$workdir"/. .
           git add -A
-          git commit -m "chore: publish ${GITHUB_REF_NAME} theme build for the CFSM theme store"
+          git commit -m "$commit_subject"
           git tag "$theme_tag"
           git push origin "$theme_tag"
 
