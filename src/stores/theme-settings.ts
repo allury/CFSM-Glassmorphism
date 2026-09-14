@@ -195,13 +195,15 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     root.dataset.motion = runtime.value.disablePageAnimation ? 'reduced' : 'full'
     root.style.colorScheme = resolvedTheme.value
     /*
-     * 预设的表面色只驱动节点卡这一组变量，对应上游 `.node-card, .bg-card,
-     * [data-slot='card']` 那条规则；文字色同样只在节点卡内部接管。
+     * 预设的表面色驱动两组变量：节点卡（对应上游 `.node-card, .bg-card,
+     * [data-slot='card']`），以及激活态的快捷筛选胶囊（对应上游 `.bg-background`，
+     * 实测那是首页上这条规则唯一的消费者）。文字色只在这两处接管。
      */
     root.style.setProperty('--node-card-surface', surfaces.card)
     root.style.setProperty('--node-card-surface-hover', surfaces.cardHover)
     root.style.setProperty('--node-card-border', surfaces.border)
     root.style.setProperty('--node-card-shadow', surfaces.shadow)
+    root.style.setProperty('--control-surface', surfaces.control)
     root.style.setProperty('--glass-text', surfaces.text)
     root.style.setProperty('--glass-muted-text', surfaces.mutedText)
     /*

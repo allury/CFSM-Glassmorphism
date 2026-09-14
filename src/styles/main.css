@@ -1018,25 +1018,40 @@ a {
   white-space: nowrap;
 }
 
+/*
+ * 这三类控件此前统一用 `--glass-strong`，上游其实各不相同。
+ * 取值来自 Komari `bf83765` 的真实交互实测（1440×900，翡翠预设，浅色）：
+ *
+ *   悬浮（三类都是）  背景 transparent、无阴影，只把文字压深到 `--foreground`
+ *   快捷筛选 · 激活   `rgba(226,232,240,0.76)`（= 预设 control 令牌）
+ *                     + `blur(14px) saturate(145%)` + 预设文字色 + shadow-sm
+ *   分组标签 · 激活   不透明 `--background` + `--selection`，无 backdrop
+ *   视图切换 · 激活   不透明 `--background` + `--selection`
+ *
+ * 快捷筛选是上游 `.bg-background` 在首页唯一命中的元素，所以也是唯一跟随配色预设的
+ * 控件；视图切换与首页工具按钮用的是 `!bg-background`，类名不同，不吃预设。
+ * 视图切换激活态上游还带 `blur(4px)`，但底色不透明时它不产生可见效果，这里不加，
+ * 以免多一层无用的合成层。
+ */
 .group-tabs .app-tabs__trigger:hover,
 .quick-controls button:hover,
-.quick-controls button.is-active,
 .view-switch button:hover {
   color: var(--ink);
-  background: var(--glass-strong);
-  box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
 }
 
-.view-switch button.is-active {
-  color: var(--selection);
-  background: var(--glass-strong);
-  box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
+.quick-controls button.is-active {
+  color: var(--glass-text, var(--ink));
+  background: var(--control-surface, var(--glass-strong));
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
 }
 
+.view-switch button.is-active,
 .group-tabs .app-tabs__trigger[data-state='active'] {
   color: var(--selection);
-  background: var(--glass-strong);
-  box-shadow: 0 2px 10px rgb(22 43 66 / 8%);
+  background: var(--background);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
 }
 
 .dashboard-controls__actions,
