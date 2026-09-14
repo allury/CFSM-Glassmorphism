@@ -51,6 +51,15 @@ const PING_RANGES: readonly HistoryHours[] = HISTORY_HOURS
  */
 const SMOOTH_HINT = '只改变点与点之间的画法（折线曲率），不改写、不过滤、不插值任何采样值；尖峰仍是真实数值'
 
+/*
+ * 长窗口提示。依据 CFSM 服务端的实际取数方式（`getMetricsHistory`）：
+ * 窗口不超过 1 小时时不套用点数上限，返回该区间内的全部上报记录；
+ * 超过 1 小时后按站点配置的 `long_history_points` 分桶，每个时间桶只取一条记录，
+ * 桶内其余采样不会出现在响应里（部分部署会对丢包列取桶内最大值，取决于其索引优化状态）。
+ * 所以这里只说「可能看不到」，不承诺任何一侧一定保留或一定丢失。
+ */
+const LONG_WINDOW_HINT = '超过 1 小时的窗口由服务端分桶取样返回，每段时间只保留一条记录，其余上报不会出现在图上，短时波动可能因此看不到。切到 1 小时可看到该区间内的全部上报记录。'
+
 interface PingTask extends PingTaskLine {
   stats: ProbeStats
 }
@@ -71,6 +80,7 @@ const rows = computed(() => buildChartRows(pingHistoryPoints.value))
 const loading = computed(() => pingHistoryState.value === 'loading')
 const errorCopy = computed(() => issueCopy(pingHistoryIssue.value, 'history'))
 const selected = ref<ProbeTarget[]>([])
+const longWindow = computed(() => pingHistoryHours.value > 1)
 const smooth = ref(false)
 
 const rangeItems: AppTabItem[] = PING_RANGES.map((hours) => ({
@@ -304,6 +314,10 @@ function retry(): void {
         </div>
 
         <div class="ping-chart__options">
+          <div v-if="longWindow" class="ping-chart__notice">
+            <AppIcon name="carbon:information" :size="13" />
+            <span>{{ LONG_WINDOW_HINT }}</span>
+          </div>
           <div class="ping-chart__smooth">
             <button type="button" class="ping-chart__button" :class="{ 'is-active': smooth }" @click="smooth = !smooth">
               曲线平滑

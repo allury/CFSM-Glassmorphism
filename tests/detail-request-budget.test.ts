@@ -25,15 +25,24 @@ function jsonResponse(body: unknown): Response {
   })
 }
 
-/** 记录请求 URL 并返回各端点的最小合法载荷。 */
-function stubNetwork(): string[] {
+/**
+ * 记录请求 URL 并返回各端点的最小合法载荷。
+ * `delays` 按 URL 子串设定响应延迟，用来制造乱序返回。
+ */
+function stubNetwork(delays: Record<string, number> = {}): string[] {
   const calls: string[] = []
   vi.stubGlobal('fetch', async (input: unknown) => {
     const url = String(input)
     calls.push(url)
+    const wait = Object.entries(delays).find(([fragment]) => url.includes(fragment))?.[1]
+    if (wait) await new Promise((resolve) => setTimeout(resolve, wait))
     if (url.includes('/api/config')) return jsonResponse({ site_title: 'demo', version: '2.8.5' })
     if (url.includes('/api/server?')) return jsonResponse({ id: 'node-1', name: 'Node 1' })
-    if (url.includes('/api/history/all')) return jsonResponse([])
+    if (url.includes('/api/history/all')) {
+      const hours = Number(new URL(url).searchParams.get('hours'))
+      // 把窗口值编进 cpu，用来断言最终留在 store 里的是哪一次响应。
+      return jsonResponse([{ timestamp: 1_700_000_000_000, cpu: hours }])
+    }
     return jsonResponse({})
   })
   // 详情页打开后会建立 WebSocket；node 环境下不连真实服务。
@@ -93,7 +102,7 @@ describe('detail page request budget', () => {
     expect(detail.sourceConfig).not.toBe(app.config)
   })
 
-  it('asks for history once, because one window carries both the load and ping series', async () => {
+  it('asks for history once, because both charts open on the same window', async () => {
     const calls = stubNetwork()
     setActivePinia(createPinia())
 
@@ -105,10 +114,55 @@ describe('detail page request budget', () => {
     await detail.open('node-1', [BASE])
 
     expect(historyCalls(calls)).toHaveLength(1)
-    expect(historyCalls(calls)[0]).toContain('hours=24')
+    expect(historyCalls(calls)[0]).toContain('hours=1')
+    expect(detail.history?.points.at(0)?.cpu).toBe(1)
     // 延迟区跟随负载图的窗口，读的是同一份历史。
+    expect(detail.historyHours).toBe(1)
+    expect(detail.pingHistoryHours).toBe(1)
+    expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  it('moves both charts together when the load window changes, with one request', async () => {
+    const calls = stubNetwork()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+    expect(historyCalls(calls)).toHaveLength(1)
+
+    await detail.loadHistory(24)
+    expect(historyCalls(calls)).toHaveLength(2)
+    expect(historyCalls(calls)[1]).toContain('hours=24')
+    expect(detail.historyHours).toBe(24)
     expect(detail.pingHistoryHours).toBe(24)
     expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  it('keeps the newest window when ranges are switched faster than the responses arrive', async () => {
+    // 24 小时那次故意慢，6 小时那次立即返回：先发的后到。
+    const calls = stubNetwork({ 'hours=24': 60 })
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+
+    const slow = detail.loadHistory(24)
+    const fast = detail.loadHistory(6)
+    await Promise.all([slow, fast])
+
+    // 后发的窗口必须胜出，迟到的 24 小时响应不能覆盖它。
+    expect(detail.historyHours).toBe(6)
+    expect(detail.historyState).toBe('ready')
+    expect(detail.history?.points.at(0)?.cpu).toBe(6)
+    expect(historyCalls(calls).filter((url) => url.includes('hours=6'))).toHaveLength(1)
   })
 
   it('fetches a second window only when the ping chart is moved off the load window', async () => {
@@ -123,14 +177,15 @@ describe('detail page request budget', () => {
     await detail.open('node-1', [BASE])
     expect(historyCalls(calls)).toHaveLength(1)
 
-    await detail.loadPingHistory(1)
+    await detail.loadPingHistory(24)
     expect(historyCalls(calls)).toHaveLength(2)
-    expect(historyCalls(calls)[1]).toContain('hours=1')
-    expect(detail.pingHistoryHours).toBe(1)
+    expect(historyCalls(calls)[1]).toContain('hours=24')
+    expect(detail.pingHistoryHours).toBe(24)
+    expect(detail.historyHours).toBe(1)
     expect(detail.pingHistory).not.toBe(detail.history)
 
     // 调回负载图的窗口：重新复用，不再产生请求。
-    await detail.loadPingHistory(24)
+    await detail.loadPingHistory(1)
     expect(historyCalls(calls)).toHaveLength(2)
     expect(detail.pingHistory).toBe(detail.history)
   })

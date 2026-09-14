@@ -30,7 +30,12 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const server = shallowRef<CfsmServer | null>(null)
   const sourceConfig = shallowRef<SiteConfig | null>(null)
   const history = shallowRef<HistorySeries | null>(null)
-  const historyHours = ref<HistoryHours>(24)
+  /*
+   * 默认 1 小时。CFSM 只在窗口大于 1 小时时才套用站点配置的点数上限
+   * （`long_history_points`）；1 小时窗口返回的是该区间内的全部上报记录，
+   * 点距等于节点自己的上报节奏。两张图共用这一个窗口，冷启动只发一次历史请求。
+   */
+  const historyHours = ref<HistoryHours>(1)
   /*
    * 上游负载图与延迟图各有一条时间范围选择，因为那边是两个独立端点
    * （`/records/load` 与 `/records/ping`）。CFSM 只有一个 `/api/history/all`，
@@ -160,11 +165,12 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       const result = await fetchHistory(current.id, hours, current.source.base, {
         signal: controller.signal,
       })
-      if (controller.signal.aborted || expectedRevision !== revision) return
+      // 窗口已被更晚的一次切换改掉时丢弃这份响应，否则慢的那次会盖掉快的那次。
+      if (controller.signal.aborted || expectedRevision !== revision || historyHours.value !== hours) return
       history.value = result
       historyState.value = result.points.length > 0 ? 'ready' : 'empty'
     } catch (error) {
-      if (controller.signal.aborted || expectedRevision !== revision) return
+      if (controller.signal.aborted || expectedRevision !== revision || historyHours.value !== hours) return
       history.value = null
       historyState.value = 'error'
       historyIssue.value = classifyCfsmRequestError(error)
