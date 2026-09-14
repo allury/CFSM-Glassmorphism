@@ -5,8 +5,8 @@
 | 日期 | 站点 | 已应用产物 | 对应源码 | 核验 |
 |---|---|---|---|---|
 | 2026-09-12 | https://sr.706632.xyz | `theme-v1.1.1` = `81ecb3884f7f2c6e3888680a9e29a38c90c246c9` | `v1.1.1` = `e26af7f` | 线上 `index-D8tgaFpd.js` / `index-JhAy0QYE.css` 与发布 ZIP 内容逐字节相同；入口引用的 5 个懒加载分块全部 200；线上冒烟通过（首页、详情页、链接规范化、旧链接兼容、上一个节点、无控制台错误） |
-
 | 2026-09-13 | https://sr.706632.xyz | `theme-v1.1.2` = `a9b23501dc7c1a685dd5d56ee3dd59756349bb0c`（验收时为候选产物 `30df8b88`） | `v1.1.2` = `a3800bb` | 线上 `index-CDg-FS4G.js` 与 `index-C_NwXGvk.css` 的 sha256 与候选逐字节相同，22 个资源全部 200；index.html 的差异仅为 CFSM 注入的站点标题与 favicon。顶部专项验收见 TODO-07 |
+| 2026-09-15 | https://sr.706632.xyz | `theme-v1.1.3` = `63eaddc97bd1656d514ea20109b86abc6d6db73a` | `v1.1.3` = `35b7a283` | 线上 `index-aI-afTXR.js` 与 `index-PutMzEX9.css` 与发布产物逐字节相同，22 个资源全部 200；冷启动 4 个请求（`config` / `server?id=` / `history/all?hours=1` / `servers`），此前为 6 个；两图默认同为 1 小时，切到 1 天时联动且只新增 1 个请求；详情页链接无 `source=`，28 张图卡 / 8 个 canvas 正常着色 |
 
 历史记录：TODO-05 的验收对应候选 `2c4ab2c`，TODO-06 的回归对应候选 `fbe35bd`。
 
@@ -20,7 +20,9 @@
 | `candidate-6b1b4f2` | `b186db6b8abe68903abd34ef361dd7cdb360bb44` | `6b1b4f2`（未应用） |
 | `candidate-3fb26c4` | `30df8b8833871d733f412b00e8f5eab032c47326` | `3fb26c4`（v1.1.2 的验收对象） |
 
-回退入口：`theme-v1.1.1` / `theme-v1.1.0` 等版本标签，均为不可变。发布包与候选的字节差异来源见 `docs/releases/v1.1.1.md` 之外的说明：源码 commit 与 bun 版本相同，差异仅为 Linux CI 与 Windows 本地构建的分块哈希不可跨平台复现，逻辑分块集合一致，并已用发布字节重新冒烟。
+v1.1.3 的候选分支 `candidate-40939f5`（产物 `af0d0a25f2e857b961050ccf35b974f4bc389d15`，源码 `40939f5`）在发布后同样删除；候选与发布之间只有 README 与版本号的差异，业务代码零变化。
+
+回退入口：`theme-v1.1.2` / `theme-v1.1.1` / `theme-v1.1.0` 等版本标签，均为不可变。发布包与候选的字节差异来源见 `docs/releases/v1.1.1.md` 之外的说明：源码 commit 与 bun 版本相同，差异仅为 Linux CI 与 Windows 本地构建的分块哈希不可跨平台复现，逻辑分块集合一致，并已用发布字节重新冒烟。
 
 > 本文件只记录**正式版（稳定版）发布前需要处理**的事项，每条写明现状、上游做法与待决策点。
 >
