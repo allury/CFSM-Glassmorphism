@@ -2,7 +2,7 @@
 
 面向 [CF-Server-Monitor](https://github.com/huilang-me/CF-Server-Monitor) 的第三方毛玻璃风格主题，基于 [Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism) 移植，使用 Vue 3 + TypeScript + Vite 构建。
 
-当前稳定版本 **v1.1.3**。
+当前稳定版本 **v1.1.2**。
 
 ## 预览
 
@@ -61,19 +61,19 @@
 在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，填入下面任一地址后点「应用自定义」：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.3
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.2
 ```
 
 ```text
 https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist
 ```
 
-- `theme-v1.1.3` 是不可变标签，指向该版本已验证的构建产物，推荐日常使用。
+- `theme-v1.1.2` 是不可变标签，指向该版本已验证的构建产物，推荐日常使用。
 - `theme-dist` 是滚动分支，始终跟随最新稳定版。
 
-也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.3.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
+也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.2.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
-如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.2` 重新应用。
+如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.1` 重新应用。
 
 ### 二、调整主题设置
 
