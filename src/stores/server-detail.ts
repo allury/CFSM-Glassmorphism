@@ -32,18 +32,22 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const history = shallowRef<HistorySeries | null>(null)
   const historyHours = ref<HistoryHours>(24)
   /*
-   * 上游负载图与延迟图各有一条时间范围选择（LoadChart 默认「实时」、
-   * PingChart 默认「1 小时」），两者互不影响。CFSM 只有一个 `/api/history/all`，
-   * 这里为延迟区单独保存一份历史，默认取上游同样的 1 小时。
+   * 上游负载图与延迟图各有一条时间范围选择，因为那边是两个独立端点
+   * （`/records/load` 与 `/records/ping`）。CFSM 只有一个 `/api/history/all`，
+   * 而且同一次响应里负载与 ping 两类序列都在，所以默认没有必要请求两次。
+   *
+   * 延迟区默认「跟随负载图的时间范围」，直接复用那一份历史，冷启动因此只发一个请求；
+   * 只有用户在延迟图上主动选了别的窗口，才单独取一份。窗口重新一致时自动回到跟随。
    */
-  const pingHistory = shallowRef<HistorySeries | null>(null)
-  const pingHistoryHours = ref<HistoryHours>(1)
+  const pingFollowsHistory = ref(true)
+  const ownPingHistory = shallowRef<HistorySeries | null>(null)
+  const ownPingHistoryHours = ref<HistoryHours>(1)
   const state = ref<DetailLoadState>('idle')
   const historyState = ref<HistoryLoadState>('idle')
-  const pingHistoryState = ref<HistoryLoadState>('idle')
+  const ownPingHistoryState = ref<HistoryLoadState>('idle')
   const issue = ref<CfsmRequestIssue | null>(null)
   const historyIssue = ref<CfsmRequestIssue | null>(null)
-  const pingHistoryIssue = ref<CfsmRequestIssue | null>(null)
+  const ownPingHistoryIssue = ref<CfsmRequestIssue | null>(null)
   const refreshIssue = ref<CfsmRequestIssue | null>(null)
   const socketState = ref<CfsmSocketState>('idle')
   const fallbackActive = ref(false)
@@ -56,6 +60,10 @@ export const useServerDetailStore = defineStore('server-detail', () => {
 
   const sourceBase = computed(() => server.value?.source.base ?? null)
   const historyPoints = computed(() => history.value?.points ?? [])
+  const pingHistory = computed(() => (pingFollowsHistory.value ? history.value : ownPingHistory.value))
+  const pingHistoryHours = computed(() => (pingFollowsHistory.value ? historyHours.value : ownPingHistoryHours.value))
+  const pingHistoryState = computed(() => (pingFollowsHistory.value ? historyState.value : ownPingHistoryState.value))
+  const pingHistoryIssue = computed(() => (pingFollowsHistory.value ? historyIssue.value : ownPingHistoryIssue.value))
   const pingHistoryPoints = computed(() => pingHistory.value?.points ?? [])
 
   function stopRealtime(): void {
@@ -138,6 +146,13 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const controller = requestController
     if (!current || !controller) return
     historyHours.value = hours
+    // 用户把负载图调回延迟图正在用的窗口时，重新跟随，避免两份相同的历史。
+    if (!pingFollowsHistory.value && ownPingHistoryHours.value === hours) {
+      pingFollowsHistory.value = true
+      ownPingHistory.value = null
+      ownPingHistoryState.value = 'idle'
+      ownPingHistoryIssue.value = null
+    }
     historyState.value = 'loading'
     historyIssue.value = null
     const expectedRevision = revision
@@ -156,26 +171,36 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     }
   }
 
-  async function loadPingHistory(hours = pingHistoryHours.value): Promise<void> {
+  async function loadPingHistory(hours: HistoryHours = pingHistoryHours.value): Promise<void> {
+    // 与负载图同窗口：复用那一份历史，不再单独请求。
+    if (hours === historyHours.value) {
+      pingFollowsHistory.value = true
+      ownPingHistory.value = null
+      ownPingHistoryState.value = 'idle'
+      ownPingHistoryIssue.value = null
+      return
+    }
+
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
-    pingHistoryHours.value = hours
-    pingHistoryState.value = 'loading'
-    pingHistoryIssue.value = null
+    pingFollowsHistory.value = false
+    ownPingHistoryHours.value = hours
+    ownPingHistoryState.value = 'loading'
+    ownPingHistoryIssue.value = null
     const expectedRevision = revision
     try {
       const result = await fetchHistory(current.id, hours, current.source.base, {
         signal: controller.signal,
       })
-      if (controller.signal.aborted || expectedRevision !== revision || pingHistoryHours.value !== hours) return
-      pingHistory.value = result
-      pingHistoryState.value = result.points.length > 0 ? 'ready' : 'empty'
+      if (controller.signal.aborted || expectedRevision !== revision || ownPingHistoryHours.value !== hours) return
+      ownPingHistory.value = result
+      ownPingHistoryState.value = result.points.length > 0 ? 'ready' : 'empty'
     } catch (error) {
-      if (controller.signal.aborted || expectedRevision !== revision || pingHistoryHours.value !== hours) return
-      pingHistory.value = null
-      pingHistoryState.value = 'error'
-      pingHistoryIssue.value = classifyCfsmRequestError(error)
+      if (controller.signal.aborted || expectedRevision !== revision || ownPingHistoryHours.value !== hours) return
+      ownPingHistory.value = null
+      ownPingHistoryState.value = 'error'
+      ownPingHistoryIssue.value = classifyCfsmRequestError(error)
     }
   }
 
@@ -218,13 +243,13 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     server.value = null
     sourceConfig.value = null
     history.value = null
-    pingHistory.value = null
+    ownPingHistory.value = null
     issue.value = null
     historyIssue.value = null
-    pingHistoryIssue.value = null
+    ownPingHistoryIssue.value = null
     refreshIssue.value = null
     historyState.value = 'idle'
-    pingHistoryState.value = 'idle'
+    ownPingHistoryState.value = 'idle'
     lastRealtimeAt.value = null
     state.value = 'loading'
 
@@ -237,7 +262,10 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       state.value = 'ready'
       const configPromise = loadSourceConfig(expectedRevision)
       const historyPromise = loadHistory(historyHours.value)
-      const pingHistoryPromise = loadPingHistory(pingHistoryHours.value)
+      // 跟随负载图时这一份历史已经够用，不再单独请求。
+      const pingHistoryPromise = pingFollowsHistory.value
+        ? Promise.resolve()
+        : loadPingHistory(ownPingHistoryHours.value)
       await configPromise
       if (requestController.signal.aborted || expectedRevision !== revision) return
       startRealtime()
@@ -253,7 +281,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     await Promise.allSettled([
       refreshServer(),
       loadHistory(historyHours.value),
-      loadPingHistory(pingHistoryHours.value),
+      pingFollowsHistory.value ? Promise.resolve() : loadPingHistory(ownPingHistoryHours.value),
     ])
   }
 

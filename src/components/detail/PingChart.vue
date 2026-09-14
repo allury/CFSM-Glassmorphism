@@ -16,6 +16,7 @@ import AppTabs, { type AppTabItem } from '@/components/ui/AppTabs.vue'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
 import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import { HISTORY_RANGE_LABELS, pingChartOption, type PingTaskLine } from '@/domain/detail-chart-options'
+import { HISTORY_HOURS } from '@/services/cfsm'
 import { issueCopy } from '@/domain/issue-copy'
 import {
   activeProbeTargets,
@@ -36,10 +37,13 @@ import '@/utils/echarts'
  * 下面是可点击开关的任务卡（平均延迟 · 丢包率 · 波动率，信息按钮展开统计），
  * 然后是「曲线平滑」开关与 320px 的延迟大图。
  *
- * 上游的任务来自后端 Ping 任务，CFSM 对应的是旧四线路与 Node 1–4 这 8 个探测目标；
- * 时间范围取上游同样的 1 小时 / 6 小时 / 12 小时 / 1 天，外加 CFSM 最长的 7 天。
+ * 上游的任务来自后端 Ping 任务，CFSM 对应的是旧四线路与 Node 1–4 这 8 个探测目标。
+ *
+ * 时间范围与负载图共用同一份档位。上游两张图档位不同，是因为那边取自两个独立端点；
+ * CFSM 只有一个 `/api/history/all`，本主题默认让延迟区跟随负载图的窗口、复用同一份响应，
+ * 档位若只取子集，负载图切到 10 分钟或 2 天时跟随过来的窗口会落在选择器之外，选中态就没了。
  */
-const PING_RANGES: readonly HistoryHours[] = [1, 6, 12, 24, 168]
+const PING_RANGES: readonly HistoryHours[] = HISTORY_HOURS
 /*
  * 上游同名开关叫「平滑峰值」，而它真的会削峰：先把偏离邻域均值超过 30% 的点置空，
  * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题不改写采样，只改折线曲率，

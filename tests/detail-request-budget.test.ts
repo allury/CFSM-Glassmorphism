@@ -52,6 +52,10 @@ function configCalls(calls: readonly string[]): string[] {
   return calls.filter((url) => url.includes('/api/config'))
 }
 
+function historyCalls(calls: readonly string[]): string[] {
+  return calls.filter((url) => url.includes('/api/history/all'))
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
 })
@@ -87,6 +91,48 @@ describe('detail page request budget', () => {
     expect(configCalls(calls)).toHaveLength(1)
     expect(configCalls(calls)[0]).toContain(OTHER)
     expect(detail.sourceConfig).not.toBe(app.config)
+  })
+
+  it('asks for history once, because one window carries both the load and ping series', async () => {
+    const calls = stubNetwork()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+
+    expect(historyCalls(calls)).toHaveLength(1)
+    expect(historyCalls(calls)[0]).toContain('hours=24')
+    // 延迟区跟随负载图的窗口，读的是同一份历史。
+    expect(detail.pingHistoryHours).toBe(24)
+    expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  it('fetches a second window only when the ping chart is moved off the load window', async () => {
+    const calls = stubNetwork()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+    expect(historyCalls(calls)).toHaveLength(1)
+
+    await detail.loadPingHistory(1)
+    expect(historyCalls(calls)).toHaveLength(2)
+    expect(historyCalls(calls)[1]).toContain('hours=1')
+    expect(detail.pingHistoryHours).toBe(1)
+    expect(detail.pingHistory).not.toBe(detail.history)
+
+    // 调回负载图的窗口：重新复用，不再产生请求。
+    await detail.loadPingHistory(24)
+    expect(historyCalls(calls)).toHaveLength(2)
+    expect(detail.pingHistory).toBe(detail.history)
   })
 
   it('asks /api/server once and does not walk the server list', async () => {
