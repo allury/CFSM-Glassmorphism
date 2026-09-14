@@ -18,12 +18,14 @@ import {
   type DetailRealtimeController,
   type HistoryHours,
 } from '@/services/cfsm'
+import { useAppStore } from './app'
 import { useThemeSettingsStore } from './theme-settings'
 
 export type DetailLoadState = 'idle' | 'loading' | 'ready' | 'error'
 export type HistoryLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 
 export const useServerDetailStore = defineStore('server-detail', () => {
+  const app = useAppStore()
   const theme = useThemeSettingsStore()
   const server = shallowRef<CfsmServer | null>(null)
   const sourceConfig = shallowRef<SiteConfig | null>(null)
@@ -177,10 +179,24 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     }
   }
 
+  /*
+   * 节点归属的后端可能不是应用启动时那一个，所以详情页需要知道「这台节点所在站点」
+   * 的配置（WebSocket 超时、站点名、版本、是否已授权）。
+   *
+   * 但单后端站点上二者就是同一个来源，再请求一次 `/api/config` 拿回的是同一份内容——
+   * 冷启动进详情页因此白白多发一个请求。这里在 base 相同时直接复用 app store 已有的配置，
+   * 只有多 apiBase 部署、节点来自另一个后端时才真正发请求。
+   */
   async function loadSourceConfig(expectedRevision: number): Promise<void> {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+
+    if (app.config && app.primaryBase === current.source.base) {
+      if (expectedRevision === revision) sourceConfig.value = app.config
+      return
+    }
+
     try {
       const config = await fetchSiteConfig(current.source.base, { signal: controller.signal })
       if (!controller.signal.aborted && expectedRevision === revision) sourceConfig.value = config
