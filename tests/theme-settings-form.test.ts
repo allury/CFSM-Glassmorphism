@@ -240,3 +240,19 @@ describe('hide header copy', () => {
     }
   })
 })
+
+/*
+ * 列表信息字段的说明此前把 city 与 asn 归为同一个原因（依赖 IP 查询、CFSM 不提供）。
+ * asn 不是这么回事：它随节点标签下发，详情页的厂商格就在显示（实测形如 `AS3258`），
+ * 被忽略的真正原因是列表信息栏只实现了 provider / region / group / tags 四列。
+ * 原因写错会让人以为是服务端缺数据，于是去改探针配置——所以这里钉住。
+ */
+describe('list metadata copy', () => {
+  it('分别说明 city 与 asn 被忽略的原因', () => {
+    const field = THEME_FORM_FIELDS.find((item) => item.key === 'nodeListMetadataFields')
+    const note = field?.note ?? ''
+    expect(note).toContain('city 依赖 IP 查询')
+    expect(note).toContain('节点标签')
+    expect(note).not.toMatch(/city 与 asn 依赖 IP 查询/)
+  })
+})

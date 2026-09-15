@@ -325,7 +325,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         rows: 3,
         wide: true,
         help: '逗号、空格或换行分隔。可用：region=地区；group=分组；tags=自定义标签；provider=厂商（仅在有可靠别名或标签匹配时显示）。',
-        note: 'city 与 asn 依赖 IP 查询，CFSM 不提供，写进去会被忽略。',
+        note: 'city 依赖 IP 查询，CFSM 不提供；asn 能从节点标签取到，但列表信息栏没有这一列，只在详情页的厂商格显示。两者写进去都会被忽略，默认值里的 asn 同理。',
         enabled: (settings) => settings.nodeListMetadataEnabled,
       },
       {
