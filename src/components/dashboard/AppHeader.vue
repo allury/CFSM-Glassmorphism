@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { ThemeMode } from '@/theme/settings'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTooltip from '@/components/ui/AppTooltip.vue'
@@ -8,7 +8,7 @@ import AppTooltip from '@/components/ui/AppTooltip.vue'
  * 与 Komari `Header.vue` 一致：只承载站点身份与全局动作。
  * 首页的高级工具开关属于控制区，不放在 Header 里。
  */
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   title: string
   version: string | null
   loading: boolean
@@ -36,11 +36,33 @@ defineEmits<{
 
 const scrolled = ref(false)
 
+/*
+ * 站点标记优先用站点自己的图标，与 Komari `Header.vue` 的 Avatar 一致
+ * （那边是 `AvatarImage src="/favicon.ico"` + 站点名首字兜底）。
+ *
+ * CFSM 不一定有 `/favicon.ico`：它把站点图标作为 `<link rel="icon">` 注入
+ * index.html，值常常是 data: URI。所以先读文档里已有的那一条，再退到固定路径。
+ * 两者都取不到、或图片加载失败时退回站点名首字，首字也没有才用内置几何标记——
+ * 任何一步都不会让这个位置空着。
+ */
+const faviconSource = ref('')
+const faviconFailed = ref(false)
+const brandInitial = computed(() => props.title.trim().slice(0, 1))
+const brandImage = computed(() => (faviconFailed.value ? '' : faviconSource.value))
+
+function resolveFavicon(): string {
+  if (typeof document === 'undefined') return ''
+  const link = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
+  const href = link?.getAttribute('href')?.trim() ?? ''
+  return href === '' ? '/favicon.ico' : href
+}
+
 function updateScrolled(): void {
   scrolled.value = window.scrollY > 12
 }
 
 onMounted(() => {
+  faviconSource.value = resolveFavicon()
   updateScrolled()
   window.addEventListener('scroll', updateScrolled, { passive: true })
 })
@@ -53,7 +75,17 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
     <div class="app-header__inner">
       <div class="brand">
         <span class="brand__mark" aria-hidden="true">
-          <span />
+          <img
+            v-if="brandImage"
+            class="brand__mark-image"
+            :src="brandImage"
+            alt=""
+            decoding="async"
+            referrerpolicy="no-referrer"
+            @error="faviconFailed = true"
+          >
+          <b v-else-if="brandInitial" class="brand__mark-initial">{{ brandInitial }}</b>
+          <span v-else class="brand__mark-dot" />
         </span>
         <div class="brand__copy">
           <strong>{{ title }}</strong>
