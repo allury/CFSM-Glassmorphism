@@ -256,3 +256,21 @@ describe('list metadata copy', () => {
     expect(note).not.toMatch(/city 与 asn 依赖 IP 查询/)
   })
 })
+
+/*
+ * 温度字段的说法。
+ *
+ * 此前源码注释写着「/api/server 不返回温度字段（只有历史行里有）」，设置页说明也只
+ * 点名详情接口。实读服务端 2.8.5 正式版（`1dc0dc4`）的 `historyFields.js`：
+ * `HISTORY_ALL_QUERY_COLUMNS` 里没有任何温度列，整个文件都没有 temp 字样，
+ * 数据库 schema 同样没有。也就是说公开接口里压根没有温度，不是「在别处」。
+ * 说成「详情接口不返回」会让人去历史里找。
+ */
+describe('temperature copy', () => {
+  it('说明写明详情接口与历史里都没有温度', () => {
+    const field = THEME_FORM_FIELDS.find((item) => item.key === 'detailMetricCardKeys')
+    const note = field?.note ?? ''
+    expect(note).toContain('历史列')
+    expect(note).not.toBe('temperature 需要 CFSM 详情接口不返回的温度字段；缺数据的卡片会自动收起，不显示为 0。')
+  })
+})

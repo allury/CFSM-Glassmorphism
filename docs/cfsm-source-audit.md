@@ -107,7 +107,7 @@ Durable Object MetricsBroadcaster ─► /api/ws batchUpdate ─► latestReport
 | load | `/proc/loadavg` | `load_avg` 字符串 | `?? '0 0 0'` | string | string | `load_avg` | — | 主题拆成三个数 |
 | processes / tcp / udp | `ps`/`ss` | `processes`/`tcp_conn`/`udp_conn` | `\|\| 0` | number | number | 同名列 | 个 | 缺失 → 0 |
 | uptime | `/proc/uptime` | `boot_time` | `\|\| ''` | 秒级时间戳 | 同 | `boot_time` | s | 空串 → 主题显示占位符 |
-| temperature | — | — | — | **不返回** | — | `temperature` | °C | 详情端点无此字段，主题不做温度卡 |
+| temperature | — | — | — | **不返回** | — | **无此列** | °C | 详情端点与 `HISTORY_ALL_QUERY_COLUMNS` 均无此字段（实读 `1dc0dc4`），主题不做温度卡 |
 | GPU | `nvidia-smi` 等 | `gpu_info` | `\|\| ''` | 数组或 JSON string | 同 | `gpu_info` | — | 空 → 隐藏 GPU 区块 |
 | disk I/O | `/proc/diskstats` | `disk{read_bps,...}` | `hasDiskMetricsPayload()`：六项全 0 或缺失即视为无 | 有则为对象 | 同 | 六个平铺列 | B/s、IOPS、ms、% | 六项全 0 → 服务端**删除** `disk`，主题隐藏 |
 | ip_v4 / ip_v6 | `cdn-cgi/trace` | `ip_v4`/`ip_v6` | `toPublicIpReachability()` → `'1'`/`'0'` | `'1'`/`'0'` | 同 | 同名列 | — | **只是可达性标志，不是 IP 地址** |

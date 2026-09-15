@@ -34,7 +34,7 @@
 | U-03 | 探针尚未完成首轮探测时上报空串，服务端 `Number("")` → `0` | UPSTREAM-LIMITATION | 「尚未测量」在服务端就变成了真实的 `0 ms / 0%`，主题无法区分。见 `docs/cfsm-source-audit.md` 的未确认项 |
 | U-04 | 详情端点在 `loss=null` 时连同 `ping` 一起删除字段 | NECESSARY-CFSM-DIFFERENCE | `omitNullLossProbeFields` 只作用于 `/api/server`。主题把字段缺席视为「未配置 / 无可用样本」，与服务端注释一致 |
 | U-05 | 详情页深链接时拿不到站点级 `show_*` 开关 | UPSTREAM-LIMITATION | 这三个开关只在 `/api/servers` 顶层出现。从首页进入详情时开关正确生效（store 已有数据）；直接粘贴详情链接冷启动时无从得知，此时保持可见。要覆盖这种情况必须在详情页额外发一次 `/api/servers`，本轮不引入新的请求形态 |
-| U-06 | 系统温度 | NECESSARY-CFSM-DIFFERENCE | `/api/server` 不返回温度（只有历史行有），第 13 轮已按此隐藏温度卡 |
+| U-06 | 系统温度 | NECESSARY-CFSM-DIFFERENCE | `/api/server` 与历史列集合都没有温度字段（实读服务端 `1dc0dc4`），第 13 轮已按此隐藏温度卡 |
 
 ## 待裁决的 UI 冲突
 

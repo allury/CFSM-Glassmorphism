@@ -72,7 +72,7 @@
 | D24 | 历史图表卡片与指标卡同源（`bg-background/50 border-none rounded-md`），范围选择器是 `h-8 bg-background/50 rounded-md` + `h-6.5 rounded-sm` 触发器 | 图表卡用 `glass-panel`，范围选择器是胶囊按钮 | 表面与控件形态不同 | P1 | 两者都改为上游表面；激活态改用 `--selection` | PASS |
 | D25 | 探针 / GPU / 磁盘 IO 区没有对应上游区块 | 已有，使用 `glass-panel` | CFSM 独有的真实数据 | — | 区块保留（真实数据不隐藏），但表面、圆角统一到详情卡语言 | NECESSARY-CFSM-DIFFERENCE |
 | D26 | 厂商标识浮层（城市 · 厂商 · ASN） | 不提供 | 需要 IP Geo 与 ASN | — | CFSM 公开 API 无这些字段，禁止伪造 | NECESSARY-CFSM-DIFFERENCE |
-| D27 | 系统温度指标卡 | 不提供 | `/api/server` 不返回温度（只有历史行有） | — | 不制造一张永远显示 `-` 的卡片 | NECESSARY-CFSM-DIFFERENCE |
+| D27 | 系统温度指标卡 | 不提供 | `/api/server` 与历史列集合都没有温度字段 | — | 不制造一张永远显示 `-` 的卡片 | NECESSARY-CFSM-DIFFERENCE |
 | D28 | 近一天网速峰值行（依赖登录后的逐节点负载记录） | 不提供 | 需要 Komari 私有历史接口 | — | CFSM 无等价公开端点，不用当前值伪造峰值 | NECESSARY-CFSM-DIFFERENCE |
 | D29 | 路由 `/instance/:id` | `/#/server/:id?source=` | 路由技术差异 + 多 apiBase 归属 | — | 见 `docs/fidelity-audit.md` 必要差异 §9 | NECESSARY-CFSM-DIFFERENCE |
 | D30 | 顶部导航：返回 / 旗帜 + 名称 / 在线徽章 / 标签 / 收藏 / 上一台 / 选择器 / 下一台 | 已一致 | — | — | 回归验证：next → prev → select 均正确携带 owning `source` | PASS |

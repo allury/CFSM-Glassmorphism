@@ -411,7 +411,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         rows: 4,
         wide: true,
         help: '逗号、空格或换行分隔。可用：nodePrice、monthlyCost、remainingTime、remainingValue、cpuUsage、gpuUsage、memoryUsage、swapUsage、diskUsage、load、processes、connections、uptime、uploadSpeed、downloadSpeed、totalTraffic、trafficQuota。',
-        note: 'temperature 需要 CFSM 详情接口不返回的温度字段；缺数据的卡片会自动收起，不显示为 0。',
+        note: 'temperature 需要温度字段，CFSM 的详情接口与历史列里都没有；缺数据的卡片会自动收起，不显示为 0。',
         enabled: (settings) => settings.detailMetricCardPreset === '自定义',
       },
     ],

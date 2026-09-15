@@ -39,7 +39,8 @@ export type GeneralCardKey =
 export type QuickControlKey = 'favorite' | 'totalTraffic' | 'upload' | 'download' | 'peak' | 'offline' | 'highLoad' | 'expiring'
 /*
  * 详情指标卡的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_DETAIL_METRIC_CARD_KEYS`。
- * 唯一删去的是 `temperature`：CFSM 的 `/api/server` 不返回温度字段（只有历史行里有），
+ * 唯一删去的是 `temperature`：CFSM 的公开接口里没有温度——`/api/server` 不返回，
+ * 历史列集合 `HISTORY_ALL_QUERY_COLUMNS` 里也没有这一列（实读服务端 `1dc0dc4`）。
  * 因此不制造一张永远显示 `-` 的卡片。
  */
 export type DetailCardKey =
