@@ -262,3 +262,28 @@ describe('theme settings store', () => {
     expect(store.draft.alertTitle).toBe('Network draft')
   })
 })
+
+/*
+ * 「数据更新间隔」的取值范围。
+ *
+ * 运行时一直把低于 5 秒的值按 5 秒执行（`MIN_FALLBACK_INTERVAL_MS`），但 schema 此前
+ * 允许 1–60，界面也让人填 2——填进去的数字和实际执行的不是一回事。现在两边统一到 5–60：
+ * 低于下限的旧值在读取时归一到默认值，页面显示的就是真正会执行的间隔。
+ */
+describe('data update interval bounds', () => {
+  it('rejects a stored value below the runtime floor', () => {
+    const resolved = resolveThemeSettings({ dataUpdateInterval: 2 }, {})
+    expect(resolved.dataUpdateInterval).toBe(5)
+  })
+
+  it('keeps values inside the supported range', () => {
+    expect(resolveThemeSettings({ dataUpdateInterval: 5 }, {}).dataUpdateInterval).toBe(5)
+    expect(resolveThemeSettings({ dataUpdateInterval: 30 }, {}).dataUpdateInterval).toBe(30)
+    expect(resolveThemeSettings({ dataUpdateInterval: 60 }, {}).dataUpdateInterval).toBe(60)
+    expect(resolveThemeSettings({ dataUpdateInterval: 61 }, {}).dataUpdateInterval).toBe(5)
+  })
+
+  it('defaults to the floor rather than a value that can never run', () => {
+    expect(resolveThemeSettings({}, {}).dataUpdateInterval).toBe(5)
+  })
+})

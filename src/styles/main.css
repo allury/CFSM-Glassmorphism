@@ -4172,6 +4172,14 @@ a {
   opacity: 0.85;
 }
 
+/* 当下是否生效，比说明文字更要看得见，所以不跟着 .settings-note 一起压淡。 */
+.settings-state {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .settings-save-panel {
   position: sticky;
   top: 88px;

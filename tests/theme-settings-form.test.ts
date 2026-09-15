@@ -142,9 +142,22 @@ describe('设置页字段注册表与上游清单一致', () => {
     expect(isFieldEnabled(field('stopEarth'), settings)).toBe(false)
   })
 
-  it('数据更新间隔说明写明 CFSM 的推送语义与下限', () => {
+  /*
+   * 这条说明此前写着「服务端约 5 秒合并一批」，来源是 POST 上报路径的合并窗口常量。
+   * 真实站点走 WSS，实测推送节奏跟随站点自己的上报配置（实测每节点约 2 秒一次），
+   * 与那个 5 秒无关。下限 5 秒的真实理由是回退轮询每跳要重取配置与节点列表。
+   */
+  it('数据更新间隔说明写明生效条件与下限，且不再声称服务端的推送批次', () => {
     const field = THEME_FORM_FIELDS.find((item) => item.key === 'dataUpdateInterval')
-    expect(field?.note).toContain('WebSocket')
+    expect(field?.help).toContain('WebSocket 不可用')
     expect(field?.note).toContain('5 秒')
+    expect(field?.note).not.toContain('一批')
+    expect(field?.note).not.toMatch(/约 ?5 ?秒/)
+  })
+
+  it('数据更新间隔的输入下限与运行时钳制一致', () => {
+    const field = THEME_FORM_FIELDS.find((item) => item.key === 'dataUpdateInterval')
+    expect(field?.min).toBe(5)
+    expect(field?.max).toBe(60)
   })
 })

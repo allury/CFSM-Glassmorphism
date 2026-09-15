@@ -25,6 +25,13 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const fallbackActive = ref(false)
   const timedOut = ref(false)
   const paused = ref(false)
+  /*
+   * 离开首页时 stop() 会把上面这些清空，设置页因此读不到实时状态。
+   * 这一对快照不参与连接逻辑，只记录「最近一次观察到的结果」，
+   * 供设置页如实说明「数据更新间隔」当下有没有在用——没有观察过就什么都不说。
+   */
+  const lastObservedStatus = ref<DashboardRealtimeStatus | null>(null)
+  const lastObservedAt = ref<number | null>(null)
   let controller: DashboardRealtimeController | null = null
   let staleTimer: ReturnType<typeof setInterval> | null = null
 
@@ -43,7 +50,15 @@ export const useRealtimeStore = defineStore('realtime', () => {
     return 'idle'
   })
 
+  /** 记录当前状态；'idle' 不算观察结果，避免把「还没连」写成一次观察。 */
+  function observe(): void {
+    if (status.value === 'idle') return
+    lastObservedStatus.value = status.value
+    lastObservedAt.value = Date.now()
+  }
+
   function stop(): void {
+    observe()
     controller?.dispose()
     controller = null
     if (staleTimer !== null) globalThis.clearInterval(staleTimer)
@@ -72,15 +87,19 @@ export const useRealtimeStore = defineStore('realtime', () => {
       onSamples: (base, samples) => servers.applyRealtimeSamples(base, samples),
       onSourceState: (base, state) => {
         sourceStates.value = { ...sourceStates.value, [base]: state }
+        observe()
       },
       onFallbackChange: (active) => {
         fallbackActive.value = active
+        observe()
       },
       onTimeoutChange: (active) => {
         timedOut.value = active
+        observe()
       },
       onPausedChange: (active) => {
         paused.value = active
+        observe()
       },
     })
     controller.start()
@@ -111,6 +130,8 @@ export const useRealtimeStore = defineStore('realtime', () => {
     timedOut,
     paused,
     status,
+    lastObservedStatus,
+    lastObservedAt,
     start,
     sync,
     continueAfterTimeout,

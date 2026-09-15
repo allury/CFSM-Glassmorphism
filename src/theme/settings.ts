@@ -144,7 +144,7 @@ const DEFAULT_CUSTOM_COLORS: GlassCustomColors = {
 
 export const DEFAULT_THEME_SETTINGS: Readonly<ThemeSettings> = Object.freeze({
   themeMode: 'beijing',
-  dataUpdateInterval: 3,
+  dataUpdateInterval: 5,
   rpcTransportMode: 'http',
   defaultViewMode: 'card',
   nodeCardSize: 'compact',
@@ -394,7 +394,7 @@ export function normalizeThemeSettingsLayer(
 
   return {
     themeMode: oneOf(normalizedThemeMode, ['beijing', 'system', 'light', 'dark'], fallback.themeMode),
-    dataUpdateInterval: numberValue(input.dataUpdateInterval, fallback.dataUpdateInterval, 1, 60, true),
+    dataUpdateInterval: numberValue(input.dataUpdateInterval, fallback.dataUpdateInterval, 5, 60, true),
     rpcTransportMode: 'http',
     defaultViewMode: oneOf(input.defaultViewMode, ['card', 'list'], fallback.defaultViewMode),
     nodeCardSize: oneOf(input.nodeCardSize, ['mini', 'compact', 'comfortable', 'large'], fallback.nodeCardSize),
@@ -537,8 +537,8 @@ export function validateThemeSettingsDraft(value: ThemeSettings): ThemeDraftIssu
   if (!isSafeBackgroundSource(value.darkBackgroundUrl)) {
     issues.push({ key: 'darkBackgroundUrl', message: '暗色背景只允许 http(s)、站内 / 路径或安全的 local: 路径。' })
   }
-  if (!Number.isInteger(value.dataUpdateInterval) || value.dataUpdateInterval < 1 || value.dataUpdateInterval > 60) {
-    issues.push({ key: 'dataUpdateInterval', message: 'REST 补偿间隔必须是 1–60 秒的整数。' })
+  if (!Number.isInteger(value.dataUpdateInterval) || value.dataUpdateInterval < 5 || value.dataUpdateInterval > 60) {
+    issues.push({ key: 'dataUpdateInterval', message: 'REST 回退间隔必须是 5–60 秒的整数。' })
   }
   if (!Number.isFinite(value.homeHighLoadThreshold) || value.homeHighLoadThreshold < 1 || value.homeHighLoadThreshold > 100) {
     issues.push({ key: 'homeHighLoadThreshold', message: '高负载阈值必须在 1–100 之间。' })

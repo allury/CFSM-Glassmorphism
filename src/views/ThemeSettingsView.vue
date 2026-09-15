@@ -10,6 +10,7 @@ import {
   type ThemeField,
 } from '@/domain/theme-settings-form'
 import { useAppStore } from '@/stores/app'
+import { useRealtimeStore } from '@/stores/realtime'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { THEME_SETTING_KEYS, type ThemeSettings } from '@/theme/settings'
 import { message } from '@/utils/message'
@@ -27,6 +28,7 @@ const theme = useThemeSettingsStore()
 const router = useRouter()
 const copying = ref(false)
 
+const realtime = useRealtimeStore()
 const groups = THEME_SETTINGS_FORM
 const primaryBase = computed(() => app.primaryBase)
 const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
@@ -78,6 +80,21 @@ function groupTitle(title: string): string {
 
 function issueFor(key: keyof ThemeSettings): string | null {
   return theme.draftIssues.find((issue) => issue.key === key)?.message ?? null
+}
+
+/*
+ * 「数据更新间隔」只在 WebSocket 不可用时才被读到，正常连接时它一次也不生效。
+ * 光靠说明文字看不出此刻算哪种，这里补一行当下的判断。
+ *
+ * 设置页自己不建实时连接，读的是首页留下的那次观察；没有观察过就不显示，
+ * 不拿「未知」冒充「正常」。
+ */
+function fieldState(key: keyof ThemeSettings): string | null {
+  if (key !== 'dataUpdateInterval') return null
+  const observed = realtime.lastObservedStatus
+  if (observed === 'live') return '最近一次观察：WebSocket 正常，此项未生效。'
+  if (observed === 'fallback') return '最近一次观察：WebSocket 不可用，此项正在生效。'
+  return null
 }
 
 function fieldEnabled(field: ThemeField): boolean {
@@ -318,6 +335,7 @@ onMounted(async () => {
                       {{ issueFor(field.key) ?? field.help }}
                     </small>
                     <small v-if="field.note" class="settings-note">{{ field.note }}</small>
+                    <small v-if="fieldState(field.key)" class="settings-state">{{ fieldState(field.key) }}</small>
                   </label>
                 </template>
               </div>
