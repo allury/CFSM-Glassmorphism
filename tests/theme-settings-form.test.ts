@@ -4,7 +4,7 @@ import {
   THEME_FORM_FIELDS,
   THEME_SETTINGS_FORM,
 } from '@/domain/theme-settings-form'
-import { cloneThemeSettings, DEFAULT_THEME_SETTINGS, THEME_SETTING_KEYS } from '@/theme/settings'
+import { cloneThemeSettings, DEFAULT_THEME_SETTINGS, resolveThemeMode, THEME_SETTING_KEYS } from '@/theme/settings'
 
 /*
  * 基线是 Komari Glassmorphism v3.3.7 的 `komari-theme.json`：它的
@@ -159,5 +159,43 @@ describe('设置页字段注册表与上游清单一致', () => {
     const field = THEME_FORM_FIELDS.find((item) => item.key === 'dataUpdateInterval')
     expect(field?.min).toBe(5)
     expect(field?.max).toBe(60)
+  })
+})
+
+/*
+ * 说明文字与实现的一致性回归。
+ *
+ * 这两条此前都写错了，而且错的方向不同：一条把写回后端的取值说少了（还把
+ * 「跟随系统」说成会转存为 auto，实测线上 `theme_options.themeMode` 存的是
+ * system），一条把生效范围说窄了（只提首页，实际详情页那三张财务卡也一起隐藏）。
+ * 说明一旦与实现脱节，使用者就会照着错的描述做决定，所以这里把两条钉住。
+ */
+describe('field copy matches behaviour', () => {
+  const field = (key: string) => THEME_FORM_FIELDS.find((item) => item.key === key)
+
+  it('默认主题模式不再声称写回后端时会转成 auto', () => {
+    const note = field('themeMode')?.note ?? ''
+    expect(note).toContain('system')
+    expect(note).not.toMatch(/只有 ?beijing/)
+    expect(note).not.toMatch(/对应 CFSM 外观设置里的 auto/)
+  })
+
+  it('默认主题模式的时段说明与 resolveThemeMode 的判断一致', () => {
+    const help = field('themeMode')?.help ?? ''
+    expect(help).toContain('07:00–18:59')
+    // 判断是 beijingHour >= 7 && beijingHour < 19，即 07:00–18:59 为浅色。
+    expect(resolveThemeMode('beijing', false, new Date(Date.UTC(2026, 0, 1, 23, 0)))).toBe('light')
+    expect(resolveThemeMode('beijing', false, new Date(Date.UTC(2026, 0, 1, 10, 59)))).toBe('light')
+    expect(resolveThemeMode('beijing', false, new Date(Date.UTC(2026, 0, 1, 11, 0)))).toBe('dark')
+    expect(resolveThemeMode('beijing', false, new Date(Date.UTC(2026, 0, 1, 22, 59)))).toBe('dark')
+  })
+
+  it('未登录隐藏价格写明详情页也在范围内', () => {
+    const help = field('hidePriceWhenLoggedOut')?.help ?? ''
+    expect(help).toContain('详情页')
+    expect(help).toContain('月均支出')
+    expect(help).toContain('在线天数仍会显示')
+    // 首页总览卡片里没有财务项，不该再提「费用类卡片」。
+    expect(help).not.toContain('费用类卡片')
   })
 })

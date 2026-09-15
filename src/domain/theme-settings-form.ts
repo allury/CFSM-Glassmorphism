@@ -107,7 +107,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         kind: 'select',
         options: THEME_MODE_OPTIONS,
         help: '「北京时间自动」在北京时间 07:00–18:59 使用浅色、其余时段使用深色；「跟随系统」跟随浏览器的深浅色偏好。',
-        note: '写入后端的取值只有 beijing / light / dark；「跟随系统」对应 CFSM 外观设置里的 auto。',
+        note: '四个取值原样写入 theme_options.themeMode，「跟随系统」存的就是 system；读取时兼容历史值 auto，按 system 处理。',
       },
       {
         key: 'dataUpdateInterval',
@@ -257,7 +257,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         key: 'hidePriceWhenLoggedOut',
         label: '未登录隐藏价格',
         kind: 'switch',
-        help: '未登录时隐藏节点卡片与列表中的价格、剩余价值和费用类卡片；在线天数仍会显示。',
+        help: '未登录时隐藏首页卡片与列表里的价格、剩余价值，以及详情页的节点价格、月均支出、剩余价值三张卡；到期时间与在线天数仍会显示。',
         note: '这是前端展示开关，不改变 CFSM 服务端的权限过滤。',
       },
       {
