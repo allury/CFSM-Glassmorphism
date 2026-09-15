@@ -3598,22 +3598,6 @@ a {
 }
 
 .ping-chart__actions,
-.ping-chart__notice {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  align-items: flex-start;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.5;
-}
-
-.ping-chart__notice svg {
-  flex: none;
-  margin-top: 2px;
-}
-
 .ping-chart__smooth {
   display: flex;
   flex: none;

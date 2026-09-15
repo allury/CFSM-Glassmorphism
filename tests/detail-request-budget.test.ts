@@ -26,6 +26,82 @@ function jsonResponse(body: unknown): Response {
 }
 
 /**
+ * 受控放行的网络桩：历史请求挂起，由测试按任意顺序放行或让它失败。
+ * 不用随机延迟碰运气，响应顺序完全由用例决定。
+ */
+interface Gate {
+  calls: string[]
+  pending: { url: string, hours: number, resolve: (body: unknown) => void, reject: (error: Error) => void }[]
+  release: (hours: number, body?: unknown, which?: 'oldest' | 'newest') => Promise<void>
+  fail: (hours: number, which?: 'oldest' | 'newest') => Promise<void>
+}
+
+function gateNetwork(): Gate {
+  const calls: string[] = []
+  const pending: Gate['pending'] = []
+  vi.stubGlobal('fetch', async (input: unknown) => {
+    const url = String(input)
+    calls.push(url)
+    if (url.includes('/api/config')) return jsonResponse({ site_title: 'demo', version: '2.8.5' })
+    if (url.includes('/api/server?')) return jsonResponse({ id: 'node-1', name: 'Node 1' })
+    if (url.includes('/api/history/all')) {
+      return new Promise((resolve, reject) => {
+        pending.push({
+          url,
+          hours: Number(new URL(url).searchParams.get('hours')),
+          resolve: (body) => resolve(jsonResponse(body)),
+          reject: (error) => reject(error),
+        })
+      })
+    }
+    return jsonResponse({})
+  })
+  vi.stubGlobal('WebSocket', class {
+    static readonly OPEN = 1
+    readyState = 0
+    close(): void {}
+    send(): void {}
+    addEventListener(): void {}
+    removeEventListener(): void {}
+  })
+
+  // 请求可能还没发出（open 要先等 /api/server），所以按窗口精确匹配并等它出现。
+  // `which` 决定放行同一窗口的哪一次在途请求，用来精确制造「先发的后到」。
+  const take = async (hours: number, which: 'oldest' | 'newest' = 'oldest') => {
+    for (let tick = 0; tick < 200; tick++) {
+      const matches = pending.map((item, index) => ({ item, index })).filter((entry) => entry.item.hours === hours)
+      if (matches.length > 0) {
+        const chosen = which === 'newest' ? matches.at(-1) : matches.at(0)
+        if (chosen) {
+          pending.splice(chosen.index, 1)
+          return chosen.item
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    }
+    throw new Error('no pending history request for hours=' + hours)
+  }
+
+  const settle = async () => {
+    for (let tick = 0; tick < 6; tick++) await new Promise((resolve) => setTimeout(resolve, 0))
+  }
+
+  return {
+    calls,
+    pending,
+    async release(hours, body, which) {
+      const entry = await take(hours, which)
+      entry.resolve(body ?? [{ timestamp: 1_700_000_000_000, cpu: hours }])
+      await settle()
+    },
+    async fail(hours, which) {
+      ;(await take(hours, which)).reject(new Error('network down'))
+      await settle()
+    },
+  }
+}
+
+/**
  * 记录请求 URL 并返回各端点的最小合法载荷。
  * `delays` 按 URL 子串设定响应延迟，用来制造乱序返回。
  */
@@ -188,6 +264,112 @@ describe('detail page request budget', () => {
     await detail.loadPingHistory(1)
     expect(historyCalls(calls)).toHaveLength(2)
     expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  /*
+   * 指令 4.2 的五个乱序场景。不变量：最后一次有效操作决定显示结果；
+   * 旧响应不得覆盖新数据、不得清空新的成功结果、不得把状态翻成错误。
+   */
+  describe('out-of-order responses', () => {
+    async function openGated(gate: Gate) {
+      const app = useAppStore()
+      app.apiBases = [BASE]
+      app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+      const detail = useServerDetailStore()
+      const opening = detail.open('node-1', [BASE])
+      await gate.release(1)
+      await opening
+      return detail
+    }
+
+    it('1h to 24h to 1h: the first 1h response lands last and is discarded', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const first = detail.loadHistory(1)
+      const middle = detail.loadHistory(24)
+      const last = detail.loadHistory(1)
+
+      // 最后那次先回，最早那次最后回。
+      await gate.release(1, [{ timestamp: 1_700_000_000_000, cpu: 111 }], 'newest')
+      await gate.release(24)
+      await gate.release(1, [{ timestamp: 1_700_000_000_000, cpu: 999 }], 'oldest')
+      await Promise.all([first, middle, last])
+
+      expect(detail.historyHours).toBe(1)
+      expect(detail.history?.points.at(0)?.cpu).toBe(111)
+      expect(detail.historyState).toBe('ready')
+    })
+
+    it('same window refreshed twice: a late failure cannot wipe the newer success', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const older = detail.loadHistory(1)
+      const newer = detail.loadHistory(1)
+
+      await gate.release(1, [{ timestamp: 1_700_000_000_000, cpu: 42 }], 'newest')
+      await gate.fail(1, 'oldest')
+      await Promise.all([older, newer])
+
+      expect(detail.historyState).toBe('ready')
+      expect(detail.history?.points.at(0)?.cpu).toBe(42)
+      expect(detail.historyIssue).toBeNull()
+    })
+
+    it('opening another node discards the response still in flight for the old one', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const abandoned = detail.loadHistory(1)
+      const reopening = detail.open('node-2', [BASE])
+      // 被弃置那次先回：它的 controller 已被 open 取消，必须丢弃。
+      await gate.release(1, [{ timestamp: 1_700_000_000_000, cpu: 777 }], 'oldest')
+      await gate.release(1, [{ timestamp: 1_700_000_000_000, cpu: 222 }], 'newest')
+      await reopening
+      await abandoned
+
+      expect(detail.server?.id).toBe('node-1')
+      expect(detail.history?.points.at(0)?.cpu).toBe(222)
+      expect(detail.historyState).toBe('ready')
+    })
+
+    it('shared to independent and back: the stale independent response is dropped', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const independent = detail.loadPingHistory(24)
+      await detail.loadPingHistory(1)
+      await gate.release(24, [{ timestamp: 1_700_000_000_000, cpu: 888 }])
+      await independent
+
+      expect(detail.pingHistoryHours).toBe(1)
+      expect(detail.pingHistory).toBe(detail.history)
+      expect(detail.pingHistory?.points.at(0)?.cpu).toBe(1)
+    })
+
+    it('independent A to B to A keeps the newest request', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const a1 = detail.loadPingHistory(6)
+      const b = detail.loadPingHistory(12)
+      const a2 = detail.loadPingHistory(6)
+
+      await gate.release(6, [{ timestamp: 1_700_000_000_000, cpu: 11 }], 'newest')
+      await gate.release(12)
+      await gate.release(6, [{ timestamp: 1_700_000_000_000, cpu: 66 }], 'oldest')
+      await Promise.all([a1, b, a2])
+
+      expect(detail.pingHistoryHours).toBe(6)
+      expect(detail.pingHistory?.points.at(0)?.cpu).toBe(11)
+      expect(detail.pingHistoryState).toBe('ready')
+    })
   })
 
   it('asks /api/server once and does not walk the server list', async () => {

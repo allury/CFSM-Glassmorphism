@@ -62,6 +62,14 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   let realtime: DetailRealtimeController | null = null
   let requestController: AbortController | null = null
   let revision = 0
+  /*
+   * 每次历史请求单独编号。只比较「窗口是否仍相同」挡不住同窗口的更早一次请求：
+   * 1 小时 → 24 小时 → 1 小时时，第一份 1 小时响应最后到达，窗口比较仍然成立，
+   * 于是它会盖掉更新的那份；同窗口连续刷新时，一次晚到的失败还会把已经成功的
+   * 数据清空并翻成错误态。序号只认「最后一次发起的请求」，成功与失败两条路径同样适用。
+   */
+  let historySeq = 0
+  let pingHistorySeq = 0
 
   const sourceBase = computed(() => server.value?.source.base ?? null)
   const historyPoints = computed(() => history.value?.points ?? [])
@@ -153,6 +161,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     historyHours.value = hours
     // 用户把负载图调回延迟图正在用的窗口时，重新跟随，避免两份相同的历史。
     if (!pingFollowsHistory.value && ownPingHistoryHours.value === hours) {
+      pingHistorySeq += 1
       pingFollowsHistory.value = true
       ownPingHistory.value = null
       ownPingHistoryState.value = 'idle'
@@ -161,16 +170,19 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     historyState.value = 'loading'
     historyIssue.value = null
     const expectedRevision = revision
+    const seq = ++historySeq
+    const stale = (): boolean => (
+      controller.signal.aborted || expectedRevision !== revision || seq !== historySeq
+    )
     try {
       const result = await fetchHistory(current.id, hours, current.source.base, {
         signal: controller.signal,
       })
-      // 窗口已被更晚的一次切换改掉时丢弃这份响应，否则慢的那次会盖掉快的那次。
-      if (controller.signal.aborted || expectedRevision !== revision || historyHours.value !== hours) return
+      if (stale()) return
       history.value = result
       historyState.value = result.points.length > 0 ? 'ready' : 'empty'
     } catch (error) {
-      if (controller.signal.aborted || expectedRevision !== revision || historyHours.value !== hours) return
+      if (stale()) return
       history.value = null
       historyState.value = 'error'
       historyIssue.value = classifyCfsmRequestError(error)
@@ -180,6 +192,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   async function loadPingHistory(hours: HistoryHours = pingHistoryHours.value): Promise<void> {
     // 与负载图同窗口：复用那一份历史，不再单独请求。
     if (hours === historyHours.value) {
+      pingHistorySeq += 1
       pingFollowsHistory.value = true
       ownPingHistory.value = null
       ownPingHistoryState.value = 'idle'
@@ -195,15 +208,23 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     ownPingHistoryState.value = 'loading'
     ownPingHistoryIssue.value = null
     const expectedRevision = revision
+    const seq = ++pingHistorySeq
+    // 回到共享窗口也要作废在途的独立请求，否则它晚到时会把图切回独立那份数据。
+    const stale = (): boolean => (
+      controller.signal.aborted
+      || expectedRevision !== revision
+      || seq !== pingHistorySeq
+      || pingFollowsHistory.value
+    )
     try {
       const result = await fetchHistory(current.id, hours, current.source.base, {
         signal: controller.signal,
       })
-      if (controller.signal.aborted || expectedRevision !== revision || ownPingHistoryHours.value !== hours) return
+      if (stale()) return
       ownPingHistory.value = result
       ownPingHistoryState.value = result.points.length > 0 ? 'ready' : 'empty'
     } catch (error) {
-      if (controller.signal.aborted || expectedRevision !== revision || ownPingHistoryHours.value !== hours) return
+      if (stale()) return
       ownPingHistory.value = null
       ownPingHistoryState.value = 'error'
       ownPingHistoryIssue.value = classifyCfsmRequestError(error)
