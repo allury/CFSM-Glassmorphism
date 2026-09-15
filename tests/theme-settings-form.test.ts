@@ -199,3 +199,24 @@ describe('field copy matches behaviour', () => {
     expect(help).not.toContain('费用类卡片')
   })
 })
+
+/*
+ * 配色方案的作用范围。
+ *
+ * v1.1.3 起激活态的快捷筛选胶囊也吃 `--control-surface` 与 `--glass-text`
+ * （`main.css` 的 `.quick-controls button.is-active`），但这条说明仍写着
+ * 「只作用于节点卡」，与同组 `glassCustomColors` 自己写的「lightControl/
+ * darkControl=控制条」互相矛盾。两处必须指向同一件事。
+ */
+describe('colour preset scope copy', () => {
+  it('承认控制条也在作用范围内，且不与自定义颜色说明矛盾', () => {
+    const preset = THEME_FORM_FIELDS.find((item) => item.key === 'glassColorPreset')
+    const custom = THEME_FORM_FIELDS.find((item) => item.key === 'glassCustomColors')
+
+    expect(preset?.note).not.toMatch(/只作用于节点卡/)
+    expect(preset?.note).toContain('快捷筛选胶囊')
+    expect(preset?.note).toContain('顶栏、面板、提示框与弹层不受影响')
+    // 自定义 JSON 说明里确实有控制条这一项，两边口径一致。
+    expect(custom?.help).toContain('控制条')
+  })
+})
