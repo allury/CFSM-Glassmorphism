@@ -18,11 +18,11 @@
 
 <img src="docs/screenshots/detail.webp" alt="节点详情" width="100%">
 
-**主题设置 · 48 项，改完即时预览**
+**主题设置 · 46 项可调，改完即时预览**
 
 <img src="docs/screenshots/settings.webp" alt="主题设置" width="100%">
 
-> 截图使用本地演示数据生成，非真实节点。
+> 截图使用本地演示数据生成，非真实节点；顶栏图标为演示图标，实际会显示你在 CFSM 后台设置的网站图标。
 
 ## 特性
 
@@ -68,8 +68,8 @@ https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.6
 https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist
 ```
 
-- `theme-v1.1.6` 是不可变标签，指向该版本已验证的构建产物，推荐日常使用。
-- `theme-dist` 是滚动分支，始终跟随最新稳定版。
+- `theme-v1.1.6` 是不可变标签，指向该版本已验证的构建产物，**推荐使用**：内容不会变，升级时机由你决定。
+- `theme-dist` 是滚动分支，始终跟随最新稳定版。用它可以自动拿到新版本，但**发布新版后可能需要手动重新应用一次**：CFSM 按地址分别缓存 `index.html` 与各个资源文件，分支前移时两者的缓存不一定同时刷新，可能出现页面暂时空白。重新应用一次即可恢复，固定标签不存在这个问题。
 
 也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.6.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
@@ -110,7 +110,7 @@ ASN 可写成 `AS3258`、`asn AS3258` 或 `asn-3258`；组织名前缀与名称�
 
 ## 兼容性
 
-- 已在 CF-Server-Monitor Worker `2.8.5 Beta5` 上实测；更早版本未验证。
+- 已在 CF-Server-Monitor Worker `2.8.5 Stable` 与 `2.8.5 Beta5` 上实测；更早版本未验证。
 - 仅使用 CFSM 公开的第三方主题接口：`/api/config`、`/api/servers`、`/api/server`、`/api/history/all`、`/api/ws`，以及保存主题配置的 `POST /api/theme_options`。
 - 管理入口链接到 CFSM 自带的 `/admin#admin`，主题本身不实现管理后台。
 - 国旗与操作系统图标取自 CFSM 默认皮肤（`/flags/`、`/os-icons/`），不打包进主题。
