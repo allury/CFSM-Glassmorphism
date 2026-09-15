@@ -794,7 +794,7 @@ docs/compatibility-matrix.md
 状态只能使用：
 
 ```text
-✅ 1:1
+✅ 一致
 🟢 等价实现
 🟡 降级实现
 🔴 CFSM API 暂不支持
@@ -804,7 +804,7 @@ docs/compatibility-matrix.md
 
 # 17. 四种功能处理等级
 
-## A. 1:1
+## A. 复刻对照
 
 CFSM 有完整对应数据。
 
@@ -3035,7 +3035,7 @@ komari-theme.json
 标记：
 
 ```text
-✅ 1:1
+✅ 一致
 🟢 等价
 🟡 降级
 🔴 不支持
@@ -3399,7 +3399,7 @@ Komari API 仍存在
 ## 实现情况
 
 ```text
-✅ 1:1
+✅ 一致
 🟢 等价
 🟡 降级
 🔴 不支持

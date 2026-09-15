@@ -216,7 +216,7 @@ REST、WebSocket partial merge、History、`theme_options`、JWT / Turnstile、�
 probe 三态与 50+ 节点性能优化的既有契约全部保持不变；
 本轮没有为解决显示问题去改数据适配层的语义。
 
-## 第 13 轮 · v1.1.0-test.4 详情页 1:1 收口
+## 第 13 轮 · v1.1.0-test.4 详情页表现层收口
 
 本轮同样只动展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、History
 （九档 hours + revision + AbortController）、probe 的 `false` / `null` / 数值三态、
@@ -245,7 +245,7 @@ CFSM 与上游的详情页差异全部记录在 `docs/detail-fidelity-audit.md`�
 IP、物理核心数、虚拟机类型、厂商（城市 / ASN）、系统温度、近一天网速峰值
 六项因 CFSM 公开 API 不提供而隐藏，不以估算值补位。
 
-## 第 11 轮 · v1.1.0-test.3 首页 1:1 收口
+## 第 11 轮 · v1.1.0-test.3 首页表现层收口
 
 本轮全部改动都在展示层，**没有触碰数据适配层**：REST、WebSocket partial merge、
 10 秒稳定后重置退避、History revision 与 AbortController、probe 的

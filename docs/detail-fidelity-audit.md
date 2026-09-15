@@ -1,4 +1,4 @@
-# 详情页 1:1 复刻审计（第 13 轮）
+# 详情页复刻审计（第 13 轮）
 
 > **最高原则：原 Komari Glassmorphism 当前默认分支的 `InstanceDetail.vue` 及其真实浏览器
 > 运行结果，是详情页 UI/UX 的唯一权威基准。**

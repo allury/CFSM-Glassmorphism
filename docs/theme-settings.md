@@ -2,7 +2,7 @@
 
 > 基线：Komari Glassmorphism v3.3.7 的 `komari-theme.json`，提交 bf8376587c720de915ac48789a8a180357c762d6。状态描述在 CFSM 上的最终适配可行性，不等同于当前实现进度。
 
-共审计 **48** 个设置：**✅ 1:1 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
+共审计 **48** 个设置：**✅ 一致 28 个、🟢 等价 11 个、🟡 降级 7 个、🔴 不支持 2 个**。
 
 ## 第 7 至 8 轮落地范围
 
@@ -42,7 +42,7 @@
 
 ## 状态定义
 
-- ✅ 1:1：配置含义和用户体验可以原样保留。
+- ✅ 一致：配置含义和用户体验可以原样保留。
 - 🟢 等价：数据结构或底层机制改变，但可达到等价体验。
 - 🟡 降级：只对 CFSM 确实提供的字段生效；不可用子项必须隐藏或说明。
 - 🔴 不支持：缺少 CFSM 公开主题能力，禁用并说明，不能接入私有 API 或 mock。
@@ -54,40 +54,40 @@
 | 1 | `themeMode` | select / `beijing` | 保留 beijing 定时明暗；同时映射 config 的 auto/light/dark 偏好 | 🟢 等价 |
 | 2 | `dataUpdateInterval` | number / `3` | 第 12 轮接入首页与详情页的 REST 回退轮询间隔（下限 5 秒，与服务端推送批次同频）；服务端 WS 批次由 CFSM 决定，主题改不了 | 🟡 降级 |
 | 3 | `rpcTransportMode` | select / `http` | CFSM 无 Komari HTTP/WebSocket RPC 二选一；固定使用官方 REST + WS | 🔴 不支持 |
-| 4 | `defaultViewMode` | select / `card` | 保留 card/list | ✅ 1:1 |
-| 5 | `nodeCardSize` | select / `compact` | 保留 mini/compact/comfortable/large | ✅ 1:1 |
-| 6 | `alertEnabled` | switch / `false` | 存于 theme_options，控制首页公告 | ✅ 1:1 |
-| 7 | `alertTitle` | string / 空 | 存于 theme_options | ✅ 1:1 |
-| 8 | `alertContent` | richtext / 空 | 支持受限 Markdown 渲染并做 XSS 清理 | ✅ 1:1 |
-| 9 | `stopEarth` | switch / `false` | 控制 realistic/cobe 动画；tiled 本身不旋转 | ✅ 1:1 |
-| 10 | `earthRenderer` | select / `realistic` | 已实现 realistic/cobe/tiled 三种可区分渲染 | ✅ 1:1 |
-| 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 1:1 |
-| 12 | `hideGeneralCard` | switch / `false` | 控制头部/总览区 | ✅ 1:1 |
+| 4 | `defaultViewMode` | select / `card` | 保留 card/list | ✅ 一致 |
+| 5 | `nodeCardSize` | select / `compact` | 保留 mini/compact/comfortable/large | ✅ 一致 |
+| 6 | `alertEnabled` | switch / `false` | 存于 theme_options，控制首页公告 | ✅ 一致 |
+| 7 | `alertTitle` | string / 空 | 存于 theme_options | ✅ 一致 |
+| 8 | `alertContent` | richtext / 空 | 支持受限 Markdown 渲染并做 XSS 清理 | ✅ 一致 |
+| 9 | `stopEarth` | switch / `false` | 控制 realistic/cobe 动画；tiled 本身不旋转 | ✅ 一致 |
+| 10 | `earthRenderer` | select / `realistic` | 已实现 realistic/cobe/tiled 三种可区分渲染 | ✅ 一致 |
+| 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 一致 |
+| 12 | `hideGeneralCard` | switch / `false` | 控制头部/总览区 | ✅ 一致 |
 | 13 | `visitorInfoEnabled` | switch / `true` | CFSM 公开主题 API 不提供访客 IP 或审计能力；强制关闭 | 🔴 不支持 |
 | 14 | `glassColorPreset` | select / `翡翠` | 保留翡翠/柔和/高对比/午夜/自定义。文字色逐字取自上游 `glassTheme.ts`，且与上游一样只作用于节点卡；表面色（card / control / border）仍为本主题值（DEFERRED-PRESET-01） | 🟡 部分 |
-| 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 1:1 |
-| 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 1:1 |
+| 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 一致 |
+| 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 一致 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |
 | 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列；remainingValue / monthlyCost / yearlyCost / trafficQuota / 各类 PeakNode / 虚拟化分布因需要跨币种换算或 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
 | 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
-| 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 1:1 |
-| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段 | ✅ 1:1 |
+| 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 一致 |
+| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段 | ✅ 一致 |
 | 22 | `providerAliases` | string / 空 | 仅匹配 name/group/tags/region 中真实文本，不做 IP Geo 猜测 | 🟢 等价 |
-| 23 | `exportSecondaryPassword` | string / 空 | 已用于客户端导出二次确认；不宣称后端安全边界 | ✅ 1:1 |
-| 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 1:1 |
-| 25 | `homeQuickControlsEnabled` | switch / `true` | 保留快捷控制区 | ✅ 1:1 |
-| 26 | `homeQuickControlPreset` | select / `完整` | 保留基础/流量/运维/完整/自定义 | ✅ 1:1 |
+| 23 | `exportSecondaryPassword` | string / 空 | 已用于客户端导出二次确认；不宣称后端安全边界 | ✅ 一致 |
+| 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 一致 |
+| 25 | `homeQuickControlsEnabled` | switch / `true` | 保留快捷控制区 | ✅ 一致 |
+| 26 | `homeQuickControlPreset` | select / `完整` | 保留基础/流量/运维/完整/自定义 | ✅ 一致 |
 | 27 | `homeQuickControlKeys` | richtext / favorite、totalTraffic、peak、offline | 第 11 轮起允许的 key 集合独立于「完整」预设，与上游 `ALL_HOME_QUICK_CONTROL_KEYS` 一致（默认六项 + upload + download）；`monthlyCost` 需跨币种换算，CFSM 不提供 | 🟢 等价 |
 | 28 | `nodeListMetadataEnabled` | switch / `true` | 信息栏保留，但 CFSM 不提供 ASN/城市/实际 IP | 🟡 降级 |
 | 29 | `nodeListMetadataFields` | richtext / provider、region、asn | region/tags/group 可用；provider 仅文本匹配；city/asn 不可用 | 🟡 降级 |
-| 30 | `nodeListCustomTagsVisible` | switch / `true` | 映射 CFSM 逗号分隔 tags | ✅ 1:1 |
-| 31 | `offlineNodesLast` | switch / `false` | 使用统一五分钟在线判定排序 | ✅ 1:1 |
-| 32 | `homeHighLoadThreshold` | number / `80` | 对 CPU、内存、磁盘真实百分比生效，限制 1–100 | ✅ 1:1 |
-| 33 | `homeTrafficWarningThreshold` | number / `80` | 只在 traffic_limit 可可靠解析时生效，限制 1–100 | ✅ 1:1 |
-| 34 | `homeExpiringDays` | number / `30` | 使用 expire_date，限制 1–3650 | ✅ 1:1 |
+| 30 | `nodeListCustomTagsVisible` | switch / `true` | 映射 CFSM 逗号分隔 tags | ✅ 一致 |
+| 31 | `offlineNodesLast` | switch / `false` | 使用统一五分钟在线判定排序 | ✅ 一致 |
+| 32 | `homeHighLoadThreshold` | number / `80` | 对 CPU、内存、磁盘真实百分比生效，限制 1–100 | ✅ 一致 |
+| 33 | `homeTrafficWarningThreshold` | number / `80` | 只在 traffic_limit 可可靠解析时生效，限制 1–100 | ✅ 一致 |
+| 34 | `homeExpiringDays` | number / `30` | 使用 expire_date，限制 1–3650 | ✅ 一致 |
 | 35 | `diskPredictionEnabled` | switch / `false` | 第 12 轮落地：对详情页已取回的 `disk_used` / `disk_total` 序列做最小二乘回归，显示在负载图磁盘卡副标题；不为预测追加请求，因此需要把时间范围选到 2 天以上（未登录最多 24 小时）。上游另有首页健康面板的磁盘风险榜，那需要逐节点历史，CFSM 不做 | 🟢 等价 |
-| 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测 | ✅ 1:1 |
-| 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换；第 12 轮补上设置页开关（此前功能已实现但页面上没有入口） | ✅ 1:1 |
+| 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测 | ✅ 一致 |
+| 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换；第 12 轮补上设置页开关（此前功能已实现但页面上没有入口） | ✅ 一致 |
 | 38 | `detailMetricCardPreset` | select / `财务` | 预设映射到 CFSM 详情领域模型，保持响应式卡片数量 | 🟢 等价 |
 | 39 | `detailMetricCardKeys` | richtext / nodePrice、monthlyCost、remainingTime、remainingValue、totalTraffic、trafficQuota、uptime、connections | 支持有真实字段的 keys；系统温度、精确配额等按可用性隐藏 | 🟡 降级 |
 | 40 | `gpuChartEnabled` | switch / `false` | 使用 gpu_info 的 id/name/info；无序列自动隐藏 | 🟢 等价 |
@@ -97,8 +97,8 @@
 | 44 | `backgroundType` | select / `image` | 保留 image/video，采用浏览器安全加载策略 | 🟢 等价 |
 | 45 | `lightBackgroundUrl` | string / 空 | 支持 http(s) 与站内路径；local: 迁移为主题可访问静态路径 | 🟢 等价 |
 | 46 | `darkBackgroundUrl` | string / 空 | 与亮色 URL 同一规则 | 🟢 等价 |
-| 47 | `backgroundBlur` | number / `0` | 映射 CSS blur，非负校验 | ✅ 1:1 |
-| 48 | `backgroundOverlay` | number / `0` | 保留 -100–100 的明暗遮罩语义 | ✅ 1:1 |
+| 47 | `backgroundBlur` | number / `0` | 映射 CSS blur，非负校验 | ✅ 一致 |
+| 48 | `backgroundOverlay` | number / `0` | 保留 -100–100 的明暗遮罩语义 | ✅ 一致 |
 
 ## 配置分层与保存
 

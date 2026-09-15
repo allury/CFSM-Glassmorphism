@@ -220,3 +220,23 @@ describe('colour preset scope copy', () => {
     expect(custom?.help).toContain('控制条')
   })
 })
+
+/*
+ * 隐藏头部的说明此前写着「隐藏地球和总览卡片」，但实现里
+ * `hideGeneralCard` 与 `hideEarth` 是两个并列的 `v-if`，前者只收走总览卡片。
+ * 保留这种拆分（多出「只藏卡片、保留地球」一种组合），说明按实际行为写。
+ */
+describe('hide header copy', () => {
+  it('说明与两个独立开关的实现一致', () => {
+    const field = THEME_FORM_FIELDS.find((item) => item.key === 'hideGeneralCard')
+    expect(field?.help).toContain('总览卡片')
+    expect(field?.help).toContain('隐藏地球')
+    expect(field?.help).not.toBe('隐藏地球和总览卡片。')
+  })
+
+  it('设置页文案不点名任何上游主题', () => {
+    for (const field of THEME_FORM_FIELDS) {
+      expect(`${field.help} ${field.note ?? ''}`).not.toMatch(/上游|Komari/)
+    }
+  })
+})

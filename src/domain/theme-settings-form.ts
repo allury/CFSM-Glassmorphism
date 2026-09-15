@@ -187,7 +187,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         key: 'hideGeneralCard',
         label: '隐藏头部',
         kind: 'switch',
-        help: '隐藏地球和总览卡片。',
+        help: '隐藏首页总览卡片；地球由「隐藏地球」单独控制，两项同时开启时整个头部区域消失。',
       },
       {
         key: 'glassColorPreset',
