@@ -52,7 +52,7 @@
 | # | key | 类型 / 原默认值 | CFSM 处理 | 状态 |
 |---:|---|---|---|---|
 | 1 | `themeMode` | select / `beijing` | 保留 beijing 定时明暗；同时映射 config 的 auto/light/dark 偏好 | 🟢 等价 |
-| 2 | `dataUpdateInterval` | number / `3` | 第 12 轮接入首页与详情页的 REST 回退轮询间隔（下限 5 秒，与服务端推送批次同频）；服务端 WS 批次由 CFSM 决定，主题改不了 | 🟡 降级 |
+| 2 | `dataUpdateInterval` | number / `5` | 第 12 轮接入首页与详情页的 REST 回退轮询间隔（取值 5–60 秒，下限来自回退轮询自身的开销，与服务端推送节奏无关）；服务端 WS 批次由 CFSM 决定，主题改不了 | 🟡 降级 |
 | 3 | `rpcTransportMode` | select / `http` | CFSM 无 Komari HTTP/WebSocket RPC 二选一；固定使用官方 REST + WS | 🔴 不支持 |
 | 4 | `defaultViewMode` | select / `card` | 保留 card/list | ✅ 一致 |
 | 5 | `nodeCardSize` | select / `compact` | 保留 mini/compact/comfortable/large | ✅ 一致 |
@@ -62,7 +62,7 @@
 | 9 | `stopEarth` | switch / `false` | 控制 realistic/cobe 动画；tiled 本身不旋转 | ✅ 一致 |
 | 10 | `earthRenderer` | select / `realistic` | 已实现 realistic/cobe/tiled 三种可区分渲染 | ✅ 一致 |
 | 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 一致 |
-| 12 | `hideGeneralCard` | switch / `false` | 控制头部/总览区 | ✅ 一致 |
+| 12 | `hideGeneralCard` | switch / `false` | 只隐藏总览卡片；地球由 `hideEarth` 单独控制，两项同时开启头部才整体消失 | 🟢 等价 |
 | 13 | `visitorInfoEnabled` | switch / `true` | CFSM 公开主题 API 不提供访客 IP 或审计能力；强制关闭 | 🔴 不支持 |
 | 14 | `glassColorPreset` | select / `翡翠` | 保留翡翠/柔和/高对比/午夜/自定义。文字色逐字取自上游 `glassTheme.ts`，且与上游一样只作用于节点卡；表面色（card / control / border）仍为本主题值（DEFERRED-PRESET-01） | 🟡 部分 |
 | 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 一致 |
@@ -71,7 +71,7 @@
 | 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列；remainingValue / monthlyCost / yearlyCost / trafficQuota / 各类 PeakNode / 虚拟化分布因需要跨币种换算或 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
 | 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
 | 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 一致 |
-| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段 | ✅ 一致 |
+| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段：首页卡片与列表的价格、剩余价值，以及详情页的节点价格 / 月均支出 / 剩余价值 | ✅ 一致 |
 | 22 | `providerAliases` | string / 空 | 仅匹配 name/group/tags/region 中真实文本，不做 IP Geo 猜测 | 🟢 等价 |
 | 23 | `exportSecondaryPassword` | string / 空 | 已用于客户端导出二次确认；不宣称后端安全边界 | ✅ 一致 |
 | 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 一致 |
@@ -79,7 +79,7 @@
 | 26 | `homeQuickControlPreset` | select / `完整` | 保留基础/流量/运维/完整/自定义 | ✅ 一致 |
 | 27 | `homeQuickControlKeys` | richtext / favorite、totalTraffic、peak、offline | 第 11 轮起允许的 key 集合独立于「完整」预设，与上游 `ALL_HOME_QUICK_CONTROL_KEYS` 一致（默认六项 + upload + download）；`monthlyCost` 需跨币种换算，CFSM 不提供 | 🟢 等价 |
 | 28 | `nodeListMetadataEnabled` | switch / `true` | 信息栏保留，但 CFSM 不提供 ASN/城市/实际 IP | 🟡 降级 |
-| 29 | `nodeListMetadataFields` | richtext / provider、region、asn | region/tags/group 可用；provider 仅文本匹配；city/asn 不可用 | 🟡 降级 |
+| 29 | `nodeListMetadataFields` | richtext / provider、region、asn | region/tags/group 可用；provider 仅文本匹配；city 无数据源，asn 有数据（取自节点标签、详情页在用）但列表未实现该列 | 🟡 降级 |
 | 30 | `nodeListCustomTagsVisible` | switch / `true` | 映射 CFSM 逗号分隔 tags | ✅ 一致 |
 | 31 | `offlineNodesLast` | switch / `false` | 使用统一五分钟在线判定排序 | ✅ 一致 |
 | 32 | `homeHighLoadThreshold` | number / `80` | 对 CPU、内存、磁盘真实百分比生效，限制 1–100 | ✅ 一致 |
