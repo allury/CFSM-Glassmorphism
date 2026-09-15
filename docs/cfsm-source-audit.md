@@ -86,7 +86,10 @@ Durable Object MetricsBroadcaster ─► /api/ws batchUpdate ─► latestReport
 - 列集合 `HISTORY_ALL_QUERY_COLUMNS` 含全部 8 个 `ping_*` 与 8 个 `loss_*`。
 - 每个时间桶取一条代表样本（`buildSampleJsonExpression ... LIMIT 1`），不是聚合平均。
 - `timestamp` 为毫秒，升序。真实响应实测 180 行、升序。
-- 点数由站点设置 `long_history_points` 决定（实测 180）。
+- 点数上限按窗口分两档：`queryHours > 1` 用站点设置 `long_history_points`（实测 180），
+  否则用服务端常量 `DEFAULT_HISTORY_MAX_POINTS = 160`。桶宽 `max(10 秒, 窗口跨度 / 上限)`，
+  两档都走 `ROW_NUMBER() ... WHERE rn = 1`，**短窗口同样分桶**，不存在「1 小时返回全部上报」的档位。
+  实读克隆版本 `90d0d21` 的 `src/database/schema.js` `getMetricsHistory`。
 
 ## 字段契约表
 

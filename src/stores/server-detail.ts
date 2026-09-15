@@ -31,9 +31,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const sourceConfig = shallowRef<SiteConfig | null>(null)
   const history = shallowRef<HistorySeries | null>(null)
   /*
-   * 默认 1 小时。CFSM 只在窗口大于 1 小时时才套用站点配置的点数上限
-   * （`long_history_points`）；1 小时窗口返回的是该区间内的全部上报记录，
-   * 点距等于节点自己的上报节奏。两张图共用这一个窗口，冷启动只发一次历史请求。
+   * 默认 1 小时。CFSM 对两类窗口都分桶取样，只是上限不同：大于 1 小时用站点配置的
+   * `long_history_points`，不大于 1 小时用服务端常量 160，桶宽都是
+   * `max(10 秒, 窗口 / 上限)`，每桶只返回一条记录。1 小时窗口约 23 秒一个桶，
+   * 通常宽于节点自己的上报间隔，所以看起来接近全量，但那是数据密度的结果而非接口保证。
+   * 两张图共用这一个窗口，冷启动只发一次历史请求。
    */
   const historyHours = ref<HistoryHours>(1)
   /*

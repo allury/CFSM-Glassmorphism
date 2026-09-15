@@ -388,3 +388,83 @@ describe('detail page request budget', () => {
     expect(calls.filter((url) => /\/api\/servers(\?|$)/.test(url))).toHaveLength(0)
   })
 })
+
+/*
+ * 实时连接的累积检查。
+ *
+ * 本地 mock 服务端没有 `/api/ws`，浏览器实测无法证明「切换节点时旧连接确实关掉了」。
+ * 这里换一条证据：把 WebSocket 换成可追踪的桩，驱动真实 store 连开三台节点再关闭，
+ * 断言任何时刻最多只有一条未关闭的连接，且离开详情页后一条不剩。
+ */
+interface TrackedSocket {
+  url: string
+  closed: boolean
+}
+
+function trackSockets(): TrackedSocket[] {
+  const sockets: TrackedSocket[] = []
+  vi.stubGlobal('WebSocket', class {
+    static readonly OPEN = 1
+    readyState = 0
+    private readonly record: TrackedSocket
+    constructor(url: string) {
+      this.record = { url, closed: false }
+      sockets.push(this.record)
+    }
+
+    close(): void {
+      this.record.closed = true
+    }
+
+    send(): void {}
+    addEventListener(): void {}
+    removeEventListener(): void {}
+  })
+  return sockets
+}
+
+const open = (sockets: readonly TrackedSocket[]): TrackedSocket[] => sockets.filter((item) => !item.closed)
+
+describe('realtime connections', () => {
+  it('keeps at most one live socket while switching nodes and none after leaving', async () => {
+    stubNetwork()
+    const sockets = trackSockets()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    for (const id of ['node-1', 'node-2', 'node-3']) {
+      await detail.open(id, [BASE])
+      expect(open(sockets)).toHaveLength(1)
+    }
+
+    expect(sockets).toHaveLength(3)
+    expect(sockets.every((item) => item.url.includes('/api/ws'))).toBe(true)
+
+    detail.close()
+    expect(open(sockets)).toHaveLength(0)
+  })
+
+  it('does not stack a second socket when the same node is opened again', async () => {
+    stubNetwork()
+    const sockets = trackSockets()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+    await detail.open('node-1', [BASE])
+
+    expect(sockets).toHaveLength(2)
+    expect(open(sockets)).toHaveLength(1)
+
+    detail.close()
+    expect(open(sockets)).toHaveLength(0)
+  })
+})
