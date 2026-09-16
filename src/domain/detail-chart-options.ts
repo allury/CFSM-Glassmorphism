@@ -1,4 +1,5 @@
 import type { ChartRow } from '@/domain/server-detail'
+import { countMasked, detectIsolatedSpikes } from '@/domain/spike-mask'
 import type { ChartFamily } from '@/domain/theme-presentation'
 import type { HistoryHours } from '@/services/cfsm'
 import type { HistoryPoint, ProbeTarget, ProbeValue } from '@/types/cfsm'
@@ -901,6 +902,47 @@ export interface PingChartContext {
   selected: readonly PingTaskLine[]
   smooth: boolean
   accessible: boolean
+  /** 「隐藏尖峰」开关。缺省为关，与此前版本等价。 */
+  hideSpikes?: boolean
+  /** 每条线路的遮蔽数组，由 `pingSpikeMasks` 从原始行算出；与 `rows` 等长。 */
+  spikeMasks?: ReadonlyMap<ProbeTarget, readonly boolean[]>
+  /** 图例的显示状态（按线路名）。缺省视为全部显示。 */
+  legendSelected?: Readonly<Record<string, boolean>>
+}
+
+/*
+ * 「隐藏尖峰」只作用于绘图副本：
+ * - 遮蔽集合从**原始行**按线路逐条算出，与曲线平滑无关，平滑开没开都得到同一组点；
+ * - 被遮蔽的位置在副本里写成 null 占位，不删点，横轴与时间映射不变；
+ * - `connectNulls` 仍为 false，线在遮蔽处断开，不跨过去连线；
+ * - 统计值、任务卡、首页口径都不经过这里。
+ */
+export function pingSpikeMasks(
+  rows: readonly ChartRow[],
+  tasks: readonly Pick<PingTaskLine, 'target'>[],
+): Map<ProbeTarget, boolean[]> {
+  return new Map(tasks.map((task) => [
+    task.target,
+    detectIsolatedSpikes(rows.map((row) => ({
+      timestamp: row.timestamp,
+      value: probeNumber(row.point?.latency[task.target]),
+    }))),
+  ]))
+}
+
+function legendVisible(legend: Readonly<Record<string, boolean>> | undefined, label: string): boolean {
+  return legend?.[label] !== false
+}
+
+/** 按钮上的 N：只数当前实际画出来的线路（已选中且图例未关闭）里被遮蔽的点。 */
+export function visibleSpikeCount(
+  selected: readonly PingTaskLine[],
+  masks: ReadonlyMap<ProbeTarget, readonly boolean[]>,
+  legend?: Readonly<Record<string, boolean>>,
+): number {
+  return selected
+    .filter((task) => legendVisible(legend, task.label))
+    .reduce((total, task) => total + countMasked(masks.get(task.target)), 0)
 }
 
 export function pingChartOption(context: PingChartContext) {
@@ -909,14 +951,18 @@ export function pingChartOption(context: PingChartContext) {
   const rows = context.selected.length > 0 ? context.rows : []
   const showDate = context.hours >= 24
   const colorByName = new Map(context.tasks.map((task) => [task.label, task.color]))
+  const hideSpikes = context.hideSpikes === true
   const series = context.selected.map((task, index) => {
     const lineType: ChartLineType = context.accessible
       ? ACCESSIBLE_LINE_TYPES[index % ACCESSIBLE_LINE_TYPES.length] ?? 'solid'
       : 'solid'
+    const mask = hideSpikes ? context.spikeMasks?.get(task.target) : undefined
     return {
       name: task.label,
       type: 'line' as const,
-      data: rows.map((row) => probeNumber(row.point?.latency[task.target])),
+      data: rows.map((row, rowIndex) => (
+        mask?.[rowIndex] === true ? null : probeNumber(row.point?.latency[task.target])
+      )),
       // 只改变绘制曲率，数值不变；上游开启时还会用 EWMA 改写数值，这里不做。
       smooth: context.smooth ? 0.6 : 0.1,
       showSymbol: false,
@@ -933,20 +979,39 @@ export function pingChartOption(context: PingChartContext) {
       ...baseTooltip(theme),
       formatter: (params: unknown): string => {
         const items = (Array.isArray(params) ? params : [params]) as PingTooltipItem[]
-        const first = items[0]
-        const row = first ? rows[first.dataIndex] : undefined
-        if (!row) return ''
+        const rowIndex = items[0]?.dataIndex
+        const row = rowIndex === undefined ? undefined : rows[rowIndex]
+        if (rowIndex === undefined || !row) return ''
         const time = formatTooltipTime(row.timestamp, context.hours)
         if (!row.point) return tooltipFrame(theme, time, `<div style="color:${theme.textSecondary}">${GAP_TEXT}</div>`)
+        const point = row.point
         // 上游按延迟从低到高排列，没有数值的任务不出现。
-        const body = items
+        const shown = items
           .filter((item): item is PingTooltipItem & { value: number } => (
             typeof item.value === 'number' && Number.isFinite(item.value)
           ))
+          .map((item) => ({ name: item.seriesName, value: item.value, hidden: false }))
+        /*
+         * 被遮蔽的点在绘图副本里是 null，ECharts 不会把它交给 formatter。
+         * 这里回到原始行，把此刻被隐藏、且线路仍在显示的真实数值补上，并标明「已隐藏」——
+         * 不显示 0，也不假装这一刻没有数据。
+         */
+        const hiddenHere = hideSpikes
+          ? context.selected.flatMap((task) => {
+              if (!legendVisible(context.legendSelected, task.label)) return []
+              if (context.spikeMasks?.get(task.target)?.[rowIndex] !== true) return []
+              const value = probeNumber(point.latency[task.target])
+              return value === null ? [] : [{ name: task.label, value, hidden: true }]
+            })
+          : []
+        const body = [...shown, ...hiddenHere]
           .sort((left, right) => left.value - right.value)
-          .map((item) => {
-            const color = colorByName.get(item.seriesName) ?? context.tasks[0]?.color ?? '#FF6B6B'
-            return `<div style="display:flex;align-items:center">${dot(color)}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(item.seriesName)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px;font-variant-numeric:tabular-nums">${Math.round(item.value)} ms</span></div>`
+          .map((entry) => {
+            const color = colorByName.get(entry.name) ?? context.tasks[0]?.color ?? '#FF6B6B'
+            const tag = entry.hidden
+              ? `<span style="margin-left:6px;padding:0 4px;border-radius:4px;font-size:11px;color:${theme.textSecondary};border:1px solid ${theme.borderColor}">已隐藏</span>`
+              : ''
+            return `<div style="display:flex;align-items:center">${dot(color)}<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(entry.name)}</span>${tag}<span style="margin-left:auto;font-weight:600;margin-left:16px;font-variant-numeric:tabular-nums">${Math.round(entry.value)} ms</span></div>`
           })
           .join('')
         return tooltipFrame(theme, time, body)
@@ -961,6 +1026,7 @@ export function pingChartOption(context: PingChartContext) {
       icon: 'roundRect',
       textStyle: { fontSize: 11, color: theme.textSecondary },
       data: context.selected.map((task) => task.label),
+      ...(context.legendSelected ? { selected: { ...context.legendSelected } } : {}),
     },
     grid: PING_CHART_MARGIN,
     xAxis: {

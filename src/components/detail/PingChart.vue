@@ -13,9 +13,14 @@ import VChart from 'vue-echarts'
 import AppEmpty from '@/components/ui/AppEmpty.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppTabs, { type AppTabItem } from '@/components/ui/AppTabs.vue'
-import AppTooltip from '@/components/ui/AppTooltip.vue'
 import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
-import { HISTORY_RANGE_LABELS, pingChartOption, type PingTaskLine } from '@/domain/detail-chart-options'
+import {
+  HISTORY_RANGE_LABELS,
+  pingChartOption,
+  pingSpikeMasks,
+  visibleSpikeCount,
+  type PingTaskLine,
+} from '@/domain/detail-chart-options'
 import { HISTORY_HOURS } from '@/services/cfsm'
 import { issueCopy } from '@/domain/issue-copy'
 import {
@@ -46,10 +51,10 @@ import '@/utils/echarts'
 const PING_RANGES: readonly HistoryHours[] = HISTORY_HOURS
 /*
  * 上游同名开关叫「平滑峰值」，而它真的会削峰：先把偏离邻域均值超过 30% 的点置空，
- * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题不改写采样，只改折线曲率，
- * 沿用上游的名字会让人以为尖峰已被处理，因此这里改称「曲线平滑」。
+ * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题把这两件事拆成两个互不排斥的开关：
+ * 「曲线平滑」只改折线曲率；「隐藏尖峰」只在绘图副本里遮蔽孤立高点、原位留断口。
+ * 两者都不改写任何采样值，统计始终来自原始数据。说明合并成一个入口放在两个开关后面。
  */
-const SMOOTH_HINT = '只改变点与点之间的画法（折线曲率），不改写、不过滤、不插值任何采样值；尖峰仍是真实数值'
 
 interface PingTask extends PingTaskLine {
   stats: ProbeStats
@@ -72,6 +77,11 @@ const loading = computed(() => pingHistoryState.value === 'loading')
 const errorCopy = computed(() => issueCopy(pingHistoryIssue.value, 'history'))
 const selected = ref<ProbeTarget[]>([])
 const smooth = ref(false)
+/* 两个开关互不排斥，状态只活在本组件的生命周期里；实时推送、主题切换与重绘都不会重置它们。 */
+const hideSpikes = ref(false)
+/* 图例的显示状态。显式交给图表，按钮上的计数才能与画出来的线保持一致。 */
+const legendSelected = ref<Record<string, boolean>>({})
+const helpOpen = ref(false)
 
 const rangeItems: AppTabItem[] = PING_RANGES.map((hours) => ({
   value: String(hours),
@@ -107,6 +117,7 @@ const allSelected = computed(() => tasks.value.every((task) => selected.value.in
 watch(() => (server.value ? `${server.value.source.base}::${server.value.id}` : ''), () => {
   selected.value = []
   openTip.value = null
+  helpOpen.value = false
 })
 /*
  * 上游在每次取回数据后、选择为空时全选。这里只跟随历史数据本身变化，
@@ -134,6 +145,24 @@ function hideAll(): void {
   selected.value = []
 }
 
+/*
+ * 遮蔽集合对**全部**任务从原始行算出：勾选或取消某条线不会改变其它线的结果，
+ * 平滑开关也不参与。计数只数当前实际画出来的线。
+ */
+const spikeMasks = computed(() => pingSpikeMasks(rows.value, tasks.value))
+const spikeCount = computed(() => visibleSpikeCount(selectedTasks.value, spikeMasks.value, legendSelected.value))
+
+function isFlagMap(value: unknown): value is Record<string, boolean> {
+  return typeof value === 'object' && value !== null
+    && Object.values(value).every((item) => typeof item === 'boolean')
+}
+
+/* ECharts 的 legendselectchanged 事件载荷按未知数据处理，只取形状正确的 selected。 */
+function onLegendSelect(event: unknown): void {
+  if (typeof event !== 'object' || event === null || !('selected' in event)) return
+  if (isFlagMap(event.selected)) legendSelected.value = { ...event.selected }
+}
+
 const option = computed(() => pingChartOption({
   rows: rows.value,
   hours: pingHistoryHours.value,
@@ -142,6 +171,9 @@ const option = computed(() => pingChartOption({
   selected: selectedTasks.value,
   smooth: smooth.value,
   accessible: accessible.value,
+  hideSpikes: hideSpikes.value,
+  spikeMasks: spikeMasks.value,
+  legendSelected: legendSelected.value,
 }))
 
 function avgText(task: PingTask): string {
@@ -183,6 +215,11 @@ function syncTouchMode(): void {
 
 function setTip(target: ProbeTarget, open: boolean): void {
   openTip.value = open ? target : openTip.value === target ? null : openTip.value
+}
+
+function toggleHelp(): void {
+  if (!touchMode.value) return
+  helpOpen.value = !helpOpen.value
 }
 
 function toggleTip(target: ProbeTarget): void {
@@ -305,19 +342,69 @@ function retry(): void {
 
         <div class="ping-chart__options">
           <div class="ping-chart__smooth">
-            <button type="button" class="ping-chart__button" :class="{ 'is-active': smooth }" @click="smooth = !smooth">
+            <button
+              type="button"
+              class="ping-chart__button"
+              :class="{ 'is-active': smooth }"
+              :aria-pressed="smooth"
+              @click="smooth = !smooth"
+            >
               曲线平滑
             </button>
-            <AppTooltip :content="SMOOTH_HINT">
-              <span class="ping-task__info" aria-hidden="true">
-                <AppIcon name="carbon:information" :size="14" />
-              </span>
-            </AppTooltip>
+            <button
+              type="button"
+              class="ping-chart__button"
+              :class="{ 'is-active': hideSpikes }"
+              :aria-pressed="hideSpikes"
+              data-spike-toggle
+              @click="hideSpikes = !hideSpikes"
+            >
+              隐藏尖峰<template v-if="hideSpikes">
+                · {{ spikeCount }}
+              </template>
+            </button>
+            <TooltipProvider :delay-duration="0">
+              <TooltipRoot
+                :open="touchMode ? helpOpen : undefined"
+                @update:open="(open: boolean) => (helpOpen = open)"
+              >
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    class="ping-task__info"
+                    aria-label="图表显示说明"
+                    data-chart-help
+                    @click="toggleHelp"
+                  >
+                    <AppIcon name="carbon:information" :size="14" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipPortal>
+                  <TooltipContent
+                    class="app-tooltip__bubble ping-chart-help"
+                    side="top"
+                    :side-offset="6"
+                    :collision-padding="8"
+                  >
+                    <strong class="ping-chart-help__title">图表显示说明</strong>
+                    <dl class="ping-chart-help__list">
+                      <dt>曲线平滑</dt>
+                      <dd>只调整线条弯曲程度，不修改采样值。</dd>
+                      <dt>隐藏尖峰</dt>
+                      <dd>仅在图上隐藏识别出的孤立高值，隐藏处保留断口；关闭后恢复显示。</dd>
+                      <dt>同时开启</dt>
+                      <dd>先隐藏尖峰，再平滑剩余连续线段。原始数据和统计结果均不变。</dd>
+                    </dl>
+                    <TooltipArrow class="app-tooltip__arrow" :width="10" :height="5" />
+                  </TooltipContent>
+                </TooltipPortal>
+              </TooltipRoot>
+            </TooltipProvider>
           </div>
         </div>
 
         <div class="ping-chart__canvas">
-          <VChart :option="option" autoresize />
+          <VChart :option="option" autoresize @legendselectchanged="onLegendSelect" />
         </div>
       </div>
 
