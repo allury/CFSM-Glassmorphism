@@ -50,13 +50,13 @@
 | 9 | 列表行主点击路径 | `NodeList` 行点击直接进入详情 | 同样先弹 QuickView | 不一致 | 否 | 行点击直达详情 | **P0** | PASS |
 | 10 | 卡片内独立控件 | 收藏等独立按钮 `stopPropagation`，不触发导航 | 已有 `@click.stop` | 一致 | 否 | 保持并加回归测试锁定 | — | PASS |
 | 11 | 首页往返状态 | 返回首页保持滚动位置、分组、搜索、视图与筛选，无需刷新 | 搜索/分组/排序/快捷筛选是组件局部 ref，离开即丢失；路由无 `scrollBehavior` | 不一致 | 否 | 会话级 `dashboard-view` store + 路由 `savedPosition` 恢复 | **P0** | PASS |
-| 12 | 总览卡片结构 | 无独立标题区，卡片本身是 12 栅格中的 `col-span-4` 单元，含图标与 hover 态；可点击卡片打开财务明细弹窗 | 带"节点总览"标题区的面板，卡片为自有网格；无财务明细弹窗 | 部分一致 | 否 | 第 9.9 轮：删除自创标题区，卡片改为 12 栅格 `span 4`，标签左上 / 图标右上 / 数值与单位基线对齐。财务明细弹窗的核心是多币种汇率换算，CFSM 不提供汇率且禁止伪造，按分币种口径保留在高级工具中 | P1 | PASS（弹窗内容为 NECESSARY-CFSM-DIFFERENCE） |
+| 12 | 总览卡片结构 | 无独立标题区，卡片本身是 12 栅格中的 `col-span-4` 单元，含图标与 hover 态；可点击卡片打开财务明细弹窗 | 带"节点总览"标题区的面板，卡片为自有网格；无财务明细弹窗 | 部分一致 | 否 | 第 9.9 轮：删除自创标题区，卡片改为 12 栅格 `span 4`，标签左上 / 图标右上 / 数值与单位基线对齐。当时认为财务明细弹窗依赖汇率而不提供；v1.1.7 财务追加改为浏览器取公开日汇率，恢复剩余价值 / 月费用 / 年费用三张卡，剩余价值卡可打开「价值与费用明细」（固定账单与汇率设置，按量估算不移植），差异见 `docs/finance-parity.md` | P1 | PASS（按量估算为有意不移植） |
 | 13 | NodeCard 内部结构 | 544 行：状态点 + `animate-ping` 脉冲、收藏、tag chips、`grid-cols-[3fr_2fr]` 指标布局、`TrafficProgress`、`NodePingListCell` | 260 行，自有结构与指标排列 | 部分一致 | 否 | 第 9.9 轮：按 Komari 区块顺序重写为 状态点+名称 / 收藏+OS+旗帜 / 运行与价格芯片 / CPU·内存·硬盘·流量四项进度 / 网速·总流量·剩余或负载三列指标盒 / 延迟与丢包双面板 / 自定义标签 / 离线遮罩 | P1 | PASS |
 | 14 | NodeList 结构 | 667 行，含 `NodePingListCell` 等独立单元 | 159 行表格 | 部分一致 | 否 | 第 9.9 轮：改为 Komari 的栅格行与十列契约（状态/系统/节点/信息/运行时间/CPU/内存/硬盘/流量/速率），「信息」列受 `nodeListMetadataEnabled` 控制，保留 `v-memo` | P1 | PASS |
 | 15 | 图表实现 | `echarts` + `vue-echarts`，`MetricSeriesChartCard` / `LoadChart` / `PingChart` 三个组件 | 手写轻量 SVG `HistoryChart.vue` | 不一致 | 否（CFSM 历史数据可满足） | 第 9.95 轮：History 图表改用上游同款 `echarts` + `vue-echarts`，沿用 Komari 的 tooltip(axis) / legend / grid / time 轴 / `autoresize`，并按 `utils/echarts.ts` 只注册用到的组件。`connectNulls: false` 保证缺口保持缺口，超时与缺失不进入数值 series | P1 | PASS |
 | 16 | 详情页结构 | `InstanceDetail.vue` 的共享 Header、顶部导航、资源卡与 2×2 信息卡层级；768/1024 的信息区分别为 1/2 列 | 第 9.95 轮已有导航条，但 Header 独立实现、信息卡内容和 768px 断点仍与真实浏览器不同 | 部分一致 | 部分（路由、字段与 CFSM 独有真实指标） | 第 10 轮：复用共享 `AppHeader`，按硬件/系统/存储/网络顺序收敛卡片；资源区 2→3→4 列、信息区 1→2 列断点与 Komari 一致；CFSM 独有且有真实数据的 probe/GPU/disk/history 区继续保留 | P1 | PASS |
 | 17 | 图标体系 | `@iconify/vue` 图标 | 文本 / emoji 占位 | 不一致 | 否 | 第 9.9 轮：以同名 Tabler / IconPark 图标替换全部字符占位；图标路径在构建期内联，运行时不访问图标 CDN（自托管与严格 CSP 环境的必要交付方式差异） | P1 | PASS（交付方式为 NECESSARY-CFSM-DIFFERENCE） |
-| 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | 第 9.95 轮：Tooltip / Tabs / Badge 改用上游同源的 `reka-ui` 基元（Portal、碰撞翻转、roving focus、`data-state` 与 aria 均由基元提供），瞬时提示改用 `vue-sonner`。Dialog / Drawer / Popover / Select / Switch / Slider 在上游仅服务于 CFSM 不具备的功能（汇率换算财务弹窗、Ping 监控弹窗）与已按规范移除的 QuickView，因此本主题没有对应弹层面，不制造空壳组件 | P1 | PASS（Dialog 等无对应面为 NECESSARY-CFSM-DIFFERENCE） |
+| 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | 第 9.95 轮：Tooltip / Tabs / Badge 改用上游同源的 `reka-ui` 基元（Portal、碰撞翻转、roving focus、`data-state` 与 aria 均由基元提供），瞬时提示改用 `vue-sonner`。Dialog / Drawer / Popover / Select / Switch / Slider 在上游仅服务于 CFSM 不具备的功能（汇率换算财务弹窗、Ping 监控弹窗）与已按规范移除的 QuickView，因此本主题没有对应弹层面，不制造空壳组件。v1.1.7 移植财务明细弹窗时接入了 reka Dialog（`AppDialog`） | P1 | PASS（其余弹层无对应面，为 NECESSARY-CFSM-DIFFERENCE） |
 | 19 | 样式体系 | Tailwind 4 + `tw-animate-css` | 4700+ 行手写 CSS | 部分一致 | 否（属实现方式差异） | 第 9.9 轮已按 Komari 尺度校准主要 token：卡片 `rounded-xl`(12px)、列表行与指标盒 `rounded-lg`(8px)、指标网格 16/10px、芯片 11px、行高 64px。余下细粒度差异（逐处 shadow / blur 强度）接受为 P2 | P2 | P2-ACCEPTED |
 | 20 | 公告 | `MarkdownRenderer` 受限 Markdown | 已实现受限 Markdown 渲染 | 一致 | 否 | — | — | PASS |
 | 21 | 分组 / 搜索 / 排序 / Quick Controls | 按真实字段过滤与排序 | 已实现且行为等价 | 一致 | 否 | — | — | PASS |
@@ -168,16 +168,24 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
    本主题这些元素没有接入该令牌。它们不在顶部区域，v1.1.2 是顶部专项，不顺带改动，记录在 TODO-03。
    （后续：v1.1.3 接入激活态快捷筛选胶囊；v1.1.7 逐项核对后接入「重新加载」，并确认其余消费者在本主题没有对应元素，见下文。）
 
-## v1.1.7（候选）：隐藏尖峰与控件配色
+## v1.1.7（候选）：隐藏尖峰、控件配色与财务币种
 
 同机、同浏览器，对照固定版本的 Komari `bf83765`。
 
 1. **延迟大图「隐藏尖峰」**（用户批准的体验扩展，不是移植）：「曲线平滑」后面新增独立开关，两者共用一个「图表显示说明」入口。命中的孤立高点只在绘图副本里写成 null，原始数据、统计与首页口径不变，隐藏处保留断口，纵轴按可见数据收缩。上游没有同类开关，它的「平滑峰值」会改写数值并插值，本主题不照搬，也不宣称与上游一致。规则与限制见 `docs/todo.md` TODO-01，验证见 `docs/chart-parity.md`。
 2. **控制色的消费者**（PASS）：按真实 DOM 逐个核对了上游带 `bg-background` 的元素。本主题有对应物的只有两处：激活态快捷筛选胶囊（v1.1.3 已接入），以及首次加载节点失败时的「重新加载」（本轮接入，对应上游连接失败提示里的描边「重试」，默认方案下浅色、深色取值与上游逐项相同）。
-   - 财务对话框、自定义时间范围、健康 / 拓扑 / 对比工具里的选中态，本主题没有对应界面；
+   - 财务明细弹窗的「显示币种」下拉框与「恢复今日汇率」描边按钮随同一候选的财务追加接入（见第 4 项）；
+   - 自定义时间范围、健康 / 拓扑 / 对比工具里的选中态，本主题没有对应界面；
    - 搜索框、视图切换、工具开关、快照导出的密码框与导出按钮、详情页节点选择器，在上游用的是 `bg-background/60`、`bg-transparent`、`!bg-background` 等不同类名，本来就不消费方案，本主题五套方案 × 明暗实测也都不变。
    - 逐项表格见 `docs/todo.md` TODO-03。v1.1.2 至 v1.1.6 发布说明里「对话框输入框与描边按钮不随配色方案变化」这条已知限制据此不再成立。
 3. **毛玻璃模糊双写**（PASS）：上游构建产物里，配色方案的 5 条规则（卡片、`header`、`.bg-background` 及两条关闭覆盖）只剩 `-webkit-backdrop-filter`，Chrome 152 不认这个写法，所以这些表面在 Chromium 里实测没有模糊。本主题按源码意图保留模糊，源码里每条模糊规则都同时写标准与前缀两种形式，构建产物 27 条全部双写，由 `tests/backdrop-filter-pairs.test.ts` 守住。节点卡、激活态胶囊、「重新加载」在 Chromium 下因此有模糊而上游没有，这是有意保留的差异。
+4. **财务币种与汇率**（PASS，有意差异逐项列出）：首页恢复上游的剩余价值、月费用估算、年费用估算三张卡，剩余价值卡可打开「价值与费用明细」；详情页剩余价值按显示币种显示。弹窗外壳、汇总、页签、下拉框、描边按钮、表格与汇率网格的计算样式在浅色与深色下与上游实测逐项相同，下拉框与描边按钮随配色方案变化。与上游不同的地方：
+   - 页签按源码意图上下排列（上游运行时并排，375 下内容被挤出）；
+   - 不移植按量估算；
+   - 无法识别的币种与缺失的到期日不计入合计，并在界面上注明；
+   - 备用汇率地址改为 frankfurter.dev。
+
+   逐项见 `docs/finance-parity.md`。
 
 ## 保留的 P2
 

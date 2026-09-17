@@ -2,7 +2,7 @@
 
 ## 唯一运行时协议
 
-本主题只调用 CF-Server-Monitor 官方第三方主题接口。Komari 的 `/api/public`、`/api/nodes`、`/api/clients`、`/rpc2` 以及 `common:*`、`public:*`、`admin:*` RPC 命名空间不得进入生产包。
+本主题只调用 CF-Server-Monitor 官方第三方主题接口；唯一的例外是 v1.1.7 起的公开日汇率（见下方「第三方汇率数据源」），它不经过 CFSM。Komari 的 `/api/public`、`/api/nodes`、`/api/clients`、`/rpc2` 以及 `common:*`、`public:*`、`admin:*` RPC 命名空间不得进入生产包。
 
 apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.example,https://b.example">`；未配置时使用当前页面 origin。每个值只保留 HTTP(S) origin，去重后独立请求。不存在额外的 `config.json`。
 
@@ -18,6 +18,21 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 | Theme Save | `POST /api/theme_options` | 第三方主题规范；LuminaPlus `services/api.ts` | `theme-settings` store → `saveThemeOptions` → `normalizeThemeOptionsSave` → `/api/config` 回读 | 已用于设置页完整快照保存并测试 |
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
+
+## 第三方汇率数据源（v1.1.7）
+
+财务合计与详情页剩余价值需要把节点原币换算成显示币种。CFSM 没有汇率接口，本主题沿用上游的做法，由访客浏览器直接读取公开日汇率，不经过 Worker，也不新增 CFSM 请求。
+
+| 顺序 | 地址 | 响应校验 | 数据日期 |
+|---|---|---|---|
+| 1 | `GET https://open.er-api.com/v6/latest/CNY` | `result === "success"`，`base_code === "CNY"`；只保留有限正数的汇率 | `time_last_update_unix` |
+| 2 | `GET https://api.frankfurter.dev/v1/latest?base=CNY` | `base === "CNY"`；只保留有限正数的汇率 | `date`（上一交易日） |
+
+- 请求与解析在 `src/services/exchange-rates.ts`，响应一律按 `unknown` 校验；状态与共享请求在 `src/stores/finance.ts`。
+- `credentials: 'omit'`、`referrerPolicy: 'no-referrer'`，单源超时 5 秒；地址固定，不带任何节点数据。
+- 只有价格可见且确实需要换算时才请求；每个浏览器每天成功一次后复用缓存，失败后本页不再重试，没有轮询。
+- 数据源缺的币种、离线时的兜底值取自 CFSM 2.8.5 Stable 的内置参考表，并在界面上标为「内置参考汇率」。
+- 规则、请求次数与验证记录见 `docs/finance-parity.md`。
 
 第 8 轮 Earth/Map、健康、性价比、快照与分类拓扑没有增加端点。它们只消费首页已经通过 `/api/config`、`/api/servers` 和 adapter 得到的 normalized snapshot；健康历史覆盖只来自 `/api/servers` 的真实 Ping/Loss 窗口，不在首页批量请求 `/api/history/all`。CFSM 没有公开 Audit Log 主题端点，因此该工具不渲染，也不回退到管理端私有 API。
 

@@ -12,7 +12,7 @@
 
 设置页现已开放并真实兑现总览卡片预设 / 自定义 keys、五套快捷控制方案、列表 metadata 与 provider aliases、高负载 / 流量 / 到期阈值、详情卡片预设 / 自定义 keys、图表预设 / 自定义指标族以及 GPU 图表开关。不可用 key 在领域注册表边界被忽略；字段存在但当前节点没有数据时对应卡片或序列自动收起。
 
-第 8 轮继续复用同一 48 项 schema 与保存协议，并启用 `earthRenderer`、`stopEarth`、`hideEarth`、`homeToolsEnabled` 和 `exportSecondaryPassword` 的实际界面。Earth 只按显式 region 的国家/地区中心放点；高级工具只在 `/api/config.authorization === true` 时显示，并消费首页已加载的 normalized snapshot。导出二次口令只提供客户端确认，不宣称后端安全边界。磁盘耗尽预测仍等待独立轮次；`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。
+第 8 轮继续复用同一 48 项 schema 与保存协议，并启用 `earthRenderer`、`stopEarth`、`hideEarth`、`homeToolsEnabled` 和 `exportSecondaryPassword` 的实际界面。Earth 只按显式 region 的国家/地区中心放点；高级工具只在 `/api/config.authorization === true` 时显示，并消费首页已加载的 normalized snapshot。导出二次口令只提供客户端确认，不宣称后端安全边界。磁盘耗尽预测仍等待独立轮次；`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。（后续：v1.1.7 起剩余价值与费用合计按浏览器取得的公开日汇率换算，来源如实标注，见 `docs/finance-parity.md`。）
 
 首页快捷控制八个 key 均有实际行为：`favorite`、`offline`、`highLoad`、`expiring` 过滤当前结果；`totalTraffic`、`upload`、`download`、`peak` 使用真实指标排序。流量预警只接受数字（按 CFSM 当前管理端语义视为 GiB）或带 B/KiB/MiB/GiB/TiB 单位的可靠上限，并按 `traffic_calc_type` 的 dl/ul/max/total 语义计算；无法解析时不计入预警。
 
@@ -68,10 +68,10 @@
 | 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 一致 |
 | 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 一致 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |
-| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列；remainingValue / monthlyCost / yearlyCost / trafficQuota / 各类 PeakNode / 虚拟化分布因需要跨币种换算或 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
+| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列。v1.1.7 起 remainingValue / monthlyCost / yearlyCost 恢复，按财务显示币种合计，剩余价值卡可打开明细，显示币种与汇率在明细里设置（浏览器本地偏好，不新增后台键）；trafficQuota / 各类 PeakNode / 虚拟化分布因 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
 | 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
 | 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 一致 |
-| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段：首页卡片与列表的价格、剩余价值，以及详情页的节点价格 / 月均支出 / 剩余价值 | ✅ 一致 |
+| 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段：首页卡片与列表的价格、剩余价值，以及详情页的节点价格 / 月均支出 / 剩余价值；v1.1.7 起首页顶部的剩余价值 / 月费用 / 年费用卡显示 `***`，不能打开明细，也不请求汇率 | ✅ 一致 |
 | 22 | `providerAliases` | string / 空 | 仅匹配 name/group/tags/region 中真实文本，不做 IP Geo 猜测 | 🟢 等价 |
 | 23 | `exportSecondaryPassword` | string / 空 | 已用于客户端导出二次确认；不宣称后端安全边界 | ✅ 一致 |
 | 24 | `disablePageAnimation` | switch / `false` | 保留并叠加系统 reduced-motion 偏好 | ✅ 一致 |
@@ -89,7 +89,7 @@
 | 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测 | ✅ 一致 |
 | 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换；第 12 轮补上设置页开关（此前功能已实现但页面上没有入口） | ✅ 一致 |
 | 38 | `detailMetricCardPreset` | select / `财务` | 预设映射到 CFSM 详情领域模型，保持响应式卡片数量 | 🟢 等价 |
-| 39 | `detailMetricCardKeys` | richtext / nodePrice、monthlyCost、remainingTime、remainingValue、totalTraffic、trafficQuota、uptime、connections | 支持有真实字段的 keys；系统温度、精确配额等按可用性隐藏 | 🟡 降级 |
+| 39 | `detailMetricCardKeys` | richtext / nodePrice、monthlyCost、remainingTime、remainingValue、totalTraffic、trafficQuota、uptime、connections | 支持有真实字段的 keys；节点价格与月均支出保留原币，剩余价值按财务显示币种换算（v1.1.7）；系统温度、精确配额等按可用性隐藏 | 🟡 降级 |
 | 40 | `gpuChartEnabled` | switch / `false` | 使用 gpu_info 的 id/name/info；无序列自动隐藏 | 🟢 等价 |
 | 41 | `chartDashboardPreset` | select / `默认` | 将预设映射到 CFSM history 可用指标族 | 🟢 等价 |
 | 42 | `chartDashboardTemplate` | richtext / cpu、memory、disk、network、gpu、connections、process | GPU 显存、GPU 温度和缺失指标不生成假序列；旧 JSON 可迁移 | 🟡 降级 |

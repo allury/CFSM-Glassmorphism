@@ -116,7 +116,7 @@
 | H40 | 球体版前六张总览卡按**列**排布（`col-start` 1/1/5/5/9/9，`row-start` 1/2/1/2/1/2），第七张起退回自动排布 | 按行排布 | 卡片顺序与视觉分组不同 | P1 | 用 `:nth-child` 移植上游的显式栅格定位，超过六张时回到自动流 | PASS |
 | H41 | tiled 版卡片 `col-span-6 sm:col-span-3`、行高 `4.75/5/5.8rem`、外框 `p-3 sm:p-4 gap-2 sm:gap-3`，地图高度是下限而非固定值（因此会随容器拉伸） | 卡片恒为 span 4、gap 恒 8px、padding 恒 16px，地图被写死 `height` 且被组件 scoped 的 `height:100%` 覆盖，窄屏底部空出约 50px、宽屏矮 100px | 布局与尺寸都不同 | P1 | 移植 span/行高/gap/padding，地图改为 `min-height` 并提高选择器特异度；实测 375 与 1920 下两版几何完全一致 | PASS |
 | H42 | 总览卡片在所有断点都是 `gap-2`（8px）+ `!p-3`（12px），字号 16px→`md` 24px | 窄屏自创 gap 6px、padding 9/11px、字号 17px 等多档覆盖 | 间距与字号漂移 | P1 | 删除窄屏覆盖，行高改由上游的 `auto-rows` 规则决定 | PASS |
-| H43 | 剩余价值 / 月费用估算 / 年费用估算 / 流量配额四张汇总卡 | 不提供 | 需要跨币种换算或站点级配额 | — | CFSM 无可靠汇率来源，也无站点级流量配额；不猜汇率、不为凑满六卡伪造汇总值 | NECESSARY-CFSM-DIFFERENCE |
+| H43 | 剩余价值 / 月费用估算 / 年费用估算 / 流量配额四张汇总卡 | v1.1.7 起提供前三张；流量配额仍不提供 | 前三张需要跨币种换算；流量配额需要站点级配额 | — | 前三张按浏览器取得的公开日汇率换算，来源与未计入的节点如实标注（`docs/finance-parity.md`）；CFSM 没有站点级流量配额，不为凑满六卡伪造汇总值 | NECESSARY-CFSM-DIFFERENCE（仅剩流量配额；前三张 v1.1.7 起已提供） |
 | H44 | `cpuCores` 卡片图标为 `tabler:chip` | 使用 `tabler:cpu` | 图标名不同 | P2 | `tabler:chip` 已不在 Iconify Tabler 图标集内（API 返回 `not_found`），上游自身也取不到该图标；改用同族 `tabler:cpu` | P2-ACCEPTED |
 | H45 | compact 节点卡首卡高 331.81px（1440×900，10 节点） | 333.75px | 1.94px | P2 | 内部行高累计差，肉眼不可辨；卡片宽度、坐标与网格列在六档视口下均完全一致 | P2-ACCEPTED |
 

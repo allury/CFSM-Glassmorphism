@@ -41,6 +41,15 @@
 
 CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`，访客/审计仍因缺少公开 API 而隐藏；这些必要差异没有被视觉收敛掩盖。最终版本 1.0.0 的发布资产继续只包含 `index.html` 与 `assets/`，tag workflow 会在完整质量门通过后生成稳定命名 ZIP。
 
+## v1.1.7 财务追加（候选）
+
+功能可行性状态不变，60 项统计不变。实现方式的变化：
+
+- 首页恢复上游的剩余价值、月费用估算、年费用估算三张卡，按显示币种合计；剩余价值卡可打开「价值与费用明细」（固定账单与汇率设置，按量估算不移植）。
+- 详情页剩余价值改按显示币种显示，节点价格与月均支出保留原币。
+- 新增一个不经过 CFSM 的请求来源：访客浏览器每天向公开日汇率服务取一次汇率（`docs/api-mapping.md`「第三方汇率数据源」）。CFSM 端点与请求次数不变。
+- 不修改 Worker / Agent / D1，不新增 `theme_options` 键。无法识别的币种、缺失的到期日、无法识别的价格都不计入合计，并在界面上注明。
+
 ## 第 13 轮实现进度（v1.1.0-test.4）
 
 第 13 轮只做详情页表现层收敛，**没有改动数据适配层**，下表功能可行性状态全部不变。
@@ -48,7 +57,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 
 - 详情指标卡改为上游的 value + unit 两段式，去掉进度条，说明文字降级为 tooltip。
 - 详情预设内容与顺序按上游 `DETAIL_METRIC_CARD_PRESETS` 重排；
-  允许的 key 集合独立于「综合」预设。新增剩余价值卡（按节点自身币种，单节点无需汇率）。
+  允许的 key 集合独立于「综合」预设。新增剩余价值卡（按节点自身币种，单节点无需汇率；v1.1.7 起改按显示币种换算，见下方 v1.1.7 一节）。
 - 详情页与首页共用同一套字节 / 价格显示规则（函数由 `formatHome*` 改名为 `formatDisplay*`，
   行为不变）；运行时间三处精度各自独立。
 - 硬件卡补齐上游的 CPU 全宽块（PassMark 外链 + 近似分级条），四张信息卡逐项补图标。
@@ -75,6 +84,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 
 `remainingValue` / `monthlyCost` / `yearlyCost` / `trafficQuota` 等汇总卡片继续不提供：
 它们需要跨币种换算或站点级配额，CFSM 没有可靠来源，不猜汇率、不为凑满六卡伪造数值。
+（后续：v1.1.7 恢复了 `remainingValue` / `monthlyCost` / `yearlyCost`，汇率由浏览器取公开日汇率并如实标注来源；`trafficQuota` 仍不提供。）
 
 ## 第 9.9 轮实现进度
 
@@ -121,7 +131,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 服务器真实 IP | ipv4/ipv6 字符串 | 仅 ip_v4/ip_v6 可达性标志 | 不把标志伪装成地址，不显示地址 | 🔴 CFSM API 暂不支持 |
 | ASN/城市/IP 地理信息 | IP Geo 查询 | 公开主题 API 不返回地址、ASN、城市 | 不发外部猜测请求，不造数据 | 🔴 CFSM API 暂不支持 |
 | 厂商识别 | 元数据、IP Geo、别名字典 | name、group、tags、region | 仅对已有文本做可解释匹配，无证据则不显示 | 🟡 降级实现 |
-| 价格与到期 | 财务卡片 | price、billing_cycle、currency、expire_date | 遵守 show_price/show_expire；卡片用严格日期显示剩余天数，剩余价值只识别 CFSM 官方周期 | ✅ 一致 |
+| 价格与到期 | 财务卡片 | price、billing_cycle、currency、expire_date | 遵守 show_price/show_expire 与未登录隐藏价格；卡片用严格日期显示剩余天数，剩余价值只识别 CFSM 官方周期；v1.1.7 起首页财务合计与详情页剩余价值按显示币种换算，汇率由浏览器每日取公开数据源，缺失时用 CFSM 内置参考表并标明（`docs/finance-parity.md`） | ✅ 一致 |
 | 流量配额 | 配额数值与使用率 | traffic_limit 为格式化字符串 | 能可靠解析时计算，否则只展示原值 | 🟡 降级实现 |
 | GPU 利用率 | GPU 指标卡 | gpu_info id/name/info | 兼容数组和 JSON 字符串 | ✅ 一致 |
 | 磁盘 IO | 吞吐、IOPS、await、util | disk 对象 | 缺失或全零时隐藏 | ✅ 一致 |

@@ -68,6 +68,14 @@ UI (render and user intent only)
 - 不补历史点，不伪造 IP/ASN/城市/厂商，不把错误格式变成看似真实的数据。
 - `src/services/cfsm/glassmorphism-adapter.ts` 再把稳定 CFSM 模型映射为首页展示模型；可达性仍是状态，不成为地址字符串。
 
+### 汇率（v1.1.7）
+
+位置：`src/services/exchange-rates.ts`。
+
+- 这是唯一不经过 CFSM transport 的请求：浏览器直接读取公开日汇率（`open.er-api.com`，失败时 `api.frankfurter.dev`），不带凭据与 Referer，单源超时 5 秒。
+- 响应按 `unknown` 校验，只保留有限正数的汇率；缓存按本地日期保存数据源实际返回的值。
+- 金额口径（价格、币种、周期、到期、换算、合计）集中在纯函数模块 `src/domain/finance.ts`，首页、详情页与明细弹窗共用。
+
 ### Store
 
 位置：`src/stores/`。
@@ -78,6 +86,7 @@ UI (render and user intent only)
 - `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
 - `dashboard-preferences.ts` 只保存以 source+id 标识的收藏。旧快照中的主题、视图与离线排序由 theme settings 层一次性迁移，避免同一外观状态有两个写入者。
 - `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。
+- `finance.ts`（v1.1.7）管理财务偏好（显示币种、排除免费节点、手动汇率）与汇率状态：当日缓存、单个进行中的请求、失败后退回旧缓存或参考表。偏好只存浏览器本地，不进入 `theme_options`。
 - `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
 
@@ -91,6 +100,7 @@ UI (render and user intent only)
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
 - 首页筛选、排序、分组和汇总位于 `src/domain/dashboard.ts`，不会在组件内重新解释 wire payload。
 - 第 7 轮的配置驱动展示注册表位于 `src/domain/theme-presentation.ts`：它从统一 runtime 和 normalized `GlassServer` / `CfsmServer` 生成总览卡片、快捷控制、provider alias、阈值、详情卡片及 History 图表族。预设只决定 key 和顺序，不拥有网络请求或 wire 解析。
+- v1.1.7 的财务明细弹窗位于 `src/components/finance/FinanceDetailsDialog.vue`，外壳是 `src/components/ui/AppDialog.vue`（reka Dialog）。组件只调用 finance store 的动作，不直接请求汇率。
 - 第 8 轮的 Earth 与高级工具领域模型位于 `src/domain/advanced-tools.ts`：`EarthMap` 和 `AdvancedTools` 只接收已经归一化的 `GlassServer`，不新增请求、不读取 wire payload。国家/地区中心、健康规则、月价折算、快照序列化和分类拓扑均为可单测的纯函数。
 - 节点卡片与列表行的主点击直达 `/#/server/:id`（与 Komari 一致），中间不再插入任何快速查看或二次确认层。
 - 首页节点区直接遍历同一份 `visibleServers` 渲染 NodeCard 或 NodeList；分组仍作为真实字段筛选条件，但不再包一层偏离 Komari 的视觉分组容器。高级工具展开状态属于 `dashboard-view` 会话状态，默认关闭，不进入 theme settings 或后端快照。

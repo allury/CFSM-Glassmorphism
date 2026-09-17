@@ -54,7 +54,7 @@
 | D06 | 指标卡内容高 `min-h-10 md:min-h-18`，值 `text-base sm:text-2xl`、单位 `text-[11px] sm:text-xs` | 固定 80/96px 高、值 22px、无单位层 | 尺寸与字号不同 | P1 | 改为 min-height 64 / 96，值 16→24px（≥640），单位 11→12px | PASS |
 | D07 | `DETAIL_METRIC_CARD_PRESETS` 六个预设 + custom，默认 `finance` 八张卡 | 自成一套，默认七张（缺剩余价值） | 顺序与成员不同 | P1 | 逐项对齐上游顺序，只删 `temperature` | PASS |
 | D08 | `ALL_DETAIL_METRIC_CARD_KEYS` 决定自定义模式的允许集合 | 由「综合」预设推导，导致 uptime / trafficQuota 在自定义模式不可选 | 允许集合来源错误 | P1 | 新建独立的 `ALL_DETAIL_CARD_KEYS` | PASS |
-| D09 | 剩余价值卡按节点自身币种显示 | 不提供 | 单节点不需要跨币种换算 | P1 | 按节点自身 `price` / `billing_cycle` / `expire_date` 与 `currency` 计算，免费节点显示「无」 | PASS |
+| D09 | 剩余价值卡按财务显示币种显示（上游 `InstanceDetail`） | 不提供 | 需要汇率 | P1 | 按节点自身 `price` / `billing_cycle` / `expire_date` 计算原币金额，免费节点显示「无」；v1.1.7 起按显示币种换算，提示里给出原币金额与汇率来源，币种无法识别或汇率缺失时显示「—」并说明 | PASS |
 | D10 | 月均支出 `${金额} / 月`，未知周期「不适用」，免费「免费」 | `${金额} / month`，未知周期整卡消失 | 文案与降级方式不同 | P1 | 按官方周期天数折算 30 天口径，未知周期显示「不适用」 | PASS |
 | D11 | 剩余时间用 `getExpireText`：`-` / 已过期 / 长期 / `N 天`，数值按 5 / 10 / 36500 天阈值着色 | `已过期 N 天` / `N 天`，tooltip 是原始 ISO 字符串 | 文案与着色不同 | P1 | 移植 `formatDetailExpireText` 与四档着色 | PASS |
 | D12 | 详情字节与首页同规则（KB/MB/GB/TB），速率加 `/s` | 详情仍是 KiB/MiB/GiB | 单位体系不同 | P1 | 第 11 轮的 `formatHome*` 改名 `formatDisplay*` 并在详情复用（行为不变） | PASS |
