@@ -2272,6 +2272,23 @@ a {
   cursor: pointer;
 }
 
+/*
+ * 节点数据加载失败时的「重新加载」跟随配色方案。
+ *
+ * 上游在首次拉取节点失败时显示连接失败提示，里面的描边「重试」按钮自带 `bg-background`，
+ * 是配色方案 `.bg-background` 规则的真实消费者：底色取控制色，文字取方案文字色；
+ * 规则带 `!important`，悬浮时这两项也不变。边框、圆角、尺寸与阴影不随方案变化，
+ * 这里保持本主题原样，面板本身的红色边框照旧承担警示。
+ * 同一面板里的「返回首页」、图表的「重试」、设置页的「重新读取」在上游没有对应的
+ * 消费者，不接入。
+ */
+.state-panel button.state-panel__retry {
+  color: var(--glass-text, var(--ink));
+  background: var(--control-surface, var(--glass-strong));
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
 .skeleton {
   display: block;
   overflow: hidden;

@@ -195,7 +195,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         kind: 'select',
         options: GLASS_PRESET_OPTIONS,
         help: '选择「自定义」后读取下方 JSON。',
-        note: '作用范围是节点卡的表面色、边框、阴影与文字色，以及激活态的快捷筛选胶囊（对应下方 JSON 里的控制条颜色）；顶栏、面板、提示框与弹层不受影响。',
+        note: '作用范围是节点卡的表面色、边框、阴影与文字色，以及激活态的快捷筛选胶囊和加载失败时的「重新加载」按钮（对应下方 JSON 里的控制条颜色）；顶栏、面板、提示框与弹层不受影响。',
       },
       {
         key: 'colorVisionMode',

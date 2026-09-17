@@ -215,6 +215,8 @@ describe('colour preset scope copy', () => {
 
     expect(preset?.note).not.toMatch(/只作用于节点卡/)
     expect(preset?.note).toContain('快捷筛选胶囊')
+    // v1.1.7 起加载失败时的「重新加载」也跟随方案，说明要一并写明。
+    expect(preset?.note).toContain('重新加载')
     expect(preset?.note).toContain('顶栏、面板、提示框与弹层不受影响')
     // 自定义 JSON 说明里确实有控制条这一项，两边口径一致。
     expect(custom?.help).toContain('控制条')

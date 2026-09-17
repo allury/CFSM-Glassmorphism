@@ -412,7 +412,7 @@ onUnmounted(() => detail.close())
             <template #extra>
               <small v-if="issue?.status">HTTP {{ issue.status }} · {{ issue.message }}</small>
               <div class="detail-state__actions">
-                <button type="button" @click="loadCurrent">
+                <button type="button" class="state-panel__retry" @click="loadCurrent">
                   重新加载
                 </button>
                 <button type="button" @click="router.push({ name: 'home' })">

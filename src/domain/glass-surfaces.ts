@@ -6,14 +6,16 @@ import { parseGlassCustomColors, type GlassColorPreset } from '@/theme/settings'
  * 取值与上游完全相同；自定义预设按上游同样的派生规则补齐 hover / header / shadow，
  * 因此不需要用户多填字段。
  *
- * 上游把这 16 个值写到 `:root`，再由三组选择器消费（上游 `styles/main.css`）：
+ * 上游把这 16 个值写到 `:root`，样式表里写了三组选择器（上游 `styles/main.css`）：
  *   `.node-card, .bg-card, [data-slot='card']` → card / card-hover / border / shadow
  *   `header`                                   → header
- *   `.bg-background`（顶部统计栏）              → control
+ *   `.bg-background`                           → control / text / muted-text
  *
- * 本轮只把节点卡这一组接上（TODO-03 的「分离表面变量 + 节点卡预设对齐」）。顶栏与
- * 顶部统计栏在本主题里的结构与上游不同（我们的顶栏是滚动后才上玻璃），仍用本主题
- * 在 `:root` 里已验证的表面色，未对齐范围逐项记在 `docs/todo.md` TODO-03。
+ * 写了规则不等于有元素消费。运行时实测：`header` 命中 0 个；`.bg-background` 的注释写着
+ * 「顶部统计栏」，但统计卡的类是 `bg-background/50`，不命中，真正命中的是选中态的
+ * 快捷筛选胶囊、连接失败提示里的「重试」、财务对话框的下拉框与描边按钮等。本主题据此
+ * 只接三处：节点卡、激活态的快捷筛选胶囊、节点数据加载失败时的「重新加载」。
+ * 其余消费者在本主题里没有对应元素，清单见 `docs/todo.md` TODO-03。
  */
 export interface GlassSurfaceTokens {
   lightCard: string

@@ -196,8 +196,9 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     root.style.colorScheme = resolvedTheme.value
     /*
      * 预设的表面色驱动两组变量：节点卡（对应上游 `.node-card, .bg-card,
-     * [data-slot='card']`），以及激活态的快捷筛选胶囊（对应上游 `.bg-background`，
-     * 实测那是首页上这条规则唯一的消费者）。文字色只在这两处接管。
+     * [data-slot='card']`），以及控制色与方案文字色（对应上游 `.bg-background`）。
+     * 后者在本主题里只有两处消费：激活态的快捷筛选胶囊，和节点数据加载失败时的
+     * 「重新加载」（对应上游连接失败提示里的描边「重试」）。文字色只在这几处接管。
      */
     root.style.setProperty('--node-card-surface', surfaces.card)
     root.style.setProperty('--node-card-surface-hover', surfaces.cardHover)
@@ -217,7 +218,9 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
      * ——那些卡片的类是 `bg-background/50` 与 `hover:bg-background`，类名不同，
      * 且 CardX 的 tailwind-merge 会把默认的 `bg-card` 合并掉。真正消费 control 令牌的是
      * 选中态的控制胶囊、对话框输入框与 outline 按钮，首页默认状态下一个都不渲染。
-     * 因此预设只驱动节点卡这一组变量是与上游一致的。详见 docs/todo.md TODO-03。
+     * 因此预设只驱动上面两组变量；上游其余消费者（财务对话框、自定义时间范围、
+     * 健康 / 拓扑 / 对比工具里的选中态等）在本主题里没有对应元素，清单见
+     * docs/todo.md TODO-03。
      */
     for (const name of ['--glass', '--glass-strong', '--glass-soft', '--glass-hover', '--glass-border', '--ink', '--muted']) {
       root.style.removeProperty(name)

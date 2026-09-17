@@ -387,7 +387,7 @@ onUnmounted(() => realtime.stop())
             <span class="state-panel__icon" aria-hidden="true">!</span>
             <h2>无法加载节点</h2>
             <p>{{ serverStore.error }}</p>
-            <button type="button" @click="refresh">
+            <button type="button" class="state-panel__retry" @click="refresh">
               重新加载
             </button>
           </div>
