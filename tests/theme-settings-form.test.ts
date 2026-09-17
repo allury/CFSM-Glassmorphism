@@ -195,8 +195,16 @@ describe('field copy matches behaviour', () => {
     expect(help).toContain('详情页')
     expect(help).toContain('月均支出')
     expect(help).toContain('在线天数仍会显示')
-    // 首页总览卡片里没有财务项，不该再提「费用类卡片」。
+    // 「费用类卡片」是早期含糊的说法，不再使用；v1.1.7 起总览确实有三张财务卡，说明要点名它们的遮蔽方式。
     expect(help).not.toContain('费用类卡片')
+    expect(help).toContain('剩余价值、月费用、年费用卡显示为 ***')
+  })
+
+  it('自定义头部卡片列出可换算的三张财务卡，并说明币种在哪里设置', () => {
+    const field = THEME_FORM_FIELDS.find((item) => item.key === 'generalCardKeys')
+    for (const key of ['remainingValue', 'monthlyCost', 'yearlyCost']) expect(field?.help).toContain(key)
+    expect(field?.note).toContain('财务显示币种')
+    expect(field?.note).not.toMatch(/remainingValue[^。]*会被忽略/)
   })
 })
 

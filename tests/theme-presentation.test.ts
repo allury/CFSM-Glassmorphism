@@ -54,7 +54,8 @@ describe('round 7 theme presentation contracts', () => {
     settings.chartDashboardPreset = '自定义'
     settings.chartDashboardTemplate = '{"pingLoss":true,"connections":true,"cpu":true}'
 
-    expect(resolveGeneralCardKeys(settings)).toEqual(['trafficWarnings', 'avgCpu'])
+    // remainingValue 自 v1.1.7 起是可换算的真实卡片，保留在自定义列表里；重复的 avgCpu 仍只出现一次。
+    expect(resolveGeneralCardKeys(settings)).toEqual(['trafficWarnings', 'avgCpu', 'remainingValue'])
     expect(resolveQuickControlKeys(settings)).toEqual(['offline', 'peak'])
     expect(resolveDetailCardKeys(settings)).toEqual(['cpuUsage', 'connections'])
     // 连接数现在是真实可画的图表卡（`tcp_conn` / `udp_conn` 历史列），不再被当成不支持的 key 丢掉。

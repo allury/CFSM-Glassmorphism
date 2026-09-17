@@ -19,6 +19,8 @@ import {
   summarizeServers,
 } from '@/domain/dashboard'
 import {
+  financeNodesOf,
+  generalFinanceContext,
   isExpiring,
   isHighLoad,
   parseProviderAliases,
@@ -30,6 +32,7 @@ import { createGlassServerMapper } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useDashboardViewStore } from '@/stores/dashboard-view'
+import { useFinanceStore } from '@/stores/finance'
 import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
@@ -41,6 +44,7 @@ const serverStore = useServersStore()
 const preferences = useDashboardPreferencesStore()
 const realtime = useRealtimeStore()
 const theme = useThemeSettingsStore()
+const finance = useFinanceStore()
 const router = useRouter()
 const glassServerMapper = createGlassServerMapper()
 
@@ -89,6 +93,29 @@ const glassServers = computed(() => (
   glassServerMapper.map(serverStore.servers, app.config)
 ))
 const summary = computed(() => summarizeServers(glassServers.value))
+/*
+ * 总览里的剩余价值 / 月费用 / 年费用。只有选用了这些卡、价格对访客可见、而且确有跨币种换算时
+ * 才请求汇率；站点关闭 show_price 的节点不参与合计，明细弹窗也只拿到这些节点。
+ */
+const financeNodes = computed(() => financeNodesOf(glassServers.value))
+const generalFinance = computed(() => (
+  showGeneralCards.value
+    ? generalFinanceContext(glassServers.value, theme.runtime, {
+      priceVisible: priceVisible.value,
+      target: finance.preferences.displayCurrency,
+      view: finance.view,
+      excludeFree: finance.preferences.excludeFree,
+      now: Date.now(),
+    })
+    : undefined
+))
+watch(
+  () => generalFinance.value?.state === 'visible' && generalFinance.value.summary.needsRates,
+  (needed) => {
+    if (needed) void finance.ensureRates()
+  },
+  { immediate: true },
+)
 const groups = computed(() => availableGroups(glassServers.value))
 const filteredServers = computed(() => {
   const servers = filterServers(
@@ -368,6 +395,8 @@ onUnmounted(() => realtime.stop())
               class="general-stage__cards"
               :servers="glassServers"
               :settings="theme.runtime"
+              :finance="generalFinance"
+              :finance-nodes="financeNodes"
             />
           </section>
 

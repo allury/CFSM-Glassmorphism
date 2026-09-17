@@ -180,9 +180,10 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
     ])
   })
 
-  it('不为了凑满六张卡而伪造剩余价值 / 月费用 / 年费用 / 流量配额', () => {
+  // v1.1.7 接入汇率换算后，剩余价值 / 月费用 / 年费用成为真实可算的卡；流量配额仍需站点级配额，照旧忽略。
+  it('剩余价值 / 月费用 / 年费用可以选用，流量配额仍不以估算值补位', () => {
     const settings = customGeneral('remainingValue\nmonthlyCost\nyearlyCost\ntrafficQuota\nonlineNodes')
-    expect(resolveGeneralCardKeys(settings)).toEqual(['onlineNodes'])
+    expect(resolveGeneralCardKeys(settings)).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'onlineNodes'])
   })
 
   it('模板渲染 unit，并把 hint 交给 tooltip', () => {
@@ -201,10 +202,12 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
 
   it('保持上游顺序，只删掉 CFSM 无法真实计算的条目', () => {
     expect(keysFor('官方')).toEqual(['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
-    expect(keysFor('基础')).toEqual(['memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
+    // 「基础」与上游一样是 6 张，第三张是剩余价值（v1.1.7 起可换算）。
+    expect(keysFor('基础')).toEqual(['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
     expect(keysFor('运维')).toEqual(['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'])
     expect(keysFor('资源')).toEqual(['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'])
-    expect(keysFor('财务')).toEqual(['expiringNodes', 'totalTraffic'])
+    // 上游「财务」的第 6 张 trafficQuota 需要站点级配额，CFSM 没有。
+    expect(keysFor('财务')).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'])
     expect(keysFor('流量')).toEqual(['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'])
     expect(keysFor('GPU')).toEqual(['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'])
     expect(keysFor('资产')).toEqual(['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'])
@@ -212,11 +215,12 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
 
   it('「完整」按上游 ALL_GENERAL_CARD_KEYS 的顺序排列', () => {
     expect(keysFor('完整')).toEqual([
-      'currentTime', 'memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed',
+      'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
+      'totalTraffic', 'uploadSpeed', 'downloadSpeed',
       'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
       'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
       'highLoadNodes', 'expiringNodes', 'trafficWarnings',
-      'regionDistribution', 'systemDistribution',
+      'regionDistribution', 'systemDistribution', 'yearlyCost',
     ])
   })
 })

@@ -828,6 +828,11 @@ a {
   background: var(--background);
 }
 
+/* 上游剩余价值卡带 `cursor-pointer`，可以点开「价值与费用明细」。焦点环沿用全局的 [role='button'] 规则。 */
+.overview-card.is-actionable {
+  cursor: pointer;
+}
+
 .overview-card__head {
   display: flex;
   min-width: 0;
@@ -5248,5 +5253,492 @@ a {
 
   .topology-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/*
+ * ===== 价值与费用明细弹窗（v1.1.7）=====
+ *
+ * 取值是 Komari `AppDialog` / `FinanceDetailsDialog` 在同机浏览器里的运行时计算值
+ * （1440 与 375、浅色与深色，记录见 docs/finance-parity.md）。有意差异只有两处：
+ * - 页签区上下排列。上游 `Tabs` 写的是 `data-horizontal:flex-col`，匹配不到 reka-ui
+ *   输出的 `data-orientation`，运行时页签与内容并排，375 宽度下账单表被挤出可视区；
+ *   这里按源码意图排成一列。
+ * - 没有「按量估算」页签，汇总栏因此是两格。
+ * 下拉框与「恢复今日汇率」是上游 `.bg-background` 的消费者，跟随配色方案的控制色与文字色；
+ * 其余表面（弹窗、表格、输入框）与上游一样不随方案变化。
+ */
+:root {
+  --dialog-surface: oklab(0.965 -0.00247213 -0.00760845 / 95%);
+  --dialog-border: oklab(0.92 0.00112401 -0.00383883 / 70%);
+  --dialog-divider: oklab(0.92 0.00112401 -0.00383883 / 60%);
+  --dialog-row-divider: oklab(0.92 0.00112401 -0.00383883 / 50%);
+  --dialog-row-hover: oklab(0.967 0.000281923 -0.000959437 / 25%);
+  --dialog-muted: oklch(0.967 0.001 286.375);
+  --dialog-thead: oklab(0.967 0.000281923 -0.000959437 / 45%);
+  --dialog-input-border: oklch(0.92 0.004 286.32);
+  --dialog-input-surface: transparent;
+  --dialog-tab-idle: oklab(0.11 0.00272667 -0.00962108 / 60%);
+  --dialog-tab-active-surface: var(--background);
+  --dialog-tab-active-border: transparent;
+  --dialog-accent: oklch(0.21 0.006 285.885);
+  --dialog-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 5%);
+}
+
+:root[data-theme='dark'] {
+  --dialog-surface: oklab(0.21 0.00164225 -0.00577088 / 95%);
+  --dialog-border: oklab(1 0 0 / 7%);
+  --dialog-divider: oklab(1 0 0 / 6%);
+  --dialog-row-divider: oklab(1 0 0 / 5%);
+  --dialog-row-hover: oklab(0.274 0.00165715 -0.00576662 / 25%);
+  --dialog-muted: oklch(0.274 0.006 286.033);
+  --dialog-thead: oklab(0.274 0.00165715 -0.00576662 / 45%);
+  --dialog-input-border: oklch(1 0 0 / 15%);
+  --dialog-input-surface: oklab(1 0 0 / 4.5%);
+  --dialog-tab-idle: var(--muted);
+  --dialog-tab-active-surface: oklab(1 0 0 / 4.5%);
+  --dialog-tab-active-border: oklch(1 0 0 / 15%);
+  --dialog-accent: oklch(0.92 0.004 286.32);
+}
+
+.app-dialog__overlay {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  background: oklab(0 0 0 / 45%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.app-dialog {
+  position: fixed;
+  z-index: 101;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  width: calc(100vw - 2rem);
+  max-width: 64rem;
+  max-height: calc(100dvh - 2rem);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--dialog-border);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--dialog-surface);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
+  font-size: 16px;
+  line-height: 24px;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+.app-dialog:focus {
+  outline: none;
+}
+
+.app-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dialog-divider);
+}
+
+.app-dialog__heading {
+  min-width: 0;
+  flex: 1;
+}
+
+.app-dialog__title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-dialog__description {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.app-dialog__close {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  color: var(--muted);
+  background: transparent;
+  cursor: default;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.app-dialog__close:hover {
+  color: var(--ink);
+  background: var(--background);
+}
+
+.app-dialog__body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.finance-dialog > * + * {
+  margin-top: 16px;
+}
+
+.finance-dialog__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding-block: 12px;
+  border-block: 1px solid var(--dialog-divider);
+  text-align: center;
+}
+
+.finance-dialog__metric {
+  min-width: 0;
+  padding-inline: 8px;
+}
+
+.finance-dialog__metric:not(:last-child) {
+  border-right: 1px solid var(--dialog-divider);
+}
+
+.finance-dialog__metric-label {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.finance-dialog__metric-value {
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 算不进合计的节点逐条交代，上游没有这一行。 */
+.finance-dialog__metric-note {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 16px;
+  /* 手机上两栏很窄，避免「未计入」的最后一个字单独折行。 */
+  text-wrap: balance;
+}
+
+.finance-dialog__tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.finance-dialog__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-dialog__tab-list {
+  display: inline-flex;
+  min-width: 0;
+  height: 36px;
+  flex: 1 1 0%;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: var(--radius);
+  color: var(--muted);
+  background: var(--dialog-muted);
+}
+
+.finance-dialog__tab {
+  position: relative;
+  display: inline-flex;
+  height: calc(100% - 1px);
+  flex: 1 1 0%;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  color: var(--dialog-tab-idle);
+  background: transparent;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: default;
+  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease;
+}
+
+.finance-dialog__tab:hover {
+  color: var(--ink);
+}
+
+.finance-dialog__tab[data-state='active'] {
+  border-color: var(--dialog-tab-active-border);
+  color: var(--ink);
+  background: var(--dialog-tab-active-surface);
+}
+
+.finance-dialog__tab .app-icon {
+  flex-shrink: 0;
+}
+
+.finance-dialog__exclude {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.finance-dialog__exclude input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--dialog-accent);
+}
+
+.finance-dialog__panel {
+  flex: 1;
+  font-size: 14px;
+  line-height: 20px;
+  outline: none;
+}
+
+.finance-dialog__panel > * + * {
+  margin-top: 8px;
+}
+
+.finance-dialog__panel--rates > * + * {
+  margin-top: 12px;
+}
+
+.finance-dialog h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+}
+
+.finance-dialog__panel-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.finance-dialog__panel-head p,
+.finance-dialog__rates-title p,
+.finance-dialog__rate-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.finance-dialog__select,
+.finance-dialog__outline-button {
+  height: 32px;
+  border: 1px solid var(--dialog-input-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  color: var(--glass-text, var(--ink));
+  background: var(--control-surface, var(--glass-strong));
+  backdrop-filter: blur(14px) saturate(145%);
+  -webkit-backdrop-filter: blur(14px) saturate(145%);
+}
+
+.finance-dialog__select {
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.finance-dialog__outline-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 12px;
+  box-shadow: var(--dialog-shadow-xs);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: default;
+}
+
+.finance-dialog__outline-button .app-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.finance-dialog__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--dialog-divider);
+  border-radius: var(--radius-md);
+}
+
+.finance-dialog__table {
+  width: 100%;
+  min-width: 620px;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+}
+
+.finance-dialog__table thead {
+  color: var(--muted);
+  background: var(--dialog-thead);
+}
+
+.finance-dialog__table th {
+  padding: 8px 12px;
+  font-weight: 500;
+}
+
+.finance-dialog__table td {
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+
+.finance-dialog__table tbody tr:not(:last-child) {
+  border-bottom: 1px solid var(--dialog-row-divider);
+}
+
+.finance-dialog__table tbody tr:hover {
+  background: var(--dialog-row-hover);
+}
+
+.finance-dialog__table .is-end {
+  text-align: right;
+}
+
+.finance-dialog__table .is-strong {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.finance-dialog__table td.finance-dialog__name {
+  max-width: 192px;
+  white-space: normal;
+}
+
+.finance-dialog__name div {
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.finance-dialog__table td.finance-dialog__empty {
+  padding: 32px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.finance-dialog__rates-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.finance-dialog__rates-title {
+  margin-right: auto;
+}
+
+.finance-dialog__rate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.finance-dialog__rate {
+  display: grid;
+  grid-template-columns: 2.5rem 1fr;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.finance-dialog__rate span {
+  font-weight: 500;
+}
+
+.finance-dialog__rate-input {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--dialog-input-border);
+  border-radius: var(--radius-md);
+  outline: none;
+  color: var(--ink);
+  background: var(--dialog-input-surface);
+  box-shadow: var(--dialog-shadow-xs);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.finance-dialog__rate-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+@media (min-width: 640px) {
+  .app-dialog__header {
+    padding-inline: 20px;
+  }
+
+  .app-dialog__body {
+    padding: 20px;
+  }
+
+  .finance-dialog__tab-list {
+    flex: none;
+  }
+
+  .finance-dialog__rate-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px) {
+  .finance-dialog__rate-input {
+    font-size: 14px;
+    line-height: 20px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .finance-dialog__rate-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }

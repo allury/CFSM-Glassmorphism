@@ -119,16 +119,71 @@ describe('详情指标卡对齐 Komari getDetailMetricCard', () => {
     expect(free.find((card) => card.key === 'monthlyCost')?.value).toBe('免费')
   })
 
-  it('剩余价值按节点自身币种计算，免费节点显示「无」', () => {
-    const paid = buildDetailCards(
-      node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '2027-01-01' }),
-      detailSettings('综合'),
-      Date.UTC(2026, 0, 1),
-    )
-    expect(paid.find((card) => card.key === 'remainingValue')?.value).toBe('€60')
+  /*
+   * v1.1.7 起与上游 InstanceDetail 的分工一致：节点价格、月均支出保留原币，剩余价值换算成
+   * 财务显示币种（默认 CNY）。此前这里断言剩余价值保持原币 `€60`，那是还没有汇率时的做法。
+   * 测试汇率是人工值：1 CNY = 0.125 EUR。
+   */
+  const testRates = { target: 'CNY' as const, view: { rates: { CNY: 1, EUR: 0.125 }, sources: { EUR: 'network' as const }, pending: false } }
 
-    const free = buildDetailCards(node({ price: '0', currency: '€' }), detailSettings('综合'))
+  it('剩余价值换算成财务显示币种，原币金额与汇率来源放进 tooltip；免费节点显示「无」', () => {
+    const paidNode = node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '2027-01-01' })
+    const paid = buildDetailCards(paidNode, detailSettings('综合'), Date.UTC(2026, 0, 1), testRates)
+    expect(paid.find((card) => card.key === 'remainingValue')).toMatchObject({
+      value: '¥480.00',
+      hint: '原币 €60\n汇率：今日网络汇率',
+    })
+    expect(paid.find((card) => card.key === 'remainingValue')?.unit).toBeUndefined()
+    // 节点价格与月均支出仍是原币。
+    expect(paid.find((card) => card.key === 'nodePrice')).toMatchObject({ value: '€60', unit: '/ 年' })
+    expect(paid.find((card) => card.key === 'monthlyCost')?.value).toBe('€4.93')
+
+    const free = buildDetailCards(node({ price: '0', currency: '€' }), detailSettings('综合'), Date.now(), testRates)
     expect(free.find((card) => card.key === 'remainingValue')?.value).toBe('无')
+  })
+
+  it('同币种不需要汇率；汇率未到、缺失或币种无法识别时如实显示', () => {
+    const now = Date.UTC(2026, 0, 1)
+    const settings = detailSettings('综合')
+    const yuan = buildDetailCards(node({ price: '120', billing_cycle: 'year', currency: '¥', expire_date: '2027-01-01' }), settings, now)
+    expect(yuan.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '¥120.00', hint: '' })
+
+    const euro = node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '2027-01-01' })
+    const pending = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: {}, sources: {}, pending: true } })
+    expect(pending.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '载入中' })
+    const missing = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: {}, sources: {}, pending: false } })
+    expect(missing.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '汇率不可用', hint: '原币 €60\n缺少汇率，无法换算' })
+    const krona = buildDetailCards(node({ price: '60', billing_cycle: 'year', currency: 'kr', expire_date: '2027-01-01' }), settings, now, testRates)
+    expect(krona.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '不可换算' })
+
+    const reference = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: { CNY: 1, EUR: 0.125 }, sources: { EUR: 'reference' }, pending: false } })
+    expect(reference.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '¥480.00', unit: '参考' })
+  })
+
+  it('缺到期时间或周期未知时不出剩余价值卡，不写成已过期的 0', () => {
+    const settings = detailSettings('综合')
+    const noExpiry = buildDetailCards(node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '' }), settings, Date.UTC(2026, 0, 1), testRates)
+    expect(noExpiry.find((card) => card.key === 'remainingValue')).toBeUndefined()
+    const expired = buildDetailCards(node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '2025-01-01' }), settings, Date.UTC(2026, 0, 1), testRates)
+    expect(expired.find((card) => card.key === 'remainingValue')?.value).toBe('¥0.00')
+  })
+
+  it('未填价格或价格无法识别时，三张财务卡都不出现，不当作免费', () => {
+    const settings = detailSettings('综合')
+    const now = Date.UTC(2026, 0, 1)
+    // CFSM 未填价格时返回空串，适配层把它归一成 null。
+    const unset = buildDetailCards(node({ price: '', billing_cycle: 'month', currency: '¥', expire_date: '2027-01-01' }), settings, now, testRates)
+    const keys = (cards: typeof unset) => cards.map((card) => card.key)
+    expect(keys(unset)).not.toContain('nodePrice')
+    // 此前月均支出这一张会单独显示「—」，另外两张不出现；v1.1.7 起三张一致。
+    expect(keys(unset)).not.toContain('monthlyCost')
+    expect(keys(unset)).not.toContain('remainingValue')
+    expect(keys(unset)).toContain('remainingTime')
+
+    const invalid = buildDetailCards(node({ price: 'abc', billing_cycle: 'month', currency: '¥', expire_date: '2027-01-01' }), settings, now, testRates)
+    expect(invalid.find((card) => card.key === 'nodePrice')?.value).toBe('—')
+    expect(keys(invalid)).not.toContain('monthlyCost')
+    expect(keys(invalid)).not.toContain('remainingValue')
   })
 
   it('GPU / 交换分区 / 流量配额缺数据时不渲染，也不写成 0', () => {

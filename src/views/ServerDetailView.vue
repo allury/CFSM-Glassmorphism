@@ -15,7 +15,8 @@ import type { IconName } from '@/constants/icons'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { issueCopy } from '@/domain/issue-copy'
 import { resolveNodeProvider } from '@/domain/provider'
-import { buildDetailCards, parseTrafficLimitBytes } from '@/domain/theme-presentation'
+import { needsExchangeRate } from '@/domain/finance'
+import { buildDetailCards, parseTrafficLimitBytes, resolveDetailCardKeys } from '@/domain/theme-presentation'
 import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
@@ -23,6 +24,7 @@ import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { useAppStore } from '@/stores/app'
+import { useFinanceStore } from '@/stores/finance'
 import { useServerDetailStore } from '@/stores/server-detail'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import {
@@ -38,6 +40,7 @@ const router = useRouter()
 const app = useAppStore()
 const detail = useServerDetailStore()
 const theme = useThemeSettingsStore()
+const finance = useFinanceStore()
 const preferences = useDashboardPreferencesStore()
 const serverStore = useServersStore()
 const {
@@ -130,9 +133,30 @@ const showTrafficPolicy = computed(() => {
     && (current.trafficLimit !== null || current.trafficCalculationType !== null
       || current.resetDay !== null)
 })
+/*
+ * 剩余价值与上游一样换算成财务显示币种。汇率只在价格可见、选用了这张卡、
+ * 而且节点币种与显示币种不同时才请求；站点开关未知的冷启动阶段 showPrice 为 false，
+ * 不会提前请求，也不会闪出金额。
+ */
+const detailFinance = computed(() => ({
+  target: finance.preferences.displayCurrency,
+  view: finance.view,
+}))
+watch(
+  () => Boolean(
+    server.value
+    && showPrice.value
+    && resolveDetailCardKeys(theme.runtime).includes('remainingValue')
+    && needsExchangeRate(server.value.currency, finance.preferences.displayCurrency),
+  ),
+  (needed) => {
+    if (needed) void finance.ensureRates()
+  },
+  { immediate: true },
+)
 const detailCards = computed(() => {
   if (!server.value) return []
-  return buildDetailCards(server.value, theme.runtime).filter((card) => {
+  return buildDetailCards(server.value, theme.runtime, Date.now(), detailFinance.value).filter((card) => {
     // 剩余价值同样由价格推导，必须跟随 show_price 一起隐藏。
     if ((card.key === 'nodePrice' || card.key === 'monthlyCost' || card.key === 'remainingValue') && !showPrice.value) return false
     if (card.key === 'remainingTime' && !showExpiry.value) return false

@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest'
  * 筛选胶囊、首次拉取节点失败时连接失败提示里的描边「重试」、财务对话框的下拉框与描边
  * 按钮、自定义时间范围的「应用」、健康 / 拓扑 / 对比工具里的选中态。
  *
- * 本主题里有对应元素的只有前两项；其余要么本主题没有这个功能，要么上游对应元素的类是
+ * 本主题里有对应元素的是前两项，以及 v1.1.7 移植的财务明细弹窗（显示币种下拉框与
+ * 「恢复今日汇率」描边按钮）；其余要么本主题没有这个功能，要么上游对应元素的类是
  * `bg-background/60`、`bg-transparent`、`!bg-background` 这类不同的类名，并不消费方案。
  * 这里把消费范围钉住：既不能漏接，也不能顺手扩散到全站的输入框和按钮。
  */
@@ -45,14 +46,25 @@ function buttonTag(template: string, label: string): string {
 }
 
 describe('控制色只被有上游对应的元素消费', () => {
-  it('引用 --control-surface 的规则只有激活态胶囊与「重新加载」两条', () => {
+  it('引用 --control-surface 的规则只有激活态胶囊、「重新加载」与财务弹窗的下拉框 / 描边按钮', () => {
     const consumers = rules(stylesheet)
       .filter((rule) => rule.body.includes('--control-surface'))
       .map((rule) => rule.selector)
     expect(consumers).toEqual([
       '.quick-controls button.is-active',
       '.state-panel button.state-panel__retry',
+      '.finance-dialog__select, .finance-dialog__outline-button',
     ])
+  })
+
+  it('财务弹窗：下拉框与描边按钮只跟随底色和文字，边框用输入框颜色；汇率输入框不跟随方案', () => {
+    const controls = rules(stylesheet).find((rule) => rule.selector === '.finance-dialog__select, .finance-dialog__outline-button')
+    expect(controls?.body).toContain('background: var(--control-surface, var(--glass-strong))')
+    expect(controls?.body).toContain('color: var(--glass-text, var(--ink))')
+    expect(controls?.body).toContain('border: 1px solid var(--dialog-input-border)')
+    const input = rules(stylesheet).find((rule) => rule.selector === '.finance-dialog__rate-input')
+    expect(input?.body).toContain('background: var(--dialog-input-surface)')
+    expect(input?.body).not.toContain('--control-surface')
   })
 
   it('「重新加载」按上游规则取控制色与方案文字色，模糊两种写法都有', () => {

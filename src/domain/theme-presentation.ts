@@ -1,4 +1,23 @@
 import type { IconName } from '@/constants/icons'
+import {
+  convertAmount,
+  describeSkipped,
+  describeSources,
+  EMPTY_RATE_VIEW,
+  formatFinanceAmount,
+  monthlyCost as monthlyCostOf,
+  remainingValueOf,
+  resolveSourceCurrency,
+  SKIP_REASONS,
+  summarizeFinance,
+  type BillableNode,
+  type Conversion,
+  type DisplayCurrency,
+  type FinanceSummary,
+  type FinanceTotal,
+  type RateSource,
+  type RateView,
+} from '@/domain/finance'
 import { parseSettingKeys, type ThemeSettings } from '@/theme/settings'
 import type { CfsmServer } from '@/types/cfsm'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -24,17 +43,17 @@ import {
 
 /*
  * 总览卡片的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_GENERAL_CARD_KEYS`，
- * 只保留 CFSM 能够真实计算的项目。上游的 remainingValue / monthlyCost / yearlyCost
- * 需要跨币种换算，trafficQuota 需要站点级配额，*PeakNode 与 virtualizationDistribution
- * 需要 CFSM 未提供的字段——它们一律不出现，而不是用估算值凑满六张卡。
+ * 只保留 CFSM 能够真实计算的项目。剩余价值、月费用与年费用在 v1.1.7 接入了汇率换算
+ * （`domain/finance.ts`）；trafficQuota 需要站点级配额，*PeakNode 与
+ * virtualizationDistribution 需要 CFSM 未提供的字段——它们仍不出现，不用估算值凑满六张卡。
  */
 export type GeneralCardKey =
-  | 'currentTime' | 'memory' | 'disk'
+  | 'currentTime' | 'memory' | 'disk' | 'remainingValue' | 'monthlyCost'
   | 'totalTraffic' | 'uploadSpeed' | 'downloadSpeed'
   | 'onlineNodes' | 'offlineNodes' | 'avgCpu' | 'avgGpu' | 'avgLoad'
   | 'swap' | 'processes' | 'connections' | 'cpuCores' | 'gpuNodes'
   | 'trafficPeak' | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings'
-  | 'regionDistribution' | 'systemDistribution'
+  | 'regionDistribution' | 'systemDistribution' | 'yearlyCost'
 
 export type QuickControlKey = 'favorite' | 'totalTraffic' | 'upload' | 'download' | 'peak' | 'offline' | 'highLoad' | 'expiring'
 /*
@@ -58,25 +77,26 @@ export type ChartFamily =
 
 /** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
 const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
-  'currentTime', 'memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed',
+  'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
+  'totalTraffic', 'uploadSpeed', 'downloadSpeed',
   'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
   'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
   'highLoadNodes', 'expiringNodes', 'trafficWarnings',
-  'regionDistribution', 'systemDistribution',
+  'regionDistribution', 'systemDistribution', 'yearlyCost',
 ]
 
 /*
  * 逐项对应 Komari `GENERAL_CARD_PRESETS`（official / basic / ops / resource /
  * finance / traffic / gpu / asset / full / custom），保持同一顺序，
- * 只删去 CFSM 无法真实计算的条目。因此「基础」是 5 张而不是 6 张：
- * 上游第三张是需要跨币种换算的剩余价值总额。
+ * 只删去 CFSM 无法真实计算的条目：「财务」里的 trafficQuota 需要站点级配额，
+ * 因此是 5 张；其余预设与上游张数相同。
  */
 const GENERAL_PRESETS: Record<ThemeSettings['generalCardPreset'], readonly GeneralCardKey[]> = {
   官方: ['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
-  基础: ['memory', 'disk', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
+  基础: ['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
   运维: ['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'],
   资源: ['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'],
-  财务: ['expiringNodes', 'totalTraffic'],
+  财务: ['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'],
   流量: ['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'],
   GPU: ['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'],
   资产: ['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'],
@@ -85,9 +105,10 @@ const GENERAL_PRESETS: Record<ThemeSettings['generalCardPreset'], readonly Gener
 }
 
 /*
- * 快捷控制预设对应 Komari `HOME_QUICK_CONTROL_PRESETS`，去掉 CFSM 没有的
- * `monthlyCost`（跨币种月费用估算）。上游的「完整」是 7 项，因此 CFSM 是 6 项，
- * 而不是此前把上行/下行也塞进去的 8 项。
+ * 快捷控制预设对应 Komari `HOME_QUICK_CONTROL_PRESETS`，去掉 `monthlyCost`：
+ * 上游预设里虽然列着它，但 `HomeView` 渲染前用
+ * `homeQuickControlOrder.filter(key => key !== 'monthlyCost')` 把它过滤掉了，
+ * 运行时从不出现。上游的「完整」因此实际显示 6 项，这里也是 6 项。
  */
 const QUICK_PRESETS: Record<ThemeSettings['homeQuickControlPreset'], readonly QuickControlKey[]> = {
   基础: ['favorite', 'peak', 'offline'],
@@ -209,22 +230,10 @@ export function daysUntilExpiry(value: string | null, now = Date.now()): number 
     : Math.ceil(difference / 86_400_000)
 }
 
-const BILLING_CYCLE_DAYS: Readonly<Record<string, number>> = {
-  month: 30,
-  quarter: 90,
-  half_year: 180,
-  year: 365,
-  two_years: 730,
-  three_years: 1095,
-  four_years: 1460,
-  five_years: 1825,
-}
-
 /**
- * 按 CFSM 官方计费周期计算节点当前剩余价值。
- *
- * 未知周期不猜测；无效日期也保持不可用。这样首页可以复刻 Komari 的短金额行，
- * 又不会把 CFSM 的自由文本 `billing_cycle` 擅自解释成某个周期。
+ * 按 CFSM 官方计费周期计算节点当前剩余价值（原币）。首页节点卡与上游一样显示原币，
+ * 计算本身交给 `domain/finance.ts`，与详情页、明细弹窗共用一套口径。
+ * 免费、未设置价格、未知周期、缺失或无效到期都返回 null。
  */
 export interface BillableServer {
   price: string | null
@@ -233,19 +242,8 @@ export interface BillableServer {
 }
 
 export function remainingValue(server: BillableServer, now = Date.now()): number | null {
-  const price = Number(server.price)
-  if (!Number.isFinite(price) || price <= 0) return null
-
-  const expiresAt = parseCfsmDate(server.expireDate)
-  if (!expiresAt) return null
-  const difference = expiresAt.getTime() - now
-  if (difference <= 0) return 0
-  if (difference / (86_400_000 * 365) > 100) return price
-
-  const cycle = server.billingCycle?.trim().toLowerCase() ?? ''
-  const cycleDays = BILLING_CYCLE_DAYS[cycle]
-  if (!cycleDays) return null
-  return Math.min(price, price * difference / (cycleDays * 86_400_000))
+  const result = remainingValueOf(server, now)
+  return result.status === 'ok' ? result.amount : null
 }
 
 export function isExpiring(server: GlassServer, days: number, now = Date.now()): boolean {
@@ -328,6 +326,152 @@ export interface PresentationCard {
   /** 数值着色，对应 Komari 详情卡的 `valueClass`（目前只有剩余时间使用）。 */
   tone?: 'danger' | 'warning' | 'muted' | 'ok'
   percentage?: number | null
+  /** 对应上游 `GeneralMetricCard.action`：目前只有剩余价值卡能打开财务明细。 */
+  action?: 'financeDetails'
+}
+
+/*
+ * ===== 财务卡 =====
+ *
+ * 首页总览的剩余价值、月费用估算、年费用估算（Komari `NodeGeneralCards`）按财务显示币种合计。
+ * 汇率与合计由 `domain/finance.ts` 算好传进来，这里只负责上游的卡片文案与格式。
+ * 上游这三张卡没有单位；本主题只在需要交代时借用单位位置放一个短标记：
+ * 汇率载入中、部分节点没能换算、用了参考 / 旧缓存 / 手动汇率。细节写进 tooltip。
+ */
+export type GeneralFinanceContext =
+  /** 没有任何节点允许显示价格（站点关闭了 show_price）：财务卡整张不出现。 */
+  | { state: 'hidden' }
+  /** 未登录隐藏价格：卡片显示 `***`，不能点开明细，也不需要汇率。 */
+  | { state: 'masked' }
+  /** 合计只含价格对访客可见的节点。 */
+  | { state: 'visible', summary: FinanceSummary, target: DisplayCurrency }
+
+export const FINANCE_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = ['remainingValue', 'monthlyCost', 'yearlyCost']
+
+/** 参与财务合计的节点：只取站点允许显示价格（`show_price`）的节点。 */
+export function financeNodesOf(servers: readonly GlassServer[]): BillableNode[] {
+  return servers
+    .filter((server) => server.showPrice)
+    .map((server) => ({
+      key: server.key,
+      name: server.name,
+      tags: server.tags,
+      price: server.price,
+      currency: server.currency,
+      billingCycle: server.billingCycle,
+      expireDate: server.expireDate,
+    }))
+}
+
+export interface GeneralFinanceInput {
+  /** 主题级「未登录隐藏价格」之后，访客能否看到价格。 */
+  priceVisible: boolean
+  target: DisplayCurrency
+  view: RateView
+  excludeFree: boolean
+  now: number
+}
+
+/**
+ * 首页总览财务卡的上下文。没有选用任何财务卡时返回 undefined，调用方也就不会去算合计、不会请求汇率。
+ */
+export function generalFinanceContext(
+  servers: readonly GlassServer[],
+  settings: ThemeSettings,
+  input: GeneralFinanceInput,
+): GeneralFinanceContext | undefined {
+  if (!resolveGeneralCardKeys(settings).some((key) => FINANCE_GENERAL_CARD_KEYS.includes(key))) return undefined
+  const nodes = financeNodesOf(servers)
+  if (nodes.length === 0) return { state: 'hidden' }
+  if (!input.priceVisible) return { state: 'masked' }
+  return {
+    state: 'visible',
+    target: input.target,
+    summary: summarizeFinance(nodes, {
+      target: input.target,
+      view: input.view,
+      excludeFree: input.excludeFree,
+      now: input.now,
+    }),
+  }
+}
+
+const CONVERSION_SKIPS = SKIP_REASONS.filter((reason) => reason.startsWith('currency-') || reason === 'rate-missing')
+
+function hasSkips(total: FinanceTotal): boolean {
+  return SKIP_REASONS.some((reason) => (total.skipped[reason] ?? 0) > 0)
+}
+
+/** 数值旁的短标记；一切正常（当日汇率、全部计入）时不显示，与上游一致。 */
+export function rateMarker(sources: readonly RateSource[]): string | undefined {
+  if (sources.includes('reference')) return '参考'
+  if (sources.includes('stale-cache')) return '旧汇率'
+  if (sources.includes('manual')) return '手动'
+  return undefined
+}
+
+/**
+ * 「部分」（有节点没能换算）与汇率质量（参考 / 旧汇率 / 手动）是两件事，同时存在时一起显示，
+ * 例如「部分 · 参考」；单位位置放不下时按上游的 truncate 截断，完整说明在 tooltip 里。
+ */
+function financeMarker(total: FinanceTotal, sources: readonly RateSource[]): string | undefined {
+  if (total.pending) return '载入中'
+  if (total.counted === 0 && hasSkips(total)) return '不可用'
+  const partial = CONVERSION_SKIPS.some((reason) => (total.skipped[reason] ?? 0) > 0) ? '部分' : undefined
+  const markers = [partial, rateMarker(sources)].filter((marker): marker is string => marker !== undefined)
+  return markers.length > 0 ? markers.join(' · ') : undefined
+}
+
+function financeValue(total: FinanceTotal, target: DisplayCurrency): string {
+  if (total.pending || (total.counted === 0 && hasSkips(total))) return '—'
+  return formatFinanceAmount(total.amount, target)
+}
+
+function financeNotes(total: FinanceTotal, sources: readonly RateSource[], alwaysShowSources: boolean): string[] {
+  const lines: string[] = []
+  if (total.pending) lines.push('汇率载入中')
+  const fresh = sources.every((source) => source === 'network' || source === 'cache')
+  const described = describeSources(sources)
+  if (described && (alwaysShowSources || !fresh)) lines.push(`汇率：${described}`)
+  lines.push(...describeSkipped(total))
+  return lines
+}
+
+function financeCards(context: GeneralFinanceContext | undefined): Pick<Record<GeneralCardKey, PresentationCard | null>, 'remainingValue' | 'monthlyCost' | 'yearlyCost'> {
+  if (!context || context.state === 'hidden') return { remainingValue: null, monthlyCost: null, yearlyCost: null }
+  if (context.state === 'masked') {
+    return {
+      remainingValue: { key: 'remainingValue', icon: 'tabler:cash', label: '剩余价值', value: '***', hint: '总价值\n***' },
+      monthlyCost: { key: 'monthlyCost', icon: 'tabler:calendar-dollar', label: '月费用估算', value: '***', hint: '' },
+      yearlyCost: { key: 'yearlyCost', icon: 'tabler:receipt-2', label: '年费用估算', value: '***', hint: '' },
+    }
+  }
+  const { summary, target } = context
+  const costCard =(key: 'monthlyCost' | 'yearlyCost', icon: IconName, label: string, total: FinanceTotal): PresentationCard => ({
+    key,
+    icon,
+    label,
+    value: financeValue(total, target),
+    unit: financeMarker(total, summary.sources),
+    hint: financeNotes(total, summary.sources, false).join('\n'),
+  })
+  return {
+    remainingValue: {
+      key: 'remainingValue',
+      icon: 'tabler:cash',
+      label: '剩余价值',
+      value: financeValue(summary.remaining, target),
+      unit: financeMarker(summary.remaining, summary.sources),
+      hint: [
+        '总价值',
+        financeValue(summary.totalValue, target),
+        ...financeNotes(summary.remaining, summary.sources, true),
+      ].join('\n'),
+      action: 'financeDetails',
+    },
+    monthlyCost: costCard('monthlyCost', 'tabler:calendar-dollar', '月费用估算', summary.monthly),
+    yearlyCost: costCard('yearlyCost', 'tabler:receipt-2', '年费用估算', summary.yearly),
+  }
 }
 
 /** 取用量最高的一台节点，用于「实时峰值」卡片的 tooltip 说明。 */
@@ -369,7 +513,12 @@ function distributionTooltip(entries: Array<{ label: string, count: number }>): 
  * 单位一栏只放真正的单位，不再塞「接收 + 发送」「在线节点合计」这类说明文字，
  * 那些说明改由 tooltip（`hint`）承担，手机端因此不会再被长文本挤到省略。
  */
-export function buildGeneralCards(servers: GlassServer[], settings: ThemeSettings, now = Date.now()): PresentationCard[] {
+export function buildGeneralCards(
+  servers: GlassServer[],
+  settings: ThemeSettings,
+  now = Date.now(),
+  finance?: GeneralFinanceContext,
+): PresentationCard[] {
   const online = servers.filter((server) => server.online)
   const offlineCount = servers.length - online.length
   const resources = (selector: (server: GlassServer) => { used: number | null, total: number | null }) => {
@@ -438,6 +587,7 @@ export function buildGeneralCards(servers: GlassServer[], settings: ThemeSetting
   const peakSplit = formatDisplaySpeedSplit(peak?.value ?? null)
 
   const values: Record<GeneralCardKey, PresentationCard | null> = {
+    ...financeCards(finance),
     currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now), hint: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(now) },
     memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
     disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
@@ -492,22 +642,64 @@ function splitMeasurement(value: string): SplitAmount {
 }
 
 /**
- * 月均支出。上游把计费周期当成天数直接除；CFSM 的 `billing_cycle` 是枚举文本，
- * 因此按同一张官方周期天数表折算成 30 天口径。未知周期返回「不适用」，不猜测。
+ * 月均支出（原币，与上游详情页的分工一致）。上游把计费周期当成天数直接除；CFSM 的
+ * `billing_cycle` 是枚举文本，按官方周期天数表折算成 30 天口径（`domain/finance.ts`）。
+ * 未知周期返回「不适用」，不猜测；未设置或无法识别的价格不出这张卡，与节点价格卡一致。
  */
 function monthlyAverageCost(server: CfsmServer): string | null {
-  const amount = Number(server.price)
-  if (!Number.isFinite(amount)) return null
-  if (amount === 0 || amount === -1) return formatPrice(server.price, server.currency, null)
-  if (amount < 0) return null
-  const cycleDays = BILLING_CYCLE_DAYS[server.billingCycle?.trim().toLowerCase() ?? '']
-  if (!cycleDays) return '不适用'
-  const monthly = amount / cycleDays * 30
+  const result = monthlyCostOf(server)
+  if (result.status === 'free') return formatPrice(server.price, server.currency, null)
+  // 未填价格（适配层里就是 null）或价格无法识别时整卡不显示，与「节点价格」「剩余价值」一致。
+  if (result.status === 'unavailable') return result.reason === 'cycle-unknown' ? '不适用' : null
+  const monthly = result.amount
   const digits = Math.abs(monthly) >= 100 ? 0 : 2
   return `${server.currency?.trim() ?? ''}${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: digits, minimumFractionDigits: digits }).format(monthly)} / 月`
 }
 
-export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, now = Date.now()): PresentationCard[] {
+/** 详情页剩余价值的换算上下文：显示币种与当前汇率。 */
+export interface DetailFinanceContext {
+  target: DisplayCurrency
+  view: RateView
+}
+
+const DEFAULT_DETAIL_FINANCE: DetailFinanceContext = { target: 'CNY', view: EMPTY_RATE_VIEW }
+
+function conversionFailure(converted: Exclude<Conversion, { status: 'ok' }>): { unit: string, note: string } {
+  if (converted.status === 'pending') return { unit: '载入中', note: '汇率载入中' }
+  if (converted.reason === 'rate-missing') return { unit: '汇率不可用', note: '缺少汇率，无法换算' }
+  return { unit: '不可换算', note: '币种无法识别，无法换算' }
+}
+
+/**
+ * 详情页剩余价值：与上游 `InstanceDetail` 一样换算成财务显示币种（节点价格与月均支出保留原币）。
+ * 原币金额与汇率来源放进 tooltip；换算不了时如实显示，不拿原币冒充换算结果。
+ */
+function detailRemainingValue(server: CfsmServer, now: number, finance: DetailFinanceContext): { value: string, unit?: string, hint: string } | null {
+  if (server.price === null) return null
+  const result = remainingValueOf(server, now)
+  if (result.status === 'free') return { value: '无', hint: '' }
+  if (result.status === 'unavailable') return null
+  const original = formatCurrencyValue(result.amount, server.currency)
+  const converted = convertAmount(result.amount, resolveSourceCurrency(server.currency), finance.target, finance.view)
+  if (converted.status !== 'ok') {
+    const failure = conversionFailure(converted)
+    return { value: '—', unit: failure.unit, hint: `原币 ${original}\n${failure.note}` }
+  }
+  const split = splitMetricValue(formatFinanceAmount(converted.amount, finance.target))
+  const sources = describeSources(converted.sources)
+  return {
+    value: split.value,
+    unit: rateMarker(converted.sources) ?? (split.unit || undefined),
+    hint: sources ? `原币 ${original}\n汇率：${sources}` : '',
+  }
+}
+
+export function buildDetailCards(
+  server: CfsmServer,
+  settings: ThemeSettings,
+  now = Date.now(),
+  finance: DetailFinanceContext = DEFAULT_DETAIL_FINANCE,
+): PresentationCard[] {
   const percent = (used: number | null, total: number | null) => used !== null && total !== null && total > 0 ? Math.min(100, Math.max(0, used / total * 100)) : null
   const totalTraffic = server.networkReceived === null && server.networkTransmitted === null ? null : (server.networkReceived ?? 0) + (server.networkTransmitted ?? 0)
   const gpu = average(server.gpus.map((item) => item.utilization))
@@ -523,11 +715,7 @@ export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, no
           : (rx ?? 0) + (tx ?? 0)
   const monthly = monthlyAverageCost(server)
   const priceText = server.price === null ? null : formatDisplayPrice(server.price, server.currency, server.billingCycle)
-  const remaining = remainingValue(server, now)
-  const freePrice = server.price !== null && (Number(server.price) === 0 || Number(server.price) === -1)
-  const remainingValueText = server.price === null
-    ? null
-    : freePrice ? '无' : remaining === null ? null : formatCurrencyValue(remaining, server.currency)
+  const remaining = detailRemainingValue(server, now, finance)
   const memoryPercent = percent(server.memoryUsed, server.memoryTotal)
   const swapPercent = percent(server.swapUsed, server.swapTotal)
   const diskPercent = percent(server.diskUsed, server.diskTotal)
@@ -560,7 +748,7 @@ export function buildDetailCards(server: CfsmServer, settings: ThemeSettings, no
           : status === 'long_term' || status === 'unknown' ? 'muted' : 'ok'
       return { ...card('remainingTime', 'tabler:calendar-dollar', '剩余时间', s.value, s.unit), tone }
     })(),
-    remainingValue: remainingValueText === null ? null : (() => { const s = splitMetricValue(remainingValueText); return card('remainingValue', 'tabler:coins', '剩余价值', s.value, s.unit) })(),
+    remainingValue: remaining === null ? null : card('remainingValue', 'tabler:coins', '剩余价值', remaining.value, remaining.unit, remaining.hint),
     cpuUsage: server.cpu === null ? null : card('cpuUsage', 'tabler:cpu', 'CPU 使用率', server.cpu.toFixed(1), '%'),
     gpuUsage: server.gpus.length === 0 ? null : card('gpuUsage', 'tabler:device-desktop-analytics', 'GPU 使用率', gpu === null ? '-' : gpu.toFixed(1), gpu === null ? '' : '%', server.gpus.map((item) => item.name).filter(Boolean).join('\n')),
     memoryUsage: memoryPercent === null ? null : card('memoryUsage', 'icon-park-outline:memory', '内存使用率', memoryPercent.toFixed(1), '%', `${formatDisplayMebibytes(server.memoryUsed)} / ${formatDisplayMebibytes(server.memoryTotal)}`),
