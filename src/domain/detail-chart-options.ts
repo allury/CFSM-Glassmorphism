@@ -1,5 +1,5 @@
 import type { ChartRow } from '@/domain/server-detail'
-import { countMasked, detectIsolatedSpikes } from '@/domain/spike-mask'
+import { countMasked, detectSpikes } from '@/domain/spike-mask'
 import type { ChartFamily } from '@/domain/theme-presentation'
 import type { HistoryHours } from '@/services/cfsm'
 import type { HistoryPoint, ProbeTarget, ProbeValue } from '@/types/cfsm'
@@ -900,7 +900,6 @@ export interface PingChartContext {
   tasks: readonly PingTaskLine[]
   /** 当前选中的任务，决定画哪些线与线型轮换。 */
   selected: readonly PingTaskLine[]
-  smooth: boolean
   accessible: boolean
   /** 「隐藏尖峰」开关。缺省为关，与此前版本等价。 */
   hideSpikes?: boolean
@@ -912,7 +911,7 @@ export interface PingChartContext {
 
 /*
  * 「隐藏尖峰」只作用于绘图副本：
- * - 遮蔽集合从**原始行**按线路逐条算出，与曲线平滑无关，平滑开没开都得到同一组点；
+ * - 遮蔽集合从**原始行**按线路逐条算出，与图例、选中状态无关；
  * - 被遮蔽的位置在副本里写成 null 占位，不删点，横轴与时间映射不变；
  * - `connectNulls` 仍为 false，线在遮蔽处断开，不跨过去连线；
  * - 统计值、任务卡、首页口径都不经过这里。
@@ -923,7 +922,7 @@ export function pingSpikeMasks(
 ): Map<ProbeTarget, boolean[]> {
   return new Map(tasks.map((task) => [
     task.target,
-    detectIsolatedSpikes(rows.map((row) => ({
+    detectSpikes(rows.map((row) => ({
       timestamp: row.timestamp,
       value: probeNumber(row.point?.latency[task.target]),
     }))),
@@ -963,8 +962,8 @@ export function pingChartOption(context: PingChartContext) {
       data: rows.map((row, rowIndex) => (
         mask?.[rowIndex] === true ? null : probeNumber(row.point?.latency[task.target])
       )),
-      // 只改变绘制曲率，数值不变；上游开启时还会用 EWMA 改写数值，这里不做。
-      smooth: context.smooth ? 0.6 : 0.1,
+      // 折线曲率固定，数值不变；上游的「平滑峰值」会用 EWMA 改写数值，本主题不做。
+      smooth: 0.1,
       showSymbol: false,
       connectNulls: false,
       lineStyle: { width: 1.5, color: task.color, cap: 'round' as const, type: lineType },

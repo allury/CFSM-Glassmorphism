@@ -12,13 +12,14 @@ import type { HistoryPoint, ProbeTarget } from '@/types/cfsm'
 import { getChartSeriesPalette, getPingChartThemeColors } from '@/utils/chart-palette'
 
 /*
- * 延迟大图的四种开关组合（曲线平滑 × 隐藏尖峰）。
+ * 延迟大图「隐藏尖峰」开关的两种状态。v1.1.8 删除了只改折线曲率的「曲线平滑」开关，
+ * 曲率固定为上游未开启时的 0.1。
  *
  * 这里驱动的是真实的图表选项构建器，不是字符串断言：
  * - 遮蔽只落在绘图副本，数组长度、时间映射、未遮蔽的数值逐点不变；
- * - 平滑不参与检测，两种开启顺序得到同一张图；
+ * - 反复开关后恢复完整；
  * - 纵轴不写死上下限，遮蔽后的数据里不再含尖峰值，范围随之收缩；
- * - 统计从原始数据算，四种组合下逐项相等；
+ * - 统计从原始数据算，两种状态下逐项相等；
  * - 按钮计数只数实际画出来的线；Tooltip 在被隐藏的时刻照实显示原值并标明「已隐藏」。
  */
 
@@ -90,7 +91,6 @@ function base(overrides: Partial<PingChartContext> = {}): PingChartContext {
     theme: getPingChartThemeColors(false),
     tasks,
     selected: tasks,
-    smooth: false,
     accessible: false,
     spikeMasks: pingSpikeMasks(rows, tasks),
     ...overrides,
@@ -102,10 +102,8 @@ function seriesOf(context: PingChartContext): LooseSeries[] {
 }
 
 const states = [
-  { name: '平滑关 · 隐藏关', smooth: false, hideSpikes: false },
-  { name: '平滑开 · 隐藏关', smooth: true, hideSpikes: false },
-  { name: '平滑关 · 隐藏开', smooth: false, hideSpikes: true },
-  { name: '平滑开 · 隐藏开', smooth: true, hideSpikes: true },
+  { name: '隐藏关', hideSpikes: false },
+  { name: '隐藏开', hideSpikes: true },
 ] as const
 
 describe('遮蔽集合', () => {
@@ -119,7 +117,7 @@ describe('遮蔽集合', () => {
     for (const task of tasks) expect(masks.get(task.target)).toHaveLength(rows.length)
   })
 
-  it('与曲线平滑无关：同一份原始行永远得到同一组点', () => {
+  it('同一份原始行永远得到同一组点', () => {
     expect(pingSpikeMasks(rows, tasks)).toEqual(pingSpikeMasks(structuredClone(rows), tasks))
   })
 
@@ -131,7 +129,7 @@ describe('遮蔽集合', () => {
   })
 })
 
-describe('四种组合的绘图数组', () => {
+describe('两种状态的绘图数组', () => {
   const raw = seriesOf(base())
 
   for (const state of states) {
@@ -142,13 +140,12 @@ describe('四种组合的绘图数组', () => {
       for (const item of series) {
         expect(item.data).toHaveLength(rows.length)
         expect(item.connectNulls).toBe(false)
-        expect(item.smooth).toBe(state.smooth ? 0.6 : 0.1)
+          expect(item.smooth).toBe(0.1)
       }
     })
   }
 
-  it('隐藏关闭时与此前版本逐点相同（平滑开关不改数值）', () => {
-    expect(seriesOf(base({ smooth: true })).map((item) => item.data)).toEqual(raw.map((item) => item.data))
+  it('隐藏关闭时与此前版本逐点相同', () => {
     expect(seriesOf(base({ hideSpikes: false })).map((item) => item.data)).toEqual(raw.map((item) => item.data))
     // 与不传遮蔽参数的旧调用方式完全一致。
     expect(seriesOf(base({ spikeMasks: undefined })).map((item) => item.data)).toEqual(raw.map((item) => item.data))
@@ -172,10 +169,7 @@ describe('四种组合的绘图数组', () => {
     expect(raw[2]?.data[3]).toBeNull()
   })
 
-  it('两种开启顺序得到同一张图，反复开关后恢复完整', () => {
-    const smoothFirst = pingChartOption(base({ smooth: true, hideSpikes: true }))
-    const hideFirst = pingChartOption(base({ hideSpikes: true, smooth: true }))
-    expect(JSON.stringify(smoothFirst.series)).toBe(JSON.stringify(hideFirst.series))
+  it('反复开关后恢复完整', () => {
     for (let round = 0; round < 3; round += 1) {
       seriesOf(base({ hideSpikes: true }))
       expect(seriesOf(base({ hideSpikes: false })).map((item) => item.data)).toEqual(raw.map((item) => item.data))
@@ -199,7 +193,7 @@ describe('四种组合的绘图数组', () => {
 })
 
 describe('统计不受开关影响', () => {
-  it('四种组合下任务卡统计逐项相等，且与原始数据一致', () => {
+  it('两种状态下任务卡统计逐项相等，且与原始数据一致', () => {
     const reference = tasks.map((task) => probeStats(points, task.target))
     for (const state of states) {
       seriesOf(base(state))
@@ -221,7 +215,7 @@ describe('按钮计数', () => {
     expect(visibleSpikeCount([], masks)).toBe(0)
   })
 
-  it('没有命中时为 0；平滑与色觉模式不影响计数', () => {
+  it('没有命中时为 0；色觉模式不影响计数', () => {
     expect(visibleSpikeCount(tasks.filter((task) => task.target === 'cu'), masks)).toBe(0)
     // 计数只依赖遮蔽集合与可见线路，与绘图选项的其它开关无关。
     for (const state of states) {
@@ -285,8 +279,7 @@ describe('图例与 Tooltip', () => {
 describe('组件接线', () => {
   const source = readFileSync(new URL('../src/components/detail/PingChart.vue', import.meta.url), 'utf8')
 
-  it('两个独立开关加一个共用说明入口，删除了只解释平滑的旧入口', () => {
-    expect(source).toContain('曲线平滑')
+  it('只剩「隐藏尖峰」一个开关，说明入口保留', () => {
     expect(source).toContain('隐藏尖峰')
     expect(source).toContain('aria-label="图表显示说明"')
     expect(source).not.toContain('SMOOTH_HINT')
@@ -295,14 +288,21 @@ describe('组件接线', () => {
     expect(source).not.toMatch(/class="ping-task__info" aria-hidden="true"/)
   })
 
-  it('说明三段文字与任务书一致', () => {
-    expect(source).toContain('只调整线条弯曲程度，不修改采样值。')
-    expect(source).toContain('仅在图上隐藏识别出的孤立高值，隐藏处保留断口；关闭后恢复显示。')
-    expect(source).toContain('先隐藏尖峰，再平滑剩余连续线段。原始数据和统计结果均不变。')
+  it('v1.1.8 删除了「曲线平滑」：按钮、状态与传参都不再存在', () => {
+    // 注释里仍会提到上游的「平滑峰值」，因此只断言按钮文案与状态本身。
+    expect(source).not.toContain('>\n              曲线平滑\n            </button>')
+    expect(source).not.toMatch(/const smooth = ref/)
+    expect(source).not.toMatch(/smooth: smooth\.value/)
+    expect(source).not.toMatch(/aria-pressed="smooth"/)
   })
 
-  it('两个开关初始都关闭，且不写入任何持久化存储', () => {
-    expect(source).toMatch(/const smooth = ref\(false\)/)
+  it('说明文字与当前行为一致', () => {
+    expect(source).toContain('仅在图上隐藏识别出的短时高值，隐藏处保留断口；关闭后恢复显示。')
+    expect(source).toContain('持续高延迟、阶跃抬升与缓慢爬升照常显示。原始数据和统计结果均不变。')
+    expect(source).not.toContain('只调整线条弯曲程度，不修改采样值。')
+  })
+
+  it('开关初始关闭，且不写入任何持久化存储', () => {
     expect(source).toMatch(/const hideSpikes = ref\(false\)/)
     expect(source).not.toMatch(/localStorage|theme\.set|setLocalSetting/)
   })

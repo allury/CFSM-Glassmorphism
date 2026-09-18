@@ -4,24 +4,32 @@
  * 这不是异常证明：被命中的点仍是节点真实上报的数值，只是在**绘图副本**里被遮蔽，
  * 让常态区间在纵轴上舒展开。原始数据、统计值、首页口径一概不经过这里。
  *
- * 首版只处理一种形态——**两侧都有充分证据的单个孤立高点**。连续多个高点、持续高延迟、
- * 阶跃抬升、缓慢爬升一律保留：宁可让一个尖峰留在图上，也不能把一段真实故障画成平稳。
+ * 处理的形态是**两侧都有正常基线证据的短时高值**：可以是单个孤立高点，也可以是
+ * 连续若干个采样的短促高值段。持续高延迟、阶跃抬升、缓慢爬升一律保留：宁可让一个
+ * 尖峰留在图上，也不能把一段真实故障画成平稳。
  *
  * 规则逐条：
  * 1. 按线路独立判断，调用方每条线单独调用；不同线路之间没有公共阈值。
- * 2. 从候选点向左、向右各取最多 `neighbors` 个有效样本作为邻域。遇到没有数值的格子
- *    （超时、未配置、缺列、离线缺口标记）立即停止，时间差超过「中位采样间隔 × gapFactor」
- *    也立即停止——不跨缺口借证据，也不拿固定索引跨度冒充固定时间窗口。
- * 3. 任一侧有效邻居少于 `minPerSide` 个，证据不足，保留。序列首尾因此天然保留。
- * 4. 以两侧邻居合并后的中位数为基线，MAD 估计噪声；噪声有下限，避免完全平稳的线路
+ * 2. **第一遍**：按原始邻域标出「疑似高点」。取候选点左右各最多 `neighbors` 个有效样本，
+ *    遇到没有数值的格子（超时、未配置、缺列、离线缺口标记）立即停止，时间差超过
+ *    「中位采样间隔 × gapFactor」也立即停止——不跨缺口借证据。任一侧不足 `minPerSide`
+ *    个就不算疑似。疑似只用于第二遍避开它们，本身不决定遮蔽。
+ * 3. **第二遍**：把相邻的疑似高点合并成「高值段」（中间不能夹缺口或超出时间步长）。
+ *    段长超过 `maxRunPoints` 个采样（即连续三个及以上），或跨越时长超过 `maxRunMs`，
+ *    都按持续高延迟保留。
+ *    单点不受时长限制：那是这条线在该时间分辨率下能表达的最短事件。
+ * 4. 为高值段取参考邻域时**跳过其它疑似高点**，每侧最多跳过 `maxSkip` 个，仍然在缺口
+ *    与时间步长处停止。这样近旁的另一处尖峰不会把某一侧的中位数抬高，导致误判为阶跃。
+ * 5. 任一侧安静邻居少于 `minPerSide` 个，证据不足，保留。序列首尾因此天然保留。
+ * 6. 以两侧安静邻居合并后的中位数为基线，MAD 估计噪声；噪声有下限，避免完全平稳的线路
  *    （MAD 为 0）因为一两毫秒抖动就被判高。
- * 5. 候选点要**同时**满足三项才算「高」：比基线高出至少 `minRiseMs` 毫秒；
+ * 7. 段内**每个**采样都要同时满足三项才算「高」：比基线高出至少 `minRiseMs` 毫秒；
  *    至少是基线的 `1 + minRiseRatio` 倍；高出量至少是噪声的 `madScale` 倍。
- * 6. 紧邻的左右两个样本本身不能也「高」——相邻多个高点属于平台，不隐藏。
- * 7. 左右两侧各自的中位数必须相近，否则是阶跃或爬升，不隐藏。
- * 8. 兜底：若一条原本有数据的线会被全部遮蔽，整条线回退为完整显示。
+ * 8. 左右两侧各自的中位数必须相近，否则是阶跃或爬升，不隐藏。
+ * 9. 兜底：若一条原本有数据的线会被全部遮蔽，整条线回退为完整显示。
  *
- * 阈值集中在 `SPIKE_PARAMS`，不是从截图里猜的；固定样本见 `tests/spike-mask.test.ts`。
+ * 阈值集中在 `SPIKE_PARAMS`，不是从截图里猜的；固定样本与线上真实样本见
+ * `tests/spike-mask.test.ts`。
  */
 
 export interface SpikeSample {
@@ -50,6 +58,12 @@ export interface SpikeParams {
   noiseFloorRatio: number
   /** 左右两侧中位数允许的差距：max(minRiseMs, 基线) × 该比例。 */
   sideAgreement: number
+  /** 一段高值最多包含几个连续采样，超过按持续高延迟保留（连续三个及以上即保留）。 */
+  maxRunPoints: number
+  /** 多点高值段允许跨越的最长真实时长（毫秒），超过按持续高延迟保留。 */
+  maxRunMs: number
+  /** 取参考邻域时，每侧最多跳过几个疑似高点。 */
+  maxSkip: number
 }
 
 export const SPIKE_PARAMS: Readonly<SpikeParams> = Object.freeze({
@@ -62,6 +76,9 @@ export const SPIKE_PARAMS: Readonly<SpikeParams> = Object.freeze({
   noiseFloorMs: 2,
   noiseFloorRatio: 0.05,
   sideAgreement: 0.5,
+  maxRunPoints: 2,
+  maxRunMs: 600_000,
+  maxSkip: 3,
 })
 
 /** MAD 换算为正态分布下的标准差估计。 */
@@ -79,11 +96,18 @@ function isNumber(value: number | null): value is number {
   return value !== null && Number.isFinite(value)
 }
 
+interface Neighbourhood {
+  left: number[]
+  right: number[]
+  baseline: number
+  noise: number
+}
+
 /**
  * 返回与输入等长的布尔数组：true 表示这一格应在绘图时被遮蔽。
  * 输入不会被修改；没有数值的格子永远是 false。
  */
-export function detectIsolatedSpikes(
+export function detectSpikes(
   samples: readonly SpikeSample[],
   params: Readonly<SpikeParams> = SPIKE_PARAMS,
 ): boolean[] {
@@ -103,46 +127,93 @@ export function detectIsolatedSpikes(
   }
   const maxStep = deltas.length > 0 ? median(deltas) * params.gapFactor : Number.POSITIVE_INFINITY
 
-  function side(from: number, origin: number, direction: -1 | 1): number[] {
+  /**
+   * 从 `from` 向一侧收集参考值。遇到缺口或超出时间步长立即停止；
+   * `skip` 里的下标是疑似高点，最多跳过 `maxSkip` 个，跳过的点不进入参考值。
+   */
+  function side(from: number, origin: number, direction: -1 | 1, skip: ReadonlySet<number>): number[] {
     const collected: number[] = []
     let previous = origin
+    let skipped = 0
     for (let index = from + direction; index >= 0 && index < samples.length; index += direction) {
       if (collected.length >= params.neighbors) break
       const sample = samples[index]
       if (!sample || !isNumber(sample.value)) break
       if (Math.abs(sample.timestamp - previous) > maxStep) break
-      collected.push(sample.value)
       previous = sample.timestamp
+      if (skip.has(index)) {
+        skipped += 1
+        if (skipped > params.maxSkip) break
+        continue
+      }
+      collected.push(sample.value)
     }
     return collected
   }
 
-  for (const candidate of valid) {
-    const left = side(candidate.index, candidate.timestamp, -1)
-    const right = side(candidate.index, candidate.timestamp, 1)
-    const nearLeft = left[0]
-    const nearRight = right[0]
-    if (left.length < params.minPerSide || right.length < params.minPerSide) continue
-    if (nearLeft === undefined || nearRight === undefined) continue
-
+  function neighbourhood(
+    firstIndex: number,
+    lastIndex: number,
+    firstTimestamp: number,
+    lastTimestamp: number,
+    skip: ReadonlySet<number>,
+  ): Neighbourhood | null {
+    const left = side(firstIndex, firstTimestamp, -1, skip)
+    const right = side(lastIndex, lastTimestamp, 1, skip)
+    if (left.length < params.minPerSide || right.length < params.minPerSide) return null
     const pool = [...left, ...right]
     const baseline = median(pool)
     const mad = median(pool.map((item) => Math.abs(item - baseline)))
     const noise = Math.max(MAD_TO_SIGMA * mad, params.noiseFloorMs, baseline * params.noiseFloorRatio)
-    const elevated = (value: number): boolean => (
-      value - baseline >= params.minRiseMs
-      && value >= baseline * (1 + params.minRiseRatio)
-      && value - baseline >= params.madScale * noise
-    )
+    return { left, right, baseline, noise }
+  }
 
-    if (!elevated(candidate.value)) continue
-    // 紧邻两侧也高：属于平台或相邻多个高点，首版保留。
-    if (elevated(nearLeft) || elevated(nearRight)) continue
+  function elevated(value: number, context: Neighbourhood): boolean {
+    return value - context.baseline >= params.minRiseMs
+      && value >= context.baseline * (1 + params.minRiseRatio)
+      && value - context.baseline >= params.madScale * context.noise
+  }
+
+  // 第一遍：按原始邻域标出疑似高点，只用于第二遍避开它们。
+  const empty: ReadonlySet<number> = new Set()
+  const suspects = new Set<number>()
+  for (const candidate of valid) {
+    const context = neighbourhood(candidate.index, candidate.index, candidate.timestamp, candidate.timestamp, empty)
+    if (context && elevated(candidate.value, context)) suspects.add(candidate.index)
+  }
+
+  // 第二遍：把相邻的疑似高点合成段，用跳过疑似点后的安静邻域重新判定。
+  for (let position = 0; position < valid.length; position += 1) {
+    const start = valid[position]
+    if (!start || !suspects.has(start.index)) continue
+
+    const run = [start]
+    while (position + 1 < valid.length) {
+      const next = valid[position + 1]
+      const previous = run[run.length - 1]
+      if (!next || !previous || !suspects.has(next.index)) break
+      // 段内不能夹着缺口：相邻疑似点之间必须是连续有效样本，且时间步长正常。
+      if (next.index !== previous.index + 1) break
+      if (next.timestamp - previous.timestamp > maxStep) break
+      run.push(next)
+      position += 1
+    }
+
+    const first = run[0]
+    const last = run[run.length - 1]
+    if (!first || !last) continue
+    if (run.length > params.maxRunPoints) continue
+    // 多点段还要看真实跨度：采样间隔大的窗口里，几个点就可能是很长一段时间。
+    if (run.length > 1 && last.timestamp - first.timestamp > params.maxRunMs) continue
+
+    const context = neighbourhood(first.index, last.index, first.timestamp, last.timestamp, suspects)
+    if (!context) continue
+    if (!run.every((item) => elevated(item.value, context))) continue
     // 两侧基线不一致：阶跃或爬升，保留。
-    const tolerance = Math.max(params.minRiseMs, baseline) * params.sideAgreement
-    if (Math.abs(median(left) - median(right)) > tolerance) continue
+    const tolerance = Math.max(params.minRiseMs, context.baseline) * params.sideAgreement
+    if (Math.abs(median(context.left) - median(context.right)) > tolerance) continue
 
-    mask[candidate.index] = true
+    for (const item of run) mask[item.index] = true
   }
 
   // 兜底：不能让一条原本有数据的线整条消失。

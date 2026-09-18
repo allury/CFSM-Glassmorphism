@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { countMasked, detectIsolatedSpikes, SPIKE_PARAMS, type SpikeSample } from '@/domain/spike-mask'
+import { countMasked, detectSpikes, SPIKE_PARAMS, type SpikeSample } from '@/domain/spike-mask'
 
 /*
  * 「隐藏尖峰」检测的固定样本。
  *
- * 首版只遮蔽「两侧都有充分证据的单个孤立高点」。以下每一组都对应任务书里点名的
- * 形态：该隐藏的只隐藏那一个点；平台、阶跃、爬升、相邻多点、首尾、缺口旁、
- * 时间不规则、稳定高延迟一律保留。
+ * 遮蔽范围是「两侧都有正常基线证据的短时高值」：单点，或不超过
+ * `maxRunPoints` 个采样、且真实跨度不超过 `maxRunMs` 的连续高值段。
+ * 平台、阶跃、爬升、首尾、缺口旁、时间不规则、稳定高延迟一律保留。
+ *
+ * v1.1.7 只处理单点，因此线上出现过两种漏判，本文件末尾用真实采样钉住：
+ * 相邻两个高点整段保留；以及近旁有尖峰时，某一侧中位数被抬高，孤立高点被
+ * 误判成阶跃而保留。两者都会把纵轴继续撑在很高的位置。
  */
 
 const START = 1_700_000_000_000
@@ -18,7 +22,7 @@ function series(values: ReadonlyArray<number | null>, step = STEP): SpikeSample[
 }
 
 function hiddenIndexes(values: ReadonlyArray<number | null>): number[] {
-  return detectIsolatedSpikes(series(values)).flatMap((hidden, index) => (hidden ? [index] : []))
+  return detectSpikes(series(values)).flatMap((hidden, index) => (hidden ? [index] : []))
 }
 
 /** 约 200ms、带正常小抖动的平稳线路。 */
@@ -42,6 +46,17 @@ describe('应当隐藏的形态', () => {
     const values = [0, 0, 0, 0, 180, 0, 0, 0, 0]
     expect(hiddenIndexes(values)).toEqual([4])
   })
+
+  it('相邻两个高点整段隐藏', () => {
+    // v1.1.7 这里整段保留，纵轴仍被 1200 撑住；现在两点作为一段短时高值一起隐藏。
+    expect(hiddenIndexes([200, 201, 199, 202, 200, 1200, 1180, 201, 199, 203, 200, 202])).toEqual([5, 6])
+  })
+
+  it('近旁还有尖峰时，参考邻域跳过它们，孤立高点照常隐藏', () => {
+    // 左边 1219 / 1217 会把左侧中位数抬到 700 以上，v1.1.7 因此把 701 判成阶跃而保留。
+    const values = [185, 185, 1219, 1217, 220, 184, 701, 175, 181, 202, 186, 190]
+    expect(hiddenIndexes(values)).toEqual([2, 3, 6])
+  })
 })
 
 describe('应当保留的形态', () => {
@@ -58,12 +73,25 @@ describe('应当保留的形态', () => {
     expect(hiddenIndexes(high)).toEqual([])
   })
 
-  it('连续高平台不隐藏', () => {
+  it('连续高平台不隐藏：三个采样起就按持续高延迟保留', () => {
+    expect(hiddenIndexes([200, 201, 199, 202, 1200, 1210, 1195, 200, 198, 203, 201, 199])).toEqual([])
     expect(hiddenIndexes([200, 201, 199, 202, 1200, 1210, 1195, 1205, 200, 198, 203, 201])).toEqual([])
   })
 
-  it('相邻两个高点按首版保守规则都保留', () => {
-    expect(hiddenIndexes([200, 201, 199, 202, 200, 1200, 1180, 201, 199, 203, 200, 202])).toEqual([])
+  it('采样间隔很大时，多点高值段按真实时长保留', () => {
+    // 15 分钟一个采样：两个点就跨了 15 分钟，超过允许的最长跨度，按持续高延迟保留。
+    const values = [200, 201, 199, 202, 200, 1200, 1180, 201, 199, 203, 200, 202]
+    expect(detectSpikes(series(values, 15 * 60_000)).some(Boolean)).toBe(false)
+    // 同样的间隔下，单点仍然隐藏：那是这条线在该分辨率下能表达的最短事件。
+    const single = [...CALM]
+    single[6] = 1200
+    expect(detectSpikes(series(single, 15 * 60_000)).flatMap((hidden, index) => (hidden ? [index] : []))).toEqual([6])
+  })
+
+  it('两侧都被尖峰占满时不硬凑证据：跳过的高点超过上限就保留', () => {
+    // 高点与安静区之间隔着 4 个高点，超过每侧允许跳过的数量。
+    const values = [200, 201, 199, 900, 910, 905, 915, 1600, 905, 915, 900, 910, 201, 199, 202]
+    expect(hiddenIndexes(values)).toEqual([])
   })
 
   it('阶跃抬升不隐藏', () => {
@@ -127,7 +155,7 @@ describe('应当保留的形态', () => {
       { timestamp: START + 15 * STEP, value: 201 },
       { timestamp: START + 16 * STEP, value: 199 },
     ]
-    expect(detectIsolatedSpikes(samples)).toEqual(samples.map(() => false))
+    expect(detectSpikes(samples)).toEqual(samples.map(() => false))
   })
 
   it('完全平稳（MAD 为 0）时一两毫秒的偏差不算高点', () => {
@@ -145,7 +173,7 @@ describe('缺失值与数据语义', () => {
     const values: Array<number | null> = [...CALM]
     values[2] = null
     values[9] = null
-    const mask = detectIsolatedSpikes(series(values))
+    const mask = detectSpikes(series(values))
     expect(mask[2]).toBe(false)
     expect(mask[9]).toBe(false)
   })
@@ -155,7 +183,7 @@ describe('缺失值与数据语义', () => {
     values[6] = 1200
     const input = series(values)
     const snapshot = structuredClone(input)
-    const mask = detectIsolatedSpikes(input)
+    const mask = detectSpikes(input)
     expect(mask).toHaveLength(input.length)
     expect(input).toEqual(snapshot)
   })
@@ -164,16 +192,16 @@ describe('缺失值与数据语义', () => {
     const values = [...CALM]
     values[6] = 1200
     const input = series(values)
-    expect(detectIsolatedSpikes(input)).toEqual(detectIsolatedSpikes(structuredClone(input)))
+    expect(detectSpikes(input)).toEqual(detectSpikes(structuredClone(input)))
   })
 
   it('一条原本有数据的线不会被整条遮蔽', () => {
     // 首尾样本一侧没有邻居，结构上不可能被遮蔽；这里再用交替高低的极端序列确认。
     const zigzag = Array.from({ length: 21 }, (_, index) => (index % 2 === 0 ? 200 : 1200))
-    const mask = detectIsolatedSpikes(series(zigzag))
+    const mask = detectSpikes(series(zigzag))
     expect(mask.some((hidden) => !hidden)).toBe(true)
     for (const values of [[200, 1200, 200, 1200, 200], CALM, [0, 0, 0, 0, 0]]) {
-      expect(detectIsolatedSpikes(series(values)).every(Boolean)).toBe(false)
+      expect(detectSpikes(series(values)).every(Boolean)).toBe(false)
     }
   })
 
@@ -197,6 +225,35 @@ describe('参数集中定义', () => {
       noiseFloorMs: 2,
       noiseFloorRatio: 0.05,
       sideAgreement: 0.5,
+      maxRunPoints: 2,
+      maxRunMs: 600_000,
+      maxSkip: 3,
     })
+  })
+})
+
+/*
+ * 线上真实采样。两组都取自 sr.706632.xyz 的 `/api/history/all`，2026-09-17 至 18 读取，
+ * 只截取高点前后的片段，数值原样保留。它们是 v1.1.7 漏判的两种形态。
+ */
+describe('线上真实采样的回归', () => {
+  it('绿云 · 移动线路：相邻两个高点（584 / 604）整段隐藏', () => {
+    // 12 小时窗口，采样间隔 2～4 分钟，常态约 80ms。
+    const values = [81, 81, 79, 79, 83, 81, 78, 98, 80, 584, 604, 81, 91, 100, 80, 91, 81, 80, 90, 81]
+    const samples: SpikeSample[] = values.map((value, index) => ({ timestamp: START + index * 3 * 60_000, value }))
+    const mask = detectSpikes(samples)
+    expect(mask.flatMap((hidden, index) => (hidden ? [index] : []))).toEqual([9, 10])
+    const visible = values.filter((_, index) => !mask[index])
+    expect(Math.max(...visible)).toBe(100)
+  })
+
+  it('NETCUP · 电信线路：双高点与近旁的 701ms 单点一并隐藏', () => {
+    // 6 小时窗口，采样间隔约 2 分钟，常态约 190ms。
+    const values = [190, 182, 188, 195, 185, 185, 1219, 1217, 220, 184, 701, 175, 1232, 181, 202, 186, 190, 184]
+    const samples: SpikeSample[] = values.map((value, index) => ({ timestamp: START + index * 2 * 60_000, value }))
+    const mask = detectSpikes(samples)
+    expect(mask.flatMap((hidden, index) => (hidden ? [index] : []))).toEqual([6, 7, 10, 12])
+    const visible = values.filter((_, index) => !mask[index])
+    expect(Math.max(...visible)).toBe(220)
   })
 })

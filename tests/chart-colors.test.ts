@@ -290,7 +290,7 @@ describe('色觉友好模式', () => {
   it('延迟大图按选中顺序轮换上游 ACCESSIBLE_LINE_TYPES，普通模式全是实线', () => {
     expect([...ACCESSIBLE_LINE_TYPES]).toEqual(['solid', 'dashed', 'dotted'])
     const tasks = pingTasks(true)
-    const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: false }
+    const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks }
     expect(seriesOf(pingChartOption({ ...base, accessible: true })).map((item) => item.lineStyle.type))
       .toEqual(['solid', 'dashed', 'dotted', 'solid', 'dashed'])
     expect(seriesOf(pingChartOption({ ...base, accessible: false })).every((item) => item.lineStyle.type === 'solid')).toBe(true)
@@ -316,7 +316,7 @@ describe('数据语义：不补点、不插值、不写 0', () => {
       ...Object.values(inlineOptions(ctx)),
       metricSeriesChartOption(trafficSeries(ctx), ctx.theme),
       metricSeriesChartOption(probeSeries(ctx.rows, PROBES, 'packetLoss', ctx.series, false), ctx.theme, true),
-      pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: true, accessible: false }),
+      pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false }),
     ]
     for (const option of all) {
       for (const item of seriesOf(option)) expect(item.connectNulls, item.name).toBe(false)
@@ -369,20 +369,16 @@ describe('数据语义：不补点、不插值、不写 0', () => {
     expect(seriesOf(memoryChartOption(context(false, false, noSwap))).map((item) => item.name)).toEqual(['RAM', 'RAM 总量'])
   })
 
-  it('「曲线平滑」只改变绘制曲率，数值一点不改', () => {
+  it('折线曲率固定为上游未开启平滑时的取值（v1.1.8 删除了「曲线平滑」开关）', () => {
     const tasks = pingTasks()
-    const base = { rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false }
-    const off = seriesOf(pingChartOption({ ...base, smooth: false }))
-    const on = seriesOf(pingChartOption({ ...base, smooth: true }))
-    expect(off.map((item) => item.smooth)).toEqual(off.map(() => 0.1))
-    expect(on.map((item) => item.smooth)).toEqual(on.map(() => 0.6))
-    expect(on.map((item) => item.data)).toEqual(off.map((item) => item.data))
+    const series = seriesOf(pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false }))
+    expect(series.map((item) => item.smooth)).toEqual(series.map(() => 0.1))
   })
 
   it('tooltip 里的节点侧文字先转义再拼进 HTML', () => {
     const label = '<img src=x onerror=alert(1)>'
     const tasks = [{ target: 'ct' as const, label, color: '#FF6B6B' }]
-    const option = pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, smooth: false, accessible: false })
+    const option = pingChartOption({ rows, hours: 1, theme: getPingChartThemeColors(false), tasks, selected: tasks, accessible: false })
     const html = option.tooltip.formatter([{ dataIndex: 0, seriesName: label, value: 20 }])
     expect(html).toContain('&lt;img')
     expect(html).not.toContain('<img')

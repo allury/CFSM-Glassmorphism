@@ -40,7 +40,7 @@ import '@/utils/echarts'
 /*
  * 移植自 Komari `components/PingChart.vue`（bf83765）：左侧时间范围、右侧全选 / 全不选，
  * 下面是可点击开关的任务卡（平均延迟 · 丢包率 · 波动率，信息按钮展开统计），
- * 然后是「曲线平滑」开关与 320px 的延迟大图。
+ * 然后是「隐藏尖峰」开关与 320px 的延迟大图。
  *
  * 上游的任务来自后端 Ping 任务，CFSM 对应的是旧四线路与 Node 1–4 这 8 个探测目标。
  *
@@ -51,9 +51,9 @@ import '@/utils/echarts'
 const PING_RANGES: readonly HistoryHours[] = HISTORY_HOURS
 /*
  * 上游同名开关叫「平滑峰值」，而它真的会削峰：先把偏离邻域均值超过 30% 的点置空，
- * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题把这两件事拆成两个互不排斥的开关：
- * 「曲线平滑」只改折线曲率；「隐藏尖峰」只在绘图副本里遮蔽孤立高点、原位留断口。
- * 两者都不改写任何采样值，统计始终来自原始数据。说明合并成一个入口放在两个开关后面。
+ * 再用 EWMA 重写整条序列并用运行值填补空洞。本主题只保留「隐藏尖峰」：在绘图副本里
+ * 遮蔽短时高值、原位留断口，不改写任何采样值，统计始终来自原始数据。
+ * v1.1.8 起不再提供只改折线曲率的「曲线平滑」开关，曲率固定为上游未开启时的取值。
  */
 
 interface PingTask extends PingTaskLine {
@@ -76,8 +76,7 @@ const rows = computed(() => buildChartRows(pingHistoryPoints.value))
 const loading = computed(() => pingHistoryState.value === 'loading')
 const errorCopy = computed(() => issueCopy(pingHistoryIssue.value, 'history'))
 const selected = ref<ProbeTarget[]>([])
-const smooth = ref(false)
-/* 两个开关互不排斥，状态只活在本组件的生命周期里；实时推送、主题切换与重绘都不会重置它们。 */
+/* 开关状态只活在本组件的生命周期里；实时推送、主题切换与重绘都不会重置它。 */
 const hideSpikes = ref(false)
 /* 图例的显示状态。显式交给图表，按钮上的计数才能与画出来的线保持一致。 */
 const legendSelected = ref<Record<string, boolean>>({})
@@ -146,8 +145,8 @@ function hideAll(): void {
 }
 
 /*
- * 遮蔽集合对**全部**任务从原始行算出：勾选或取消某条线不会改变其它线的结果，
- * 平滑开关也不参与。计数只数当前实际画出来的线。
+ * 遮蔽集合对**全部**任务从原始行算出：勾选或取消某条线不会改变其它线的结果。
+ * 计数只数当前实际画出来的线。
  */
 const spikeMasks = computed(() => pingSpikeMasks(rows.value, tasks.value))
 const spikeCount = computed(() => visibleSpikeCount(selectedTasks.value, spikeMasks.value, legendSelected.value))
@@ -169,7 +168,6 @@ const option = computed(() => pingChartOption({
   theme: getPingChartThemeColors(theme.resolvedTheme === 'dark'),
   tasks: tasks.value,
   selected: selectedTasks.value,
-  smooth: smooth.value,
   accessible: accessible.value,
   hideSpikes: hideSpikes.value,
   spikeMasks: spikeMasks.value,
@@ -341,16 +339,7 @@ function retry(): void {
         </div>
 
         <div class="ping-chart__options">
-          <div class="ping-chart__smooth">
-            <button
-              type="button"
-              class="ping-chart__button"
-              :class="{ 'is-active': smooth }"
-              :aria-pressed="smooth"
-              @click="smooth = !smooth"
-            >
-              曲线平滑
-            </button>
+          <div class="ping-chart__toggles">
             <button
               type="button"
               class="ping-chart__button"
@@ -388,12 +377,10 @@ function retry(): void {
                   >
                     <strong class="ping-chart-help__title">图表显示说明</strong>
                     <dl class="ping-chart-help__list">
-                      <dt>曲线平滑</dt>
-                      <dd>只调整线条弯曲程度，不修改采样值。</dd>
                       <dt>隐藏尖峰</dt>
-                      <dd>仅在图上隐藏识别出的孤立高值，隐藏处保留断口；关闭后恢复显示。</dd>
-                      <dt>同时开启</dt>
-                      <dd>先隐藏尖峰，再平滑剩余连续线段。原始数据和统计结果均不变。</dd>
+                      <dd>仅在图上隐藏识别出的短时高值，隐藏处保留断口；关闭后恢复显示。</dd>
+                      <dt>不会隐藏</dt>
+                      <dd>持续高延迟、阶跃抬升与缓慢爬升照常显示。原始数据和统计结果均不变。</dd>
                     </dl>
                     <TooltipArrow class="app-tooltip__arrow" :width="10" :height="5" />
                   </TooltipContent>
