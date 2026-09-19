@@ -13,14 +13,16 @@
  * 2. **第一遍**：按原始邻域标出「疑似高点」。取候选点左右各最多 `neighbors` 个有效样本，
  *    遇到没有数值的格子（超时、未配置、缺列、离线缺口标记）立即停止，时间差超过
  *    「中位采样间隔 × gapFactor」也立即停止——不跨缺口借证据。任一侧不足 `minPerSide`
- *    个就不算疑似。疑似只用于第二遍避开它们，本身不决定遮蔽。
+ *    个通常不算疑似；若不足是因为已经走到所选窗口边缘，则允许用边缘侧现有的一个正常点
+ *    与另一侧的充分证据交叉核对。疑似只用于第二遍避开它们，本身不决定遮蔽。
  * 3. **第二遍**：把相邻的疑似高点合并成「高值段」（中间不能夹缺口或超出时间步长）。
  *    段长超过 `maxRunPoints` 个采样（即连续三个及以上），或跨越时长超过 `maxRunMs`，
  *    都按持续高延迟保留。
  *    单点不受时长限制：那是这条线在该时间分辨率下能表达的最短事件。
  * 4. 为高值段取参考邻域时**跳过其它疑似高点**，每侧最多跳过 `maxSkip` 个，仍然在缺口
  *    与时间步长处停止。这样近旁的另一处尖峰不会把某一侧的中位数抬高，导致误判为阶跃。
- * 5. 任一侧安静邻居少于 `minPerSide` 个，证据不足，保留。序列首尾因此天然保留。
+ * 5. 任一侧安静邻居少于 `minPerSide` 个，且不是所选窗口的自然边缘，证据不足，保留。
+ *    窗口最外侧可以只靠内侧证据；倒数第二 / 第二个点还必须让边缘侧现有样本与内侧基线一致。
  * 6. 以两侧安静邻居合并后的中位数为基线，MAD 估计噪声；噪声有下限，避免完全平稳的线路
  *    （MAD 为 0）因为一两毫秒抖动就被判高。
  * 7. 段内**每个**采样都要同时满足三项才算「高」：比基线高出至少 `minRiseMs` 毫秒；
@@ -107,7 +109,7 @@ interface Neighbourhood {
   right: number[]
   baseline: number
   noise: number
-  /** 两侧证据都够，可以比较左右中位数。 */
+  /** 两侧至少各有一个值，可以比较左右中位数。 */
   comparable: boolean
 }
 
@@ -173,20 +175,27 @@ export function detectSpikes(
     const leftEnough = left.values.length >= params.minPerSide
     const rightEnough = right.values.length >= params.minPerSide
     /*
-     * 一侧证据不足时，只有「高值段正好贴着窗口边界、那一侧一个采样都没有」才继续：
-     * 窗口第一个或最后一个采样上的高点此前一律保留，结果整张图的纵轴被一个边缘点顶住。
-     * 那一侧还剩一两个点时不放行——点太少，基线会被它们带偏；缺口造成的证据不足同样保留。
+     * 所选窗口边缘不是数据断档：尖峰位于倒数第二个点时，右侧通常只来得及积累一个
+     * 正常样本。旧规则把这种真实的短时高值永久判成「证据不足」，直到下一桶历史出现才
+     * 突然开始隐藏。自然边缘允许使用现有的少量样本，但另一侧仍须有充分证据；由 null、
+     * 离线占位或异常时间间隔截断的邻域仍然不放行。
      */
-    const leftIsEdge = left.atEdge && left.values.length === 0
-    const rightIsEdge = right.atEdge && right.values.length === 0
+    const leftIsEdge = left.atEdge
+    const rightIsEdge = right.atEdge
     if (!leftEnough && !(leftIsEdge && rightEnough)) return null
     if (!rightEnough && !(rightIsEdge && leftEnough)) return null
     const pool = [...left.values, ...right.values]
     const baseline = median(pool)
     const mad = median(pool.map((item) => Math.abs(item - baseline)))
     const noise = Math.max(MAD_TO_SIGMA * mad, params.noiseFloorMs, baseline * params.noiseFloorRatio)
-    // 两侧都够才比较中位数；靠边的那一侧点太少，比出来的差值没有意义。
-    return { left: left.values, right: right.values, baseline, noise, comparable: leftEnough && rightEnough }
+    // 边缘侧只要已有一个值，就必须与另一侧基线相符；这能挡住窗口边缘处的真实阶跃。
+    return {
+      left: left.values,
+      right: right.values,
+      baseline,
+      noise,
+      comparable: left.values.length > 0 && right.values.length > 0,
+    }
   }
 
   function elevated(value: number, context: Neighbourhood): boolean {

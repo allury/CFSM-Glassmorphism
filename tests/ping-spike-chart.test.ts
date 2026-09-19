@@ -121,6 +121,32 @@ describe('遮蔽集合', () => {
     expect(pingSpikeMasks(rows, tasks)).toEqual(pingSpikeMasks(structuredClone(rows), tasks))
   })
 
+  it('窗口倒数第二个真实尖峰会立即进入遮蔽计数', () => {
+    const edgeValues = [97, 95, 99, 98, 1106, 103]
+    const edgeTimestamps = [
+      1789830536279,
+      1789830596536,
+      1789830668714,
+      1789830788884,
+      1789830909080,
+      1789831029317,
+    ]
+    const edgePoints = edgeValues.map((value, index): HistoryPoint => {
+      const basePoint = point(0)
+      return {
+        ...basePoint,
+        timestamp: edgeTimestamps[index] ?? START,
+        latency: { ...basePoint.latency, cu: value },
+      }
+    })
+    const edgeRows = buildChartRows(edgePoints)
+    const edgeTasks = tasks.filter((task) => task.target === 'cu')
+    const edgeMasks = pingSpikeMasks(edgeRows, edgeTasks)
+
+    expect(edgeMasks.get('cu')?.flatMap((hidden, index) => (hidden ? [index] : []))).toEqual([4])
+    expect(visibleSpikeCount(edgeTasks, edgeMasks)).toBe(1)
+  })
+
   it('不修改原始行', () => {
     const snapshot = structuredClone(rows)
     pingSpikeMasks(rows, tasks)
