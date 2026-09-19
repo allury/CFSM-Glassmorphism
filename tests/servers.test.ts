@@ -1,4 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
+import { watch } from 'vue'
 import { describe, expect, it } from 'vitest'
 import { normalizeServer } from '@/services/cfsm/adapters'
 import { apiSource } from '@/services/cfsm/config'
@@ -54,6 +55,39 @@ describe('realtime server store', () => {
       packetLoss: { node_1: false },
     })
     expect(store.lastRealtimeAt).toBe(1_700_000_010_000)
+  })
+
+  it('applies all API-base batches in one reactive commit', () => {
+    setActivePinia(createPinia())
+    const store = useServersStore()
+    store.collections = [
+      collection('https://a.example', 10),
+      collection('https://b.example', 20),
+    ]
+    const commits: unknown[] = []
+    const stop = watch(() => store.collections, (value) => commits.push(value), { flush: 'sync' })
+
+    store.applyRealtimeBatches([
+      {
+        base: 'https://a.example',
+        samples: [{ serverId: 'same-id', timestamp: 1, data: { cpu: 11, net_out_speed: 0 } }],
+      },
+      {
+        base: 'https://b.example',
+        samples: [{ serverId: 'same-id', timestamp: 1, data: { cpu: 22, ping_node_1: null } }],
+      },
+    ], 1_700_000_010_000)
+    stop()
+
+    expect(commits).toHaveLength(1)
+    expect(store.findServer('https://a.example', 'same-id')).toMatchObject({
+      cpu: 11,
+      networkOutSpeed: 0,
+    })
+    expect(store.findServer('https://b.example', 'same-id')).toMatchObject({
+      cpu: 22,
+      latency: { node_1: null },
+    })
   })
 
   it('marks online nodes stale after five minutes without inventing new metrics', () => {

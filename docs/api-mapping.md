@@ -109,12 +109,13 @@ WebSocket 侧已确认：`latestReportUpdates[].samples[].data` 只含标量探�
 2. 连接成功后发送 `{ type: "subscribe", scope: "all", ids }`，ids 去重、校验且只属于当前 base；不发送订阅消息不会收到更新。
 3. `batchUpdate.updates[].samples[]` 从第一个有效的 `data || payload || metrics` 增量对象读取，按 sample、update、message 的真实时间戳顺序回退，再按字段合并到现有 REST 实体。缺失字段不会被覆盖为 null、0 或空值。
    旧四线路和 Node 1–4 的 Ping/Loss 都走同一 presence-based merge；payload 中明确出现的 `false`、`null`、`0` 和普通数字都会覆盖对应旧值，未出现的 probe 字段保持不变。
-4. 页面隐藏时主动关闭全部连接；重新可见时先执行 REST revalidate，再按最新节点集合恢复订阅。
-5. `frontend_ws_timeout_minutes` 只接受 0–1440 的整数。正数时限到达后停止连接，由用户明确选择继续新连接或保持暂停。
-6. 网络或策略失败采用 1–30 秒有界指数退避，并确保每条连接只有一个待执行重试；不可用期间启用单个 60 秒 REST 补偿循环。REST 503 保留已有来源快照并显示来源错误，不生成替代数据。
-7. 同源非公开站点依赖 CFSM cookie；跨源才把 JWT 放入 `token` 查询参数。Turnstile 不参与 WebSocket 验证。
-8. 详情使用 owning base 的 `subscribe=<id>`，不发送 all-scope 订阅帧、不订阅其他节点；隐藏时关闭，可见时先补单节点 REST 再恢复。失败时只有一个低频 `/api/server` 补偿循环。
-9. 详情负载图的「实时」档位逐条消费 `batchUpdate.samples[]`：样本时间兼容秒/毫秒，指标继续按 partial update 合并，每条真实样本都进入最近 10 分钟缓冲。前端不对 Angel 配置的 `wss_report_interval` 做 10 秒降采样；不同密度只按时间轴排列，超过 1 分钟没有真实样本才画断点。
+4. 首页把同一轮内分批抵达的节点消息收齐后跨 base 一次性写入 store。收集窗口由最快 `wss_report_interval` 推导且短于下一轮上报；原始样本不丢弃、不平均，首页总上行/总下行因此每轮只重算一次。
+5. 页面隐藏时主动关闭全部连接；重新可见时先执行 REST revalidate，再按最新节点集合恢复订阅。
+6. `frontend_ws_timeout_minutes` 只接受 0–1440 的整数。正数时限到达后停止连接，由用户明确选择继续新连接或保持暂停。
+7. 网络或策略失败采用 1–30 秒有界指数退避，并确保每条连接只有一个待执行重试；不可用期间启用单个 60 秒 REST 补偿循环。REST 503 保留已有来源快照并显示来源错误，不生成替代数据。
+8. 同源非公开站点依赖 CFSM cookie；跨源才把 JWT 放入 `token` 查询参数。Turnstile 不参与 WebSocket 验证。
+9. 详情使用 owning base 的 `subscribe=<id>`，并在 open 后发送同 ID scope 的订阅帧来激活实时上报；该帧的 `ids` 为空，既不使用 all-scope，也不订阅其他节点。隐藏时关闭，可见时先补单节点 REST 再恢复；失败时只有一个低频 `/api/server` 补偿循环。
+10. 详情负载图的「实时」档位先复用已加载 History 的最近 10 分钟，必要时才补取 10 分钟 History，再逐条消费 `batchUpdate.samples[]`：样本时间兼容秒/毫秒，指标继续按 partial update 合并，每条真实样本都进入最近 10 分钟缓冲。前端不对 Angel 配置的 `wss_report_interval` 做 10 秒降采样；不同密度只按时间轴排列，超过 1 分钟没有真实样本才画断点。
 
 CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 Node 1–4 probe 字段和三态语义。其 `/api/config` 示例与 `SiteConfig` 示例目前漏列 `node_1_name..node_4_name`，但同一文档明确指定这些名称，且官方公开 `/api/config` handler 与官方前端都已返回/读取它们；本主题据此按公开接口兼容，并保留旧版本 fallback。
 

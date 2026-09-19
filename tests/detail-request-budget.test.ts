@@ -117,7 +117,7 @@ function stubNetwork(delays: Record<string, number> = {}): string[] {
     if (url.includes('/api/history/all')) {
       const hours = Number(new URL(url).searchParams.get('hours'))
       // 把窗口值编进 cpu，用来断言最终留在 store 里的是哪一次响应。
-      return jsonResponse([{ timestamp: 1_700_000_000_000, cpu: hours }])
+      return jsonResponse([{ timestamp: Date.now() - 5_000, cpu: hours }])
     }
     return jsonResponse({})
   })
@@ -216,6 +216,45 @@ describe('detail page request budget', () => {
     expect(detail.historyHours).toBe(24)
     expect(detail.pingHistoryHours).toBe(24)
     expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  it('enters live mode immediately from the already loaded real history', async () => {
+    const calls = stubNetwork()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+    expect(historyCalls(calls)).toHaveLength(1)
+
+    await detail.setLiveMode(true)
+    expect(detail.liveMode).toBe(true)
+    expect(detail.livePoints).toHaveLength(1)
+    expect(detail.livePoints[0]?.cpu).toBe(1)
+    // 已有历史足以垫底时，不再额外请求同一份 10 分钟历史。
+    expect(historyCalls(calls)).toHaveLength(1)
+  })
+
+  it('re-seeds live mode when navigating to another node', async () => {
+    const calls = stubNetwork()
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+    await detail.setLiveMode(true)
+    expect(detail.livePoints).toHaveLength(1)
+
+    await detail.open('node-2', [BASE])
+    expect(detail.liveMode).toBe(true)
+    expect(detail.livePoints).toHaveLength(1)
+    expect(historyCalls(calls)).toHaveLength(2)
   })
 
   it('keeps the newest window when ranges are switched faster than the responses arrive', async () => {

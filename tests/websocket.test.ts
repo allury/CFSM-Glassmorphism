@@ -77,7 +77,7 @@ describe('CFSM WebSocket transport', () => {
     })).toThrow('valid CFSM WebSocket subscription target')
   })
 
-  it('uses the single-server URL without sending an all-scope subscription', () => {
+  it('uses the single-server URL and activates realtime reporting with a matching subscription frame', () => {
     vi.useFakeTimers()
     const sockets: FakeSocket[] = []
     const urls: string[] = []
@@ -100,9 +100,13 @@ describe('CFSM WebSocket transport', () => {
 
     expect(urls).toEqual(['wss://a.example/api/ws?subscribe=node-a'])
     sockets[0]?.open()
-    expect(sockets[0]?.sent).toEqual([])
+    expect(sockets[0]?.sent).toEqual([JSON.stringify({
+      type: 'subscribe',
+      scope: 'node-a',
+      ids: [],
+    })])
     vi.advanceTimersByTime(30_000)
-    expect(sockets[0]?.sent).toEqual([JSON.stringify({ type: 'ping' })])
+    expect(sockets[0]?.sent[1]).toBe(JSON.stringify({ type: 'ping' }))
   })
 
   it('sanitizes IDs and sends the exact all-scope subscription and heartbeat', () => {

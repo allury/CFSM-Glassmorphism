@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type {
+  CfsmRealtimeBatch,
   CfsmRealtimeSample,
   CfsmServer,
   ServerCollection,
@@ -84,33 +85,49 @@ export const useServersStore = defineStore('servers', () => {
     }
   }
 
+  function applyRealtimeBatches(
+    batches: readonly CfsmRealtimeBatch[],
+    receivedAt = Date.now(),
+  ): void {
+    const samplesByBase = new Map<string, CfsmRealtimeSample[]>()
+    for (const batch of batches) {
+      if (batch.samples.length === 0) continue
+      const pending = samplesByBase.get(batch.base)
+      if (pending) pending.push(...batch.samples)
+      else samplesByBase.set(batch.base, [...batch.samples])
+    }
+    if (samplesByBase.size === 0) return
+
+    let changed = false
+    const nextCollections = collections.value.map((collection) => {
+      const samples = samplesByBase.get(collection.source.base)
+      if (!samples) return collection
+      const updated = new Map(collection.servers.map((server) => [server.id, server]))
+      let collectionChanged = false
+      for (const sample of samples) {
+        const current = updated.get(sample.serverId)
+        if (!current) continue
+        updated.set(sample.serverId, mergeRealtimeSample(current, sample, receivedAt))
+        collectionChanged = true
+      }
+      if (!collectionChanged) return collection
+      changed = true
+      return {
+        ...collection,
+        servers: collection.servers.map((server) => updated.get(server.id) ?? server),
+      }
+    })
+    if (!changed) return
+    collections.value = nextCollections
+    lastRealtimeAt.value = receivedAt
+  }
+
   function applyRealtimeSamples(
     base: string,
     samples: readonly CfsmRealtimeSample[],
     receivedAt = Date.now(),
   ): void {
-    const collectionIndex = collections.value.findIndex((item) => item.source.base === base)
-    const collection = collections.value[collectionIndex]
-    if (collectionIndex < 0 || !collection || samples.length === 0) return
-
-    const updated = new Map(collection.servers.map((server) => [server.id, server]))
-    let changed = false
-    for (const sample of samples) {
-      const current = updated.get(sample.serverId)
-      if (!current) continue
-      updated.set(sample.serverId, mergeRealtimeSample(current, sample, receivedAt))
-      changed = true
-    }
-    if (!changed) return
-
-    const nextCollection: ServerCollection = {
-      ...collection,
-      servers: collection.servers.map((server) => updated.get(server.id) ?? server),
-    }
-    collections.value = collections.value.map((item, index) => (
-      index === collectionIndex ? nextCollection : item
-    ))
-    lastRealtimeAt.value = receivedAt
+    applyRealtimeBatches([{ base, samples }], receivedAt)
   }
 
   function expireStaleServers(now = Date.now()): void {
@@ -150,6 +167,7 @@ export const useServersStore = defineStore('servers', () => {
     findServer,
     siteVisibility,
     load,
+    applyRealtimeBatches,
     applyRealtimeSamples,
     expireStaleServers,
     clear,

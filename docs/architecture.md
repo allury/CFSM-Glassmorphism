@@ -133,14 +133,15 @@ schema defaults
 - 一条首页连接只对应一个 apiBase；它的订阅 IDs 只来自同一 base。
 - 首页连接 URL 固定为 `/api/ws?subscribe=all`，open 后发送包含本 base 真实节点 IDs 的 all-scope subscription。
 - 收到 `batchUpdate` 后提取 sample 的 `data`、`payload` 或 `metrics`，按字段合并进已有实体。
+- 同一轮上报里的节点消息可能在约数百毫秒内分批抵达。首页按当前最快 `wss_report_interval` 的一半（限制为 250～1000ms）收齐这一轮消息，再跨 apiBase 原子提交一次；每条 sample 仍按原顺序 partial merge，不降采样、不平均，也不把 Angel 的 1～5 秒上报周期改成前端固定值。
 - 高频增量缺失字段是正常情况，不得覆盖已有值；显式存在的 probe `false`、`null`、`0` 与普通数字则必须更新对应单一字段。
 - 列表 ping/loss 窗口由 REST 补齐，详情实时字段与历史序列分别管理。
 - document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。
 - 配置的连接时限到达后由用户选择继续或暂停；网络恢复采用单计时器指数退避，不会并发重连。
 - 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
-- 详情连接使用 `/api/ws?subscribe=<id>` 且不发送 all-scope frame；只合并同 ID sample。隐藏时关闭、可见时先请求 `/api/server` 再建立新连接，连接时限仍要求用户明确选择。
-- 详情负载图的「实时」档位复用这条 single-server 连接：空缓冲时只取一次最近 10 分钟 History 垫底，此后把 `batchUpdate.samples[]` 按采样时间逐条 partial merge 并逐条入图，完整保留 Angel 的 `wss_report_interval` 节奏，前端不改成固定 10 秒。历史桶与 WSS 密度可以不同；实时图只在相邻真实采样超过 1 分钟时插入断点，因此刷新垫底或切换时间档位不会把密度变化误画成大段空白。缓冲只保留最近 10 分钟且最多 600 点，切到历史档位不会清空它。
+- 详情连接使用 `/api/ws?subscribe=<id>`，open 后发送 `{ type: "subscribe", scope: <id>, ids: [] }` 激活 CFSM 的 Agent 实时提示，但绝不使用 all-scope，也不订阅其他节点；只合并同 ID sample。隐藏时关闭、可见时先请求 `/api/server` 再建立新连接，连接时限仍要求用户明确选择。
+- 详情负载图的「实时」档位复用这条 single-server 连接：优先从已经加载的 History 立即取最近 10 分钟垫底，确实没有近点时才单独请求 10 分钟 History；此后把 `batchUpdate.samples[]` 按采样时间逐条 partial merge 并逐条入图，完整保留 Angel 的 `wss_report_interval` 节奏，前端不改成固定 10 秒。历史桶与 WSS 密度可以不同；实时图只在相邻真实采样超过 1 分钟时插入断点，因此刷新、节点切换或时间档位切换不会把密度变化误画成大段空白。缓冲只保留最近 10 分钟且最多 600 点，切到历史档位不会清空它。
 
 ## Multi API Base
 

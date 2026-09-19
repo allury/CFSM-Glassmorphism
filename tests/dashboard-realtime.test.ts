@@ -57,7 +57,7 @@ describe('dashboard realtime coordination', () => {
       getSources: () => sources,
       getTimeoutMinutes: () => 20,
       refreshRest: async () => undefined,
-      onSamples: vi.fn(),
+      onSampleBatches: vi.fn(),
       onSourceState: vi.fn(),
       onFallbackChange: vi.fn(),
       onTimeoutChange: vi.fn(),
@@ -90,7 +90,7 @@ describe('dashboard realtime coordination', () => {
       getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
       getTimeoutMinutes: () => 0,
       refreshRest,
-      onSamples: vi.fn(),
+      onSampleBatches: vi.fn(),
       onSourceState: vi.fn(),
       onFallbackChange: vi.fn(),
       onTimeoutChange: vi.fn(),
@@ -123,7 +123,7 @@ describe('dashboard realtime coordination', () => {
       getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
       getTimeoutMinutes: () => 5,
       refreshRest: async () => undefined,
-      onSamples: vi.fn(),
+      onSampleBatches: vi.fn(),
       onSourceState: vi.fn(),
       onFallbackChange: vi.fn(),
       onTimeoutChange,
@@ -159,7 +159,7 @@ describe('dashboard realtime coordination', () => {
       getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
       getTimeoutMinutes: () => 0,
       refreshRest,
-      onSamples: vi.fn(),
+      onSampleBatches: vi.fn(),
       onSourceState: vi.fn(),
       onFallbackChange,
       onTimeoutChange: vi.fn(),
@@ -193,7 +193,7 @@ describe('dashboard realtime coordination', () => {
       getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
       getTimeoutMinutes: () => 0,
       refreshRest,
-      onSamples: vi.fn(),
+      onSampleBatches: vi.fn(),
       onSourceState: vi.fn(),
       onFallbackChange: vi.fn(),
       onTimeoutChange: vi.fn(),
@@ -217,6 +217,85 @@ describe('dashboard realtime coordination', () => {
     expect(refreshRest).toHaveBeenCalledOnce()
     await vi.advanceTimersByTimeAsync(1)
     expect(refreshRest).toHaveBeenCalledTimes(2)
+    controller.dispose()
+  })
+
+  it('commits staggered per-node messages once per Angel reporting interval', async () => {
+    vi.useFakeTimers()
+    const factory = connectionFactory()
+    const onSampleBatches = vi.fn()
+    const controller = createDashboardRealtime({
+      getSources: () => [
+        { base: 'https://a.example', ids: ['a-1', 'a-2'] },
+        { base: 'https://b.example', ids: ['b-1'] },
+      ],
+      getTimeoutMinutes: () => 0,
+      getSampleSettleDelayMs: () => 1_000,
+      refreshRest: async () => undefined,
+      onSampleBatches,
+      onSourceState: vi.fn(),
+      onFallbackChange: vi.fn(),
+      onTimeoutChange: vi.fn(),
+      onPausedChange: vi.fn(),
+      createSocket: factory.createSocket,
+    })
+
+    controller.start()
+    factory.options[0]?.onSamples([{ serverId: 'a-1', timestamp: 1, data: { net_out_speed: 1 } }])
+    await vi.advanceTimersByTimeAsync(350)
+    factory.options[1]?.onSamples([{ serverId: 'b-1', timestamp: 1, data: { net_out_speed: 2 } }])
+    await vi.advanceTimersByTimeAsync(350)
+    factory.options[0]?.onSamples([{ serverId: 'a-2', timestamp: 1, data: { net_out_speed: 3 } }])
+
+    await vi.advanceTimersByTimeAsync(299)
+    expect(onSampleBatches).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(onSampleBatches).toHaveBeenCalledOnce()
+    expect(onSampleBatches).toHaveBeenCalledWith([
+      {
+        base: 'https://a.example',
+        samples: [
+          { serverId: 'a-1', timestamp: 1, data: { net_out_speed: 1 } },
+          { serverId: 'a-2', timestamp: 1, data: { net_out_speed: 3 } },
+        ],
+      },
+      {
+        base: 'https://b.example',
+        samples: [{ serverId: 'b-1', timestamp: 1, data: { net_out_speed: 2 } }],
+      },
+    ])
+
+    factory.options[0]?.onSamples([{ serverId: 'a-1', timestamp: 2, data: { net_out_speed: 4 } }])
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(onSampleBatches).toHaveBeenCalledTimes(2)
+    controller.dispose()
+  })
+
+  it('drops an unfinished aggregate cycle when the page becomes hidden', async () => {
+    vi.useFakeTimers()
+    const visibility = new FakeVisibility()
+    const factory = connectionFactory()
+    const onSampleBatches = vi.fn()
+    const controller = createDashboardRealtime({
+      getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
+      getTimeoutMinutes: () => 0,
+      getSampleSettleDelayMs: () => 1_000,
+      refreshRest: async () => undefined,
+      onSampleBatches,
+      onSourceState: vi.fn(),
+      onFallbackChange: vi.fn(),
+      onTimeoutChange: vi.fn(),
+      onPausedChange: vi.fn(),
+      createSocket: factory.createSocket,
+      documentRef: visibility,
+    })
+
+    controller.start()
+    factory.options[0]?.onSamples([{ serverId: 'a-1', timestamp: 1, data: { cpu: 1 } }])
+    visibility.hidden = true
+    visibility.emit()
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(onSampleBatches).not.toHaveBeenCalled()
     controller.dispose()
   })
 })

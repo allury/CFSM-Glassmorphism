@@ -2,7 +2,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizeServer } from '@/services/cfsm/adapters'
 import { apiSource } from '@/services/cfsm/config'
-import { useRealtimeStore } from '@/stores/realtime'
+import { dashboardSampleSettleDelayMs, useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import type { ServerCollection } from '@/types/cfsm'
 
@@ -43,6 +43,20 @@ function stubSocket(): void {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+})
+
+describe('dashboard sample settle delay', () => {
+  it('uses half the fastest Angel interval without crossing the next report wave', () => {
+    expect(dashboardSampleSettleDelayMs([
+      { websocketReportInterval: 5 },
+      { websocketReportInterval: 2 },
+      { websocketReportInterval: null },
+    ])).toBe(1_000)
+    expect(dashboardSampleSettleDelayMs([{ websocketReportInterval: 1 }])).toBe(500)
+    expect(dashboardSampleSettleDelayMs([{ websocketReportInterval: 5 }])).toBe(1_000)
+    expect(dashboardSampleSettleDelayMs([{ websocketReportInterval: null }])).toBe(1_000)
+    expect(dashboardSampleSettleDelayMs([])).toBe(1_000)
+  })
 })
 
 describe('realtime status snapshot', () => {

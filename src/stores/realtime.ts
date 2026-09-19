@@ -4,7 +4,7 @@ import {
   createDashboardRealtime,
   type DashboardRealtimeController,
 } from '@/services/cfsm'
-import type { CfsmSocketState } from '@/types/cfsm'
+import type { CfsmServer, CfsmSocketState } from '@/types/cfsm'
 import { useAppStore } from './app'
 import { useServersStore } from './servers'
 import { useThemeSettingsStore } from './theme-settings'
@@ -16,6 +16,23 @@ export type DashboardRealtimeStatus =
   | 'fallback'
   | 'timed-out'
   | 'paused'
+
+const DEFAULT_SAMPLE_SETTLE_DELAY_MS = 1_000
+
+/** 取最快上报周期的一半收集同轮消息，并限制在 250～1000ms，避免跨入下一轮。 */
+export function dashboardSampleSettleDelayMs(
+  items: readonly Pick<CfsmServer, 'websocketReportInterval'>[],
+): number {
+  const seconds = items.flatMap((server) => (
+    typeof server.websocketReportInterval === 'number'
+      && Number.isFinite(server.websocketReportInterval)
+      && server.websocketReportInterval > 0
+      ? [server.websocketReportInterval]
+      : []
+  ))
+  if (seconds.length === 0) return DEFAULT_SAMPLE_SETTLE_DELAY_MS
+  return Math.min(1_000, Math.max(250, Math.min(...seconds) * 500))
+}
 
 export const useRealtimeStore = defineStore('realtime', () => {
   const app = useAppStore()
@@ -83,8 +100,9 @@ export const useRealtimeStore = defineStore('realtime', () => {
        * 下一次回退启动时即生效，不必重建 WebSocket 连接。
        */
       fallbackIntervalMs: () => theme.runtime.dataUpdateInterval * 1000,
+      getSampleSettleDelayMs: () => dashboardSampleSettleDelayMs(servers.servers),
       refreshRest,
-      onSamples: (base, samples) => servers.applyRealtimeSamples(base, samples),
+      onSampleBatches: (batches) => servers.applyRealtimeBatches(batches),
       onSourceState: (base, state) => {
         sourceStates.value = { ...sourceStates.value, [base]: state }
         observe()

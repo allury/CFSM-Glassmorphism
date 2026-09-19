@@ -197,7 +197,7 @@ function retry(): void {
       </div>
       <AppEmpty
         v-else-if="rows.length === 0 && !loading"
-        :description="liveMode ? '正在采集实时数据，只显示本次打开页面后收到的样本' : '暂无负载数据'"
+        :description="liveMode ? '暂无近期样本，正在等待 WebSocket 实时数据' : '暂无负载数据'"
       />
 
       <div v-else class="metric-chart-grid">

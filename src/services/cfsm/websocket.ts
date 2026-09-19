@@ -184,8 +184,16 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
   }
 
   function sendSubscription(current: CfsmSocketLike): boolean {
-    if (subscribe !== 'all') return true
-    const subscription: CfsmSocketSubscription = { type: 'subscribe', scope: 'all', ids }
+    /*
+     * CFSM 在收到订阅帧后才会通知 Agent 进入实时上报。即使 URL 已经是
+     * `subscribe=<serverId>`，也必须像官方前端一样再发送一次同 scope 的订阅帧；
+     * 否则连接只收到 hello，在没有其它活跃订阅者时不会收到 batchUpdate。
+     */
+    const subscription: CfsmSocketSubscription = {
+      type: 'subscribe',
+      scope: subscribe,
+      ids: subscribe === 'all' ? ids : [],
+    }
     try {
       current.send(JSON.stringify(subscription))
       return true

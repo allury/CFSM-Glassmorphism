@@ -231,7 +231,7 @@ export type CfsmSocketState =
 
 export interface CfsmSocketSubscription {
   type: 'subscribe'
-  scope: 'all'
+  scope: string
   ids: string[]
 }
 
@@ -239,6 +239,12 @@ export interface CfsmRealtimeSample {
   serverId: string
   timestamp: NullableNumber
   data: Record<string, unknown>
+}
+
+/** 同一个首页刷新周期内、按 owning API base 分组的真实 WebSocket 样本。 */
+export interface CfsmRealtimeBatch {
+  base: string
+  samples: readonly CfsmRealtimeSample[]
 }
 
 export type CfsmRequestIssueKind =

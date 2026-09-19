@@ -75,8 +75,9 @@ export const useServerDetailStore = defineStore('server-detail', () => {
    */
   const historyHours = ref<HistoryHours>(1)
   /*
-   * 「实时」档位：只画本次打开页面后 WebSocket 推来的样本，不发任何请求。
-   * 缓冲随节点切换清空，离开或刷新就重新开始；窗口与条数上限在 `domain/server-detail.ts`。
+   * 「实时」档位：先复用已加载历史的最近 10 分钟，必要时再取一次 10 分钟历史，
+   * 随后逐条接续 WebSocket 样本。缓冲随节点切换清空并重新垫底；窗口与条数上限在
+   * `domain/server-detail.ts`。
    */
   const liveMode = ref(false)
   const livePoints = ref<HistoryPoint[]>([])
@@ -138,6 +139,13 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+    /*
+     * 详情页通常已经有当前历史窗口。先复用其中最近 10 分钟的真实点，切换后立即可见，
+     * 避免额外请求尚未返回时把正常页面误显示成“仍在采集”。如果当前历史没有近点，
+     * 再读取最密的 10 分钟窗口；WSS 到达的真实样本仍会按时间合并并覆盖同一时刻。
+     */
+    livePoints.value = seedLivePoints(history.value?.points ?? [], livePoints.value, Date.now())
+    if (livePoints.value.length > 0) return
     try {
       const seed = await fetchHistory(current.id, LIVE_SEED_HOURS, current.source.base, {
         signal: controller.signal,
@@ -255,6 +263,9 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       if (stale()) return
       history.value = result
       historyState.value = result.points.length > 0 ? 'ready' : 'empty'
+      if (liveMode.value && livePoints.value.length === 0) {
+        livePoints.value = seedLivePoints(result.points, livePoints.value, Date.now())
+      }
     } catch (error) {
       if (stale()) return
       history.value = null
