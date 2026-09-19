@@ -183,7 +183,10 @@ const rateNotes = computed(() => {
   return notes.join('；')
 })
 
-/** 「恢复今日汇率」只清除手动汇率；当前表不是今日取得的就不这么称呼它。 */
+/*
+ * 「恢复今日汇率」只清除手动汇率；当前表不是今日取得的就不这么称呼它。
+ * 没有手动汇率时按钮置灰：点下去本来就什么都不会变，不该看起来可点。
+ */
 const restoreLabel = computed(() => (finance.hasTodayTable ? '恢复今日汇率' : '清除手动汇率'))
 </script>
 
@@ -297,7 +300,13 @@ const restoreLabel = computed(() => (finance.hasTodayTable ? '恢复今日汇率
                 {{ item }}
               </option>
             </select>
-            <button type="button" class="finance-dialog__outline-button" @click="finance.clearOverrides()">
+            <button
+              type="button"
+              class="finance-dialog__outline-button"
+              :disabled="!finance.hasOverrides"
+              :title="finance.hasOverrides ? undefined : '当前没有手动汇率'"
+              @click="finance.clearOverrides()"
+            >
               <AppIcon name="tabler:refresh" :size="14" />{{ restoreLabel }}
             </button>
           </div>

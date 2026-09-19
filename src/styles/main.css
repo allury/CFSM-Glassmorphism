@@ -5590,6 +5590,12 @@ a {
   cursor: default;
 }
 
+/* 没有手动汇率时这个按钮什么也不会改，置灰与汇率输入框的禁用态一致。 */
+.finance-dialog__outline-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .finance-dialog__outline-button .app-icon {
   width: 16px;
   height: 16px;

@@ -187,5 +187,8 @@ describe('入口接线', () => {
     expect(dialog).toContain('汇率设置')
     expect(dialog).toContain('排除免费节点')
     expect(dialog).toContain("finance.hasTodayTable ? '恢复今日汇率' : '清除手动汇率'")
+    // 没有手动汇率时点了什么都不会变，按钮就不该看起来可点。
+    expect(dialog).toContain(':disabled="!finance.hasOverrides"')
+    expect(dialog).toContain("finance.hasOverrides ? undefined : '当前没有手动汇率'")
   })
 })
