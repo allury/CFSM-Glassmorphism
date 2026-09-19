@@ -121,16 +121,9 @@ describe('遮蔽集合', () => {
     expect(pingSpikeMasks(rows, tasks)).toEqual(pingSpikeMasks(structuredClone(rows), tasks))
   })
 
-  it('窗口倒数第二个真实尖峰会立即进入遮蔽计数', () => {
-    const edgeValues = [97, 95, 99, 98, 1106, 103]
-    const edgeTimestamps = [
-      1789830536279,
-      1789830596536,
-      1789830668714,
-      1789830788884,
-      1789830909080,
-      1789831029317,
-    ]
+  it('窗口倒数第二个尖峰会立即进入遮蔽计数', () => {
+    const edgeValues = [198, 202, 199, 201, 1200, 200]
+    const edgeTimestamps = edgeValues.map((_, index) => START + index * STEP)
     const edgePoints = edgeValues.map((value, index): HistoryPoint => {
       const basePoint = point(0)
       return {
