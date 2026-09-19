@@ -41,7 +41,7 @@
 
 CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`，访客/审计仍因缺少公开 API 而隐藏；这些必要差异没有被视觉收敛掩盖。最终版本 1.0.0 的发布资产继续只包含 `index.html` 与 `assets/`，tag workflow 会在完整质量门通过后生成稳定命名 ZIP。
 
-## v1.1.7 财务追加（候选）
+## v1.1.7 财务追加（已发布）
 
 功能可行性状态不变，60 项统计不变。实现方式的变化：
 
@@ -139,7 +139,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 延迟窗口小图 | 历史延迟序列 | `/api/servers` ping/loss 窗口 | 使用真实稀疏时间戳，不补点 | ✅ 一致 |
 | 在线状态 | Komari online 字段 | is_online 或 last_updated/timestamp | 遵循五分钟在线阈值 | 🟢 等价实现 |
 | 多 API Base | 原主题单后端 | apiBase meta 可配置多个 origin | 每个节点保存 source ownership | 🟢 等价实现 |
-| 定时刷新间隔 | dataUpdateInterval/RPC | REST + 服务端五秒 WS 批次 | 设置只控制 REST 补偿/前端刷新，不改变服务端节奏 | 🟡 降级实现 |
+| 定时刷新间隔 | dataUpdateInterval/RPC | REST 回退 + Angel 配置的 WSS 上报节奏 | 设置只控制 WebSocket 不可用时的 REST 补偿轮询；WSS 按 `wss_report_interval` 推送，前端不强制为 5 秒或 10 秒 | 🟡 降级实现 |
 | 实时订阅 | `/api/clients` | `/api/ws` | 每个 base 独立连接、订阅其自身 IDs、增量合并 | 🟢 等价实现 |
 | 单节点详情初始数据 | Komari node RPC | `/api/server?id=` | 已实现详情只拉单节点；owning base 已知时不探测其他来源 | 🟢 等价实现 |
 | 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 已实现官方九种周期、稀疏点 ECharts 图表与真实空/错误状态 | 🟢 等价实现 |
