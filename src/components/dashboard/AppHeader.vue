@@ -16,7 +16,12 @@ const props = withDefaults(defineProps<{
   total?: number
   sourceCount?: number
   adminUrl: string | null
+  /** 站点自己配置的主题模式：本地没有覆盖时按它描述。 */
   themeMode: ThemeMode
+  /** 当前真实呈现的明暗，决定图标。 */
+  resolvedTheme: 'light' | 'dark'
+  /** 访客在本浏览器里的覆盖；null 表示跟随站点设置。 */
+  themeOverride?: 'light' | 'dark' | null
   /*
    * 设置页不订阅节点数据，显示「0/0 在线」会是假状态，因此那里关掉状态条，
    * 只保留站点身份与全局动作——首页与详情页仍然照旧显示真实计数。
@@ -27,6 +32,7 @@ const props = withDefaults(defineProps<{
   total: 0,
   sourceCount: 0,
   showStatus: true,
+  themeOverride: null,
 })
 
 defineEmits<{
@@ -35,6 +41,18 @@ defineEmits<{
 }>()
 
 const scrolled = ref(false)
+
+/*
+ * 主题按钮的文案，对应 Komari `Header.vue` 的 `themeTitleMap`：
+ * 访客在本浏览器里选了浅色 / 深色就直接说明；没选时说明站点自己的设置会怎么决定。
+ */
+const themeLabel = computed(() => {
+  if (props.themeOverride === 'light') return '浅色'
+  if (props.themeOverride === 'dark') return '深色'
+  if (props.themeMode === 'beijing') return `跟随站点设置（北京时间${props.resolvedTheme === 'dark' ? '夜间' : '日间'}）`
+  if (props.themeMode === 'system') return '跟随站点设置（跟随系统）'
+  return `跟随站点设置（${props.themeMode === 'dark' ? '深色' : '浅色'}）`
+})
 
 /*
  * 站点标记优先用站点自己的图标，与 Komari `Header.vue` 的 Avatar 一致
@@ -107,14 +125,14 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
       </div>
 
       <div class="header-actions">
-        <AppTooltip :content="`主题：${themeMode === 'beijing' ? '北京时间自动' : themeMode === 'system' ? '跟随系统' : themeMode === 'light' ? '浅色' : '深色'}（点击切换）`">
+        <AppTooltip :content="`主题：${themeLabel}（点击切换）`">
           <button
             class="icon-button"
             type="button"
-            :aria-label="`切换主题，当前${themeMode}`"
+            :aria-label="`切换主题，当前${themeLabel}`"
             @click="$emit('cycleTheme')"
           >
-            <AppIcon :name="themeMode === 'light' ? 'tabler:sun' : 'tabler:moon'" :size="18" />
+            <AppIcon :name="resolvedTheme === 'dark' ? 'tabler:moon' : 'tabler:sun'" :size="18" />
           </button>
         </AppTooltip>
         <AppTooltip content="刷新 REST 数据">

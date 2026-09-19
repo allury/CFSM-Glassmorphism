@@ -58,6 +58,11 @@ export interface ThemeSaveOutcome {
 }
 
 
+/** 去掉记录里的某一个键，返回新对象；原对象不变。 */
+function withoutKey(record: Record<string, unknown>, key: string): Record<string, unknown> {
+  return Object.fromEntries(Object.entries(record).filter(([name]) => name !== key))
+}
+
 function recordValue(value: unknown): Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
     ? { ...value }
@@ -332,10 +337,43 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     rebuildFromLayers(true)
   }
 
+  /** 移除某一项的本地覆盖，让它回到后端 / 默认值。 */
+  function clearLocalSetting<Key extends keyof ThemeSettings>(key: Key): void {
+    if (!(key in localOverrides.value)) return
+    localOverrides.value = withoutKey(localOverrides.value, key)
+    persistOverrides()
+    previewing.value = false
+    rebuildFromLayers(true)
+  }
+
+  /** 站点自己配置的主题模式：忽略本地覆盖后剩下的那一层。 */
+  const siteThemeMode = computed<ThemeMode>(() => resolveThemeSettings(
+    backendRaw.value,
+    withoutKey(localOverrides.value, 'themeMode'),
+    preferredTheme.value,
+  ).themeMode)
+
+  /** 顶栏按钮写入的本地覆盖；没有覆盖时跟随站点设置。 */
+  const themeOverride = computed<'light' | 'dark' | null>(() => {
+    const value = localOverrides.value.themeMode
+    return value === 'light' || value === 'dark' ? value : null
+  })
+
+  /*
+   * 顶栏的明暗按钮：跟随站点设置 → 浅色 / 深色 → 另一种 → 回到跟随，共三态。
+   *
+   * 关键是第一下必须切到**与当前显示相反**的模式。此前按 `beijing → system →
+   * light → dark` 轮换，白天点前两三下画面完全不变（两种自动模式与浅色都是浅色），
+   * 手机上看起来就像按钮失灵。`beijing` / `system` 属于站点配置，不该由访客在顶栏里逐个翻。
+   */
   function cycleTheme(): void {
-    const modes: ThemeMode[] = ['beijing', 'system', 'light', 'dark']
-    const current = modes.indexOf(runtime.value.themeMode)
-    setLocalSetting('themeMode', modes[(current + 1) % modes.length] ?? 'beijing')
+    const autoDark = resolveThemeMode(siteThemeMode.value, systemDark.value, new Date(clock.value)) === 'dark'
+    const opposite: ThemeMode = autoDark ? 'light' : 'dark'
+    const sameAsSite: ThemeMode = autoDark ? 'dark' : 'light'
+    const current = themeOverride.value
+    if (current === null) setLocalSetting('themeMode', opposite)
+    else if (current === opposite) setLocalSetting('themeMode', sameAsSite)
+    else clearLocalSetting('themeMode')
   }
 
   function saveLocal(): boolean {
@@ -481,6 +519,9 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     setLocalSetting,
     setDashboardViewMode,
     cycleTheme,
+    clearLocalSetting,
+    siteThemeMode,
+    themeOverride,
     saveLocal,
     useBackend,
     saveBackend,

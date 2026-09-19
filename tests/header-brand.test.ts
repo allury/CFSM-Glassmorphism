@@ -23,6 +23,7 @@ const props = {
   loading: false,
   adminUrl: null,
   themeMode: 'system' as const,
+  resolvedTheme: 'light' as const,
 }
 
 async function render(overrides: Record<string, unknown> = {}): Promise<string> {
@@ -79,5 +80,50 @@ describe('header brand mark', () => {
     const markBlock = stylesheet.slice(markStart, stylesheet.indexOf('}', markStart))
     expect(markBlock).toContain('overflow: hidden')
     expect(markBlock).toContain('border-radius: 50%')
+  })
+})
+
+/*
+ * 明暗按钮。
+ *
+ * 此前它在四个主题模式之间轮换（北京时间自动 → 跟随系统 → 浅色 → 深色），而白天
+ * 前三种看起来都是浅色，所以手机上要连点三下画面才会变暗，像是按钮失灵。现在按钮只
+ * 表达三种状态：跟随站点设置 / 浅色 / 深色，图标跟随真实呈现的明暗。
+ *
+ * 提示气泡的文字由 Portal 在打开时才渲染，服务端渲染里取不到，因此这里断言按钮的
+ * 可访问标签——它和气泡用的是同一份文案。
+ */
+describe('顶栏明暗按钮', () => {
+  const buttonOf = (html: string) => {
+    const at = html.indexOf('切换主题')
+    const start = html.lastIndexOf('<button', at)
+    return html.slice(start, html.indexOf('</button>', start))
+  }
+
+  it('图标跟随真实呈现的明暗，而不是配置里的模式名', async () => {
+    const light = buttonOf(await render({ themeMode: 'beijing', resolvedTheme: 'light' }))
+    const dark = buttonOf(await render({ themeMode: 'beijing', resolvedTheme: 'dark' }))
+    // 同一个站点模式下，图标只由当前明暗决定：两次渲染的图形必须不同。
+    expect(light).not.toBe(dark)
+    const pathOf = (html: string) => /<path[^>]*d="([^"]+)"/.exec(html)?.[1] ?? ''
+    expect(pathOf(light)).not.toBe('')
+    expect(pathOf(light)).not.toBe(pathOf(dark))
+    // 站点设为浅色但当前呈现深色（访客自己切过）时，画的也是深色的图标。
+    const overridden = buttonOf(await render({ themeMode: 'light', resolvedTheme: 'dark', themeOverride: 'dark' }))
+    expect(pathOf(overridden)).toBe(pathOf(dark))
+  })
+
+  it('没有本地覆盖时说明跟随站点设置，并写明站点设置是什么', async () => {
+    const labelOf = (html: string) => /aria-label="([^"]+)"/.exec(buttonOf(html))?.[1] ?? ''
+    expect(labelOf(await render({ themeMode: 'beijing', resolvedTheme: 'light' }))).toBe('切换主题，当前跟随站点设置（北京时间日间）')
+    expect(labelOf(await render({ themeMode: 'beijing', resolvedTheme: 'dark' }))).toBe('切换主题，当前跟随站点设置（北京时间夜间）')
+    expect(labelOf(await render({ themeMode: 'system', resolvedTheme: 'light' }))).toBe('切换主题，当前跟随站点设置（跟随系统）')
+    expect(labelOf(await render({ themeMode: 'dark', resolvedTheme: 'dark' }))).toBe('切换主题，当前跟随站点设置（深色）')
+  })
+
+  it('访客自己选过之后直接说明选的是哪一种', async () => {
+    const labelOf = (html: string) => /aria-label="([^"]+)"/.exec(buttonOf(html))?.[1] ?? ''
+    expect(labelOf(await render({ themeMode: 'beijing', resolvedTheme: 'dark', themeOverride: 'dark' }))).toBe('切换主题，当前深色')
+    expect(labelOf(await render({ themeMode: 'dark', resolvedTheme: 'light', themeOverride: 'light' }))).toBe('切换主题，当前浅色')
   })
 })

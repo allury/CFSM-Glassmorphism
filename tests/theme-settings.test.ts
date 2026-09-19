@@ -106,6 +106,80 @@ describe('theme settings schema', () => {
 describe('theme settings store', () => {
   beforeEach(() => setActivePinia(createPinia()))
 
+  /*
+   * 顶栏的明暗按钮。此前它在四个主题模式之间轮换（北京时间自动 → 跟随系统 → 浅色 →
+   * 深色）：白天前三种看起来都是浅色，手机上要连点三下画面才变暗。现在只有三种状态，
+   * 并且第一下一定切到与当前显示相反的那一种，每次点击都看得见变化。
+   */
+  it('明暗按钮第一下就切到相反的明暗，第三下回到跟随站点设置', () => {
+    const storage = new MemoryStorage()
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({ themeMode: 'light' }, 'auto', true)
+    expect(store.themeOverride).toBeNull()
+    expect(store.resolvedTheme).toBe('light')
+
+    store.cycleTheme()
+    expect(store.themeOverride).toBe('dark')
+    expect(store.resolvedTheme).toBe('dark')
+
+    store.cycleTheme()
+    expect(store.themeOverride).toBe('light')
+    expect(store.resolvedTheme).toBe('light')
+
+    store.cycleTheme()
+    expect(store.themeOverride).toBeNull()
+    expect(store.siteThemeMode).toBe('light')
+    expect(parseThemeStorageSnapshot(storage.getItem(THEME_SETTINGS_STORAGE_KEY))?.overrides.themeMode).toBeUndefined()
+  })
+
+  it('站点本来就是深色时，第一下切到浅色', () => {
+    const store = useThemeSettingsStore()
+    store.initialize(new MemoryStorage())
+    store.hydrateBackend({ themeMode: 'dark' }, 'auto', true)
+    expect(store.resolvedTheme).toBe('dark')
+
+    store.cycleTheme()
+    expect(store.themeOverride).toBe('light')
+    expect(store.resolvedTheme).toBe('light')
+
+    store.cycleTheme()
+    expect(store.themeOverride).toBe('dark')
+    store.cycleTheme()
+    expect(store.themeOverride).toBeNull()
+  })
+
+  it('本地存着旧的自动模式覆盖时，也是一下就切到相反的明暗', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(THEME_SETTINGS_STORAGE_KEY, JSON.stringify(themeStorageSnapshot({ themeMode: 'beijing' })))
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({ themeMode: 'light' }, 'auto', true)
+    // 覆盖值不是浅色也不是深色，按「跟随」处理：下一步直接给出相反的明暗。
+    expect(store.themeOverride).toBeNull()
+    const before = store.resolvedTheme
+    store.cycleTheme()
+    expect(store.themeOverride).toBe(before === 'dark' ? 'light' : 'dark')
+    expect(store.resolvedTheme).not.toBe(before)
+  })
+
+  it('回到跟随站点设置只清除主题这一项，其它本地覆盖保留', () => {
+    const storage = new MemoryStorage()
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({ themeMode: 'light', alertTitle: 'Backend' }, 'auto', true)
+    store.setLocalSetting('alertTitle', 'Local')
+
+    store.cycleTheme()
+    store.cycleTheme()
+    store.cycleTheme()
+
+    expect(store.themeOverride).toBeNull()
+    expect(store.runtime.alertTitle).toBe('Local')
+    expect(store.hasLocalOverrides).toBe(true)
+    expect(parseThemeStorageSnapshot(storage.getItem(THEME_SETTINGS_STORAGE_KEY))?.overrides.alertTitle).toBe('Local')
+  })
+
   it('saves and clears a browser-only override', () => {
     const storage = new MemoryStorage()
     storage.setItem(LEGACY_DASHBOARD_STORAGE_KEY, JSON.stringify({

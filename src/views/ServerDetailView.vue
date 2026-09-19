@@ -413,7 +413,9 @@ onUnmounted(() => detail.close())
         :total="headerTotal"
         :source-count="sourceCount"
         :admin-url="visibleAdminUrl"
-        :theme-mode="theme.runtime.themeMode"
+        :theme-mode="theme.siteThemeMode"
+        :resolved-theme="theme.resolvedTheme"
+        :theme-override="theme.themeOverride"
         @refresh="refresh"
         @cycle-theme="theme.cycleTheme"
       />
