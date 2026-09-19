@@ -8,13 +8,13 @@ import {
   labeledProbeTargets,
   liveHistoryPoint,
   LIVE_MAX_POINTS,
-  LIVE_STEP_MS,
   LIVE_WINDOW_MS,
   buildLiveChartRows,
   probeStats,
   seedLivePoints,
 } from '@/domain/server-detail'
 import { normalizeHistory, normalizeServer } from '@/services/cfsm/adapters'
+import { mergeDetailLiveSamples } from '@/stores/server-detail'
 
 const source = { base: 'https://status.example', label: 'status.example' }
 const START = 1_700_000_000_000
@@ -186,15 +186,43 @@ describe('实时样本缓冲', () => {
   })
 
   it('条数也有上限，长时间停留不会无限增长', () => {
-    // 10 分钟窗口按 10 秒一点只装得下 60 来个，这里放宽窗口，专门验条数上限这条。
-    const window = LIVE_STEP_MS * (LIVE_MAX_POINTS + 100)
+    // 放宽时间窗口，专门验证条数上限；1 秒是 Angel 允许的最短 WSS 上报间隔。
+    const step = 1_000
+    const window = step * (LIVE_MAX_POINTS + 100)
     let points = [] as ReturnType<typeof appendLivePoint>
     for (let index = 0; index < LIVE_MAX_POINTS + 50; index += 1) {
-      points = appendLivePoint(points, liveHistoryPoint(server, START + index * LIVE_STEP_MS), window)
+      points = appendLivePoint(points, liveHistoryPoint(server, START + index * step), window)
     }
     expect(points).toHaveLength(LIVE_MAX_POINTS)
     // 保留的是最近的那些点。
-    expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * LIVE_STEP_MS)
+    expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * step)
+  })
+
+  it('逐条保留 Angel 配置间隔到达的 WSS 样本，不在前端强制降成 10 秒', () => {
+    for (const interval of [1_000, 2_000, 5_000]) {
+      const timestamps = [0, 1, 2, 3].map((index) => START + index * interval)
+      const points = timestamps.reduce<ReturnType<typeof appendLivePoint>>(
+        (buffer, timestamp) => appendLivePoint(buffer, liveHistoryPoint(server, timestamp)),
+        [],
+      )
+      expect(points.map((point) => point.timestamp)).toEqual(timestamps)
+    }
+  })
+
+  it('逐条回放同一个 batchUpdate 内按 Angel 间隔采集的多条样本', () => {
+    const merged = mergeDetailLiveSamples(server, [], [
+      { serverId: server.id, timestamp: START / 1000, data: { cpu: 10 } },
+      { serverId: server.id, timestamp: (START + 2_000) / 1000, data: { cpu: 20 } },
+      { serverId: server.id, timestamp: (START + 4_000) / 1000, data: { cpu: 30 } },
+    ], START + 5_000)
+
+    expect(merged.matched).toBe(3)
+    expect(merged.points.map((point) => [point.timestamp, point.cpu])).toEqual([
+      [START, 10],
+      [START + 2_000, 20],
+      [START + 4_000, 30],
+    ])
+    expect(merged.server.cpu).toBe(30)
   })
 
   it('实时缺口按绝对时间判断：密度不一致不算断线，真断了才留占位', () => {

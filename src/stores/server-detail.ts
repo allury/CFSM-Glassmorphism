@@ -2,6 +2,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { defineStore } from 'pinia'
 import type {
   CfsmRequestIssue,
+  CfsmRealtimeSample,
   CfsmServer,
   CfsmSocketState,
   HistoryPoint,
@@ -26,11 +27,38 @@ import {
   LIVE_SEED_HOURS,
   seedLivePoints,
 } from '@/domain/server-detail'
+import { normalizeTimestampMilliseconds } from '@/utils/format'
 import { useAppStore } from './app'
 import { useThemeSettingsStore } from './theme-settings'
 
 export type DetailLoadState = 'idle' | 'loading' | 'ready' | 'error'
 export type HistoryLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
+
+/**
+ * 按 CFSM `batchUpdate.samples[]` 的顺序逐条回放详情实时数据。
+ *
+ * 一个 WebSocket 消息可能装着多条由 Angel 按 `wss_report_interval` 采集的样本；这些样本
+ * 既要逐条 partial merge，也要逐条进入实时图，不能把整个批次压成最后一个点。时间戳
+ * 使用样本自己的采集时间（秒或毫秒均兼容），只有缺失时才退到消息到达时间。
+ */
+export function mergeDetailLiveSamples(
+  server: CfsmServer,
+  points: readonly HistoryPoint[],
+  samples: readonly CfsmRealtimeSample[],
+  receivedAt: number,
+): { server: CfsmServer, points: HistoryPoint[], matched: number } {
+  let current = server
+  let nextPoints = [...points]
+  let matched = 0
+  for (const sample of samples) {
+    if (sample.serverId !== current.id) continue
+    current = mergeRealtimeSample(current, sample, receivedAt)
+    const timestamp = normalizeTimestampMilliseconds(sample.timestamp) ?? receivedAt
+    nextPoints = appendLivePoint(nextPoints, liveHistoryPoint(current, timestamp))
+    matched += 1
+  }
+  return { server: current, points: nextPoints, matched }
+}
 
 export const useServerDetailStore = defineStore('server-detail', () => {
   const app = useAppStore()
@@ -130,18 +158,15 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     paused.value = false
   }
 
-  function applySamples(samples: Parameters<typeof mergeRealtimeSample>[1][]): void {
-    let current = server.value
+  function applySamples(samples: readonly CfsmRealtimeSample[]): void {
+    const current = server.value
     if (!current) return
     const receivedAt = Date.now()
-    for (const sample of samples) {
-      if (sample.serverId !== current.id) continue
-      current = mergeRealtimeSample(current, sample, receivedAt)
-    }
-    server.value = current
+    const merged = mergeDetailLiveSamples(current, livePoints.value, samples, receivedAt)
+    if (merged.matched === 0) return
+    server.value = merged.server
     lastRealtimeAt.value = receivedAt
-    // 每条推送留一份快照给「实时」档位；与历史各走各的，互不覆盖。
-    livePoints.value = appendLivePoint(livePoints.value, liveHistoryPoint(current, receivedAt))
+    livePoints.value = merged.points
   }
 
   function startRealtime(): void {

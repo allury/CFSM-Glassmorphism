@@ -40,8 +40,8 @@ import '@/utils/echarts'
  * 移植自 Komari `components/LoadChart.vue`（bf83765）：顶部一条时间范围 Tab，
  * 下面是 1 / 2 / 3 列（md / xl）的图表卡片栅格，卡片顺序由「历史图表方案」决定。
  *
- * 数据只读 detail store 已取回的 `/api/history/all`。上游的「实时」「自定义」依赖
- * CFSM 不存在的接口，时间范围因此只列 CFSM 支持的时段；默认仍是此前验收过的 1 天。
+ * 历史档位只读 detail store 已取回的 `/api/history/all`；「实时」档位消费详情页已有的
+ * single-server WebSocket，不增加接口或轮询。「自定义」仍因 CFSM 没有对应接口而不提供。
  */
 const detail = useServerDetailStore()
 const theme = useThemeSettingsStore()
@@ -58,8 +58,8 @@ const {
 
 const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友好')
 /*
- * 「实时」档位画的是本次打开页面后 WebSocket 推来的样本（store 里的缓冲），
- * 历史档位画的是取回的那份历史。两者互不混合：同一条线上不会既有桶聚合值又有秒级样本。
+ * 「实时」档位用最近 10 分钟历史垫底，再按 Angel 的 WSS 上报间隔逐条接续真实样本；
+ * 历史档位画所选固定窗口。切走不会清空实时缓冲，回到实时后继续向前更新。
  */
 const rows = computed(() => (liveMode.value ? liveRows.value : buildChartRows(historyPoints.value)))
 const context = computed<LoadChartContext>(() => ({

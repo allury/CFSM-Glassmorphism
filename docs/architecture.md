@@ -140,6 +140,7 @@ schema defaults
 - 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
 - 详情连接使用 `/api/ws?subscribe=<id>` 且不发送 all-scope frame；只合并同 ID sample。隐藏时关闭、可见时先请求 `/api/server` 再建立新连接，连接时限仍要求用户明确选择。
+- 详情负载图的「实时」档位复用这条 single-server 连接：空缓冲时只取一次最近 10 分钟 History 垫底，此后把 `batchUpdate.samples[]` 按采样时间逐条 partial merge 并逐条入图，完整保留 Angel 的 `wss_report_interval` 节奏，前端不改成固定 10 秒。历史桶与 WSS 密度可以不同；实时图只在相邻真实采样超过 1 分钟时插入断点，因此刷新垫底或切换时间档位不会把密度变化误画成大段空白。缓冲只保留最近 10 分钟且最多 600 点，切到历史档位不会清空它。
 
 ## Multi API Base
 
