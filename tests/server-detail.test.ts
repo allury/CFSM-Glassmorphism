@@ -8,7 +8,9 @@ import {
   labeledProbeTargets,
   liveHistoryPoint,
   LIVE_MAX_POINTS,
+  LIVE_STEP_MS,
   LIVE_WINDOW_MS,
+  buildLiveChartRows,
   probeStats,
   seedLivePoints,
 } from '@/domain/server-detail'
@@ -171,39 +173,44 @@ describe('实时样本缓冲', () => {
   it('按真实时间窗口裁剪，并且不修改传入的数组', () => {
     const base = [
       liveHistoryPoint(server, START),
-      liveHistoryPoint(server, START + LIVE_WINDOW_MS - 1_000),
+      liveHistoryPoint(server, START + LIVE_WINDOW_MS - 20_000),
     ]
     const snapshot = structuredClone(base)
     const next = appendLivePoint(base, liveHistoryPoint(server, START + LIVE_WINDOW_MS + 1_000))
     expect(base).toEqual(snapshot)
     // 第一个点已经超出窗口，被裁掉。
     expect(next.map((point) => point.timestamp)).toEqual([
-      START + LIVE_WINDOW_MS - 1_000,
+      START + LIVE_WINDOW_MS - 20_000,
       START + LIVE_WINDOW_MS + 1_000,
     ])
   })
 
   it('条数也有上限，长时间停留不会无限增长', () => {
+    // 10 分钟窗口按 10 秒一点只装得下 60 来个，这里放宽窗口，专门验条数上限这条。
+    const window = LIVE_STEP_MS * (LIVE_MAX_POINTS + 100)
     let points = [] as ReturnType<typeof appendLivePoint>
     for (let index = 0; index < LIVE_MAX_POINTS + 50; index += 1) {
-      points = appendLivePoint(points, liveHistoryPoint(server, START + index * 1_000))
+      points = appendLivePoint(points, liveHistoryPoint(server, START + index * LIVE_STEP_MS), window)
     }
     expect(points).toHaveLength(LIVE_MAX_POINTS)
     // 保留的是最近的那些点。
-    expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * 1_000)
+    expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * LIVE_STEP_MS)
   })
 
-  it('缓冲可以直接交给图表行构建，缺口规则与历史一致', () => {
-    const points = [
+  it('实时缺口按绝对时间判断：密度不一致不算断线，真断了才留占位', () => {
+    // 垫底历史约 10 秒一点、推送约 2 秒一点，这种密度差异以前会被判成缺口，图上出现空白。
+    const mixed = [
       liveHistoryPoint(server, START),
-      liveHistoryPoint(server, START + 5_000),
       liveHistoryPoint(server, START + 10_000),
-      // 中间断了很久：与历史一样要插入缺口占位行。
-      liveHistoryPoint(server, START + 120_000),
+      liveHistoryPoint(server, START + 20_000),
+      liveHistoryPoint(server, START + 22_000),
+      liveHistoryPoint(server, START + 24_000),
     ]
-    const rows = buildChartRows(points)
-    expect(rows.length).toBeGreaterThan(points.length)
-    expect(rows.some((row) => row.point === null)).toBe(true)
+    expect(buildLiveChartRows(mixed).every((row) => row.point !== null)).toBe(true)
+    // 真的断了一分钟以上才插占位行。
+    const broken = [...mixed, liveHistoryPoint(server, START + 24_000 + 120_000)]
+    const rows = buildLiveChartRows(broken)
+    expect(rows.filter((row) => row.point === null)).toHaveLength(1)
   })
 })
 

@@ -186,6 +186,13 @@ export function activeProbeTargets(
  */
 export const LIVE_WINDOW_MS = 600_000
 export const LIVE_MAX_POINTS = 600
+/*
+ * 实时缓冲的点距。推送大约 2 秒一条，而垫底用的 10 分钟历史是服务端按约 10 秒一桶
+ * 聚合的；两种密度混在一条线里， 会把稀的那一段判成缺口，图上出现
+ * 一条条空白。所以缓冲按同一个步长保留：不足一个步长的推送不另开新点。
+ * 每个点仍是真实采样，只是丢掉了同一步长内多余的那几条，不做平均也不插值。
+ */
+export const LIVE_STEP_MS = 10_000
 
 /** 把一份节点快照转成历史点；字段一一对应，缺失仍是缺失，不补 0。 */
 export function liveHistoryPoint(server: CfsmServer, timestamp: number): HistoryPoint {
@@ -222,7 +229,11 @@ export function appendLivePoint(
   point: HistoryPoint,
   windowMs = LIVE_WINDOW_MS,
   maxPoints = LIVE_MAX_POINTS,
+  stepMs = LIVE_STEP_MS,
 ): HistoryPoint[] {
+  const last = points[points.length - 1]
+  // 距离上一个保留点不足一个步长：这一条只更新卡片，不进图。
+  if (last && point.timestamp - last.timestamp < stepMs) return [...points]
   const next = [...points, point]
   const earliest = point.timestamp - windowMs
   const withinWindow = next.filter((item) => item.timestamp >= earliest)
@@ -253,4 +264,27 @@ export function seedLivePoints(
   }
   const merged = [...byTimestamp.values()].sort((left, right) => left.timestamp - right.timestamp)
   return merged.length > maxPoints ? merged.slice(merged.length - maxPoints) : merged
+}
+
+/**
+ * 「实时」档位的绘图行。
+ *
+ * 历史用的 `buildChartRows` 按「中位间隔 × 2」判断缺口，那套阈值在实时缓冲上会误判：
+ * 垫底历史与推送样本的密度不同，稀的那一段就被整段当成断线，图上出现一条条空白。
+ * 这里改用绝对阈值：只有真的断了 `gapMs`（默认一分钟）才插占位行，密度差异不算缺口。
+ */
+export function buildLiveChartRows(points: readonly HistoryPoint[], gapMs = 60_000): ChartRow[] {
+  const samples = [...points]
+    .filter((point) => Number.isFinite(point.timestamp))
+    .sort((left, right) => left.timestamp - right.timestamp)
+    .map((point) => ({ timestamp: point.timestamp, point }))
+  const rows: ChartRow[] = []
+  samples.forEach((sample, index) => {
+    const previous = samples[index - 1]
+    if (previous && sample.timestamp - previous.timestamp > gapMs) {
+      rows.push({ timestamp: (previous.timestamp + sample.timestamp) / 2, point: null })
+    }
+    rows.push(sample)
+  })
+  return rows
 }

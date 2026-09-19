@@ -21,7 +21,7 @@ import {
 } from '@/services/cfsm'
 import {
   appendLivePoint,
-  buildChartRows,
+  buildLiveChartRows,
   liveHistoryPoint,
   LIVE_SEED_HOURS,
   seedLivePoints,
@@ -94,8 +94,8 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const pingHistoryState = computed(() => (pingFollowsHistory.value ? historyState.value : ownPingHistoryState.value))
   const pingHistoryIssue = computed(() => (pingFollowsHistory.value ? historyIssue.value : ownPingHistoryIssue.value))
   const pingHistoryPoints = computed(() => pingHistory.value?.points ?? [])
-  /** 「实时」缓冲的绘图行，与历史走同一套缺口规则。 */
-  const liveRows = computed(() => buildChartRows(livePoints.value))
+  /** 「实时」缓冲的绘图行：缺口按绝对时间判断，密度差异不算断线。 */
+  const liveRows = computed(() => buildLiveChartRows(livePoints.value))
   /*
    * 切换「实时」档位。历史窗口保持不变，回到历史档位时不重新请求；延迟区不跟随，
    * 它仍然画自己的历史窗口。
