@@ -170,3 +170,87 @@ export function activeProbeTargets(
     ))
   ))
 }
+
+/*
+ * 「实时」档位的样本缓冲。
+ *
+ * CFSM 的 `/api/history/all` 只有 9 个固定时段，取回来就是静止的快照；页面上真正持续
+ * 到达的是详情页那条 WebSocket 推送。这里把每条推送后的节点快照转成一个历史点，攒在
+ * 浏览器内存里供负载图画「实时」。
+ *
+ * 边界写死在这里，不给调用方放宽的余地：
+ * - 只收本次打开页面之后到达的样本，刷新或离开就重新开始；
+ * - 按真实时间保留最近 `LIVE_WINDOW_MS`，同时限制条数，避免长时间停留后无上限增长；
+ * - 时间戳用推送到达的时刻，与图表其余部分一样按毫秒升序；
+ * - 延迟与丢包照抄当前值，但延迟区不使用这个缓冲（它仍然走自己的历史窗口）。
+ */
+export const LIVE_WINDOW_MS = 600_000
+export const LIVE_MAX_POINTS = 600
+
+/** 把一份节点快照转成历史点；字段一一对应，缺失仍是缺失，不补 0。 */
+export function liveHistoryPoint(server: CfsmServer, timestamp: number): HistoryPoint {
+  return {
+    timestamp,
+    cpu: server.cpu,
+    gpus: server.gpus,
+    memoryUsed: server.memoryUsed,
+    memoryTotal: server.memoryTotal,
+    swapUsed: server.swapUsed,
+    swapTotal: server.swapTotal,
+    diskUsed: server.diskUsed,
+    diskTotal: server.diskTotal,
+    networkInSpeed: server.networkInSpeed,
+    networkOutSpeed: server.networkOutSpeed,
+    networkReceived: server.networkReceived,
+    networkTransmitted: server.networkTransmitted,
+    processes: server.processes,
+    tcpConnections: server.tcpConnections,
+    udpConnections: server.udpConnections,
+    load1: server.load1,
+    load5: server.load5,
+    load15: server.load15,
+    temperature: null,
+    latency: server.latency,
+    packetLoss: server.packetLoss,
+    ...(server.diskIo ? { diskIo: server.diskIo } : {}),
+  }
+}
+
+/** 追加一个点并裁掉超出时间窗口或条数上限的旧点；返回新数组，输入不变。 */
+export function appendLivePoint(
+  points: readonly HistoryPoint[],
+  point: HistoryPoint,
+  windowMs = LIVE_WINDOW_MS,
+  maxPoints = LIVE_MAX_POINTS,
+): HistoryPoint[] {
+  const next = [...points, point]
+  const earliest = point.timestamp - windowMs
+  const withinWindow = next.filter((item) => item.timestamp >= earliest)
+  return withinWindow.length > maxPoints ? withinWindow.slice(withinWindow.length - maxPoints) : withinWindow
+}
+
+/** 垫底用的历史窗口：10 分钟，与 `HISTORY_HOURS` 的第一档相同。 */
+export const LIVE_SEED_HOURS = 0.167
+
+/**
+ * 用最近一段历史给实时缓冲垫底：只取还在窗口内的点，与已经收到的推送样本合并，
+ * 同一时刻以推送样本为准（它更新），最后按时间升序并遵守条数上限。
+ */
+export function seedLivePoints(
+  history: readonly HistoryPoint[],
+  live: readonly HistoryPoint[],
+  now: number,
+  windowMs = LIVE_WINDOW_MS,
+  maxPoints = LIVE_MAX_POINTS,
+): HistoryPoint[] {
+  const earliest = now - windowMs
+  const byTimestamp = new Map<number, HistoryPoint>()
+  for (const point of history) {
+    if (point.timestamp >= earliest) byTimestamp.set(point.timestamp, point)
+  }
+  for (const point of live) {
+    if (point.timestamp >= earliest) byTimestamp.set(point.timestamp, point)
+  }
+  const merged = [...byTimestamp.values()].sort((left, right) => left.timestamp - right.timestamp)
+  return merged.length > maxPoints ? merged.slice(merged.length - maxPoints) : merged
+}

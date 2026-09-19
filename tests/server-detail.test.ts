@@ -3,9 +3,14 @@ import { DEFAULT_PROBE_LABELS } from '@/constants/probes'
 import { probeSeries } from '@/domain/detail-chart-options'
 import {
   activeProbeTargets,
+  appendLivePoint,
   buildChartRows,
   labeledProbeTargets,
+  liveHistoryPoint,
+  LIVE_MAX_POINTS,
+  LIVE_WINDOW_MS,
   probeStats,
+  seedLivePoints,
 } from '@/domain/server-detail'
 import { normalizeHistory, normalizeServer } from '@/services/cfsm/adapters'
 
@@ -117,5 +122,116 @@ describe('probe targets', () => {
       { target: 'node_1', label: 'Tokyo (node_1)' },
       { target: 'node_2', label: 'Tokyo (node_2)' },
     ])
+  })
+})
+
+/*
+ * 「实时」档位的样本缓冲。
+ *
+ * CFSM 的历史接口只有 9 个固定时段，取回来就是静止的；页面上持续到达的只有详情页那条
+ * WebSocket 推送。缓冲把每次推送后的节点快照转成历史点，因此必须做到：字段一一对应、
+ * 缺失仍是缺失、按真实时间裁剪，并且不改动传入的数组。
+ */
+describe('实时样本缓冲', () => {
+  const server = normalizeServer({
+    id: 'node',
+    name: 'Node',
+    cpu: 12.5,
+    load: 0.25,
+    ram: 400,
+    ram_total: 1024,
+    swap: 0,
+    swap_total: 512,
+    disk: 2048,
+    disk_total: 20480,
+    net_in_speed: 1500,
+    net_out_speed: 2500,
+    net_in_transfer: 10,
+    net_out_transfer: 20,
+    process: 99,
+    tcp_conn: 5,
+    udp_conn: 1,
+    ping_ct: 30,
+    loss_ct: 0,
+  }, source)
+
+  it('快照逐字段映射成历史点，缺失不补 0', () => {
+    const point = liveHistoryPoint(server, START)
+    expect(point.timestamp).toBe(START)
+    expect(point.cpu).toBe(server.cpu)
+    expect(point.load1).toBe(server.load1)
+    expect(point.memoryUsed).toBe(server.memoryUsed)
+    expect(point.networkInSpeed).toBe(server.networkInSpeed)
+    expect(point.processes).toBe(server.processes)
+    expect(point.latency.ct).toBe(server.latency.ct)
+    // 历史里有、推送里没有的字段保持缺失，不写成 0。
+    expect(point.temperature).toBeNull()
+  })
+
+  it('按真实时间窗口裁剪，并且不修改传入的数组', () => {
+    const base = [
+      liveHistoryPoint(server, START),
+      liveHistoryPoint(server, START + LIVE_WINDOW_MS - 1_000),
+    ]
+    const snapshot = structuredClone(base)
+    const next = appendLivePoint(base, liveHistoryPoint(server, START + LIVE_WINDOW_MS + 1_000))
+    expect(base).toEqual(snapshot)
+    // 第一个点已经超出窗口，被裁掉。
+    expect(next.map((point) => point.timestamp)).toEqual([
+      START + LIVE_WINDOW_MS - 1_000,
+      START + LIVE_WINDOW_MS + 1_000,
+    ])
+  })
+
+  it('条数也有上限，长时间停留不会无限增长', () => {
+    let points = [] as ReturnType<typeof appendLivePoint>
+    for (let index = 0; index < LIVE_MAX_POINTS + 50; index += 1) {
+      points = appendLivePoint(points, liveHistoryPoint(server, START + index * 1_000))
+    }
+    expect(points).toHaveLength(LIVE_MAX_POINTS)
+    // 保留的是最近的那些点。
+    expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * 1_000)
+  })
+
+  it('缓冲可以直接交给图表行构建，缺口规则与历史一致', () => {
+    const points = [
+      liveHistoryPoint(server, START),
+      liveHistoryPoint(server, START + 5_000),
+      liveHistoryPoint(server, START + 10_000),
+      // 中间断了很久：与历史一样要插入缺口占位行。
+      liveHistoryPoint(server, START + 120_000),
+    ]
+    const rows = buildChartRows(points)
+    expect(rows.length).toBeGreaterThan(points.length)
+    expect(rows.some((row) => row.point === null)).toBe(true)
+  })
+})
+
+describe('实时缓冲的历史垫底', () => {
+  const point = (timestamp: number, cpu: number) => ({
+    ...liveHistoryPoint(normalizeServer({ id: 'node', name: 'Node', cpu }, source), timestamp),
+  })
+
+  it('只取还在窗口内的历史点，按时间升序', () => {
+    const now = START + LIVE_WINDOW_MS
+    const seeded = seedLivePoints(
+      [point(START - 60_000, 1), point(START + 1_000, 2), point(START + 2_000, 3)],
+      [],
+      now,
+    )
+    expect(seeded.map((item) => item.timestamp)).toEqual([START + 1_000, START + 2_000])
+  })
+
+  it('与已收到的推送样本合并，同一时刻以推送为准', () => {
+    const now = START + 10_000
+    const seeded = seedLivePoints([point(START, 1), point(START + 5_000, 1)], [point(START + 5_000, 9)], now)
+    expect(seeded).toHaveLength(2)
+    expect(seeded[1]?.cpu).toBe(9)
+  })
+
+  it('垫底同样受条数上限约束', () => {
+    const history = Array.from({ length: LIVE_MAX_POINTS + 20 }, (_, index) => point(START + index * 1_000, 1))
+    const seeded = seedLivePoints(history, [], START + (LIVE_MAX_POINTS + 20) * 1_000, LIVE_WINDOW_MS * 10)
+    expect(seeded).toHaveLength(LIVE_MAX_POINTS)
   })
 })

@@ -96,11 +96,19 @@ function isNumber(value: number | null): value is number {
   return value !== null && Number.isFinite(value)
 }
 
+interface SideEvidence {
+  values: number[]
+  /** 走到序列尽头才停：证据少是因为窗口边界，而不是缺口。 */
+  atEdge: boolean
+}
+
 interface Neighbourhood {
   left: number[]
   right: number[]
   baseline: number
   noise: number
+  /** 两侧证据都够，可以比较左右中位数。 */
+  comparable: boolean
 }
 
 /**
@@ -131,24 +139,26 @@ export function detectSpikes(
    * 从 `from` 向一侧收集参考值。遇到缺口或超出时间步长立即停止；
    * `skip` 里的下标是疑似高点，最多跳过 `maxSkip` 个，跳过的点不进入参考值。
    */
-  function side(from: number, origin: number, direction: -1 | 1, skip: ReadonlySet<number>): number[] {
-    const collected: number[] = []
+  function side(from: number, origin: number, direction: -1 | 1, skip: ReadonlySet<number>): SideEvidence {
+    const values: number[] = []
     let previous = origin
     let skipped = 0
-    for (let index = from + direction; index >= 0 && index < samples.length; index += direction) {
-      if (collected.length >= params.neighbors) break
+    let index = from + direction
+    for (; index >= 0 && index < samples.length; index += direction) {
+      if (values.length >= params.neighbors) return { values, atEdge: false }
       const sample = samples[index]
-      if (!sample || !isNumber(sample.value)) break
-      if (Math.abs(sample.timestamp - previous) > maxStep) break
+      if (!sample || !isNumber(sample.value)) return { values, atEdge: false }
+      if (Math.abs(sample.timestamp - previous) > maxStep) return { values, atEdge: false }
       previous = sample.timestamp
       if (skip.has(index)) {
         skipped += 1
-        if (skipped > params.maxSkip) break
+        if (skipped > params.maxSkip) return { values, atEdge: false }
         continue
       }
-      collected.push(sample.value)
+      values.push(sample.value)
     }
-    return collected
+    // 一路走到序列尽头：这一侧之所以证据少，是因为窗口就到这里了，不是遇到缺口。
+    return { values, atEdge: true }
   }
 
   function neighbourhood(
@@ -160,12 +170,23 @@ export function detectSpikes(
   ): Neighbourhood | null {
     const left = side(firstIndex, firstTimestamp, -1, skip)
     const right = side(lastIndex, lastTimestamp, 1, skip)
-    if (left.length < params.minPerSide || right.length < params.minPerSide) return null
-    const pool = [...left, ...right]
+    const leftEnough = left.values.length >= params.minPerSide
+    const rightEnough = right.values.length >= params.minPerSide
+    /*
+     * 一侧证据不足时，只有「高值段正好贴着窗口边界、那一侧一个采样都没有」才继续：
+     * 窗口第一个或最后一个采样上的高点此前一律保留，结果整张图的纵轴被一个边缘点顶住。
+     * 那一侧还剩一两个点时不放行——点太少，基线会被它们带偏；缺口造成的证据不足同样保留。
+     */
+    const leftIsEdge = left.atEdge && left.values.length === 0
+    const rightIsEdge = right.atEdge && right.values.length === 0
+    if (!leftEnough && !(leftIsEdge && rightEnough)) return null
+    if (!rightEnough && !(rightIsEdge && leftEnough)) return null
+    const pool = [...left.values, ...right.values]
     const baseline = median(pool)
     const mad = median(pool.map((item) => Math.abs(item - baseline)))
     const noise = Math.max(MAD_TO_SIGMA * mad, params.noiseFloorMs, baseline * params.noiseFloorRatio)
-    return { left, right, baseline, noise }
+    // 两侧都够才比较中位数；靠边的那一侧点太少，比出来的差值没有意义。
+    return { left: left.values, right: right.values, baseline, noise, comparable: leftEnough && rightEnough }
   }
 
   function elevated(value: number, context: Neighbourhood): boolean {
@@ -209,9 +230,11 @@ export function detectSpikes(
     const context = neighbourhood(first.index, last.index, first.timestamp, last.timestamp, suspects)
     if (!context) continue
     if (!run.every((item) => elevated(item.value, context))) continue
-    // 两侧基线不一致：阶跃或爬升，保留。
-    const tolerance = Math.max(params.minRiseMs, context.baseline) * params.sideAgreement
-    if (Math.abs(median(context.left) - median(context.right)) > tolerance) continue
+    // 两侧基线不一致：阶跃或爬升，保留。靠窗口边界的那一段没有两侧可比，跳过这一条。
+    if (context.comparable) {
+      const tolerance = Math.max(params.minRiseMs, context.baseline) * params.sideAgreement
+      if (Math.abs(median(context.left) - median(context.right)) > tolerance) continue
+    }
 
     for (const item of run) mask[item.index] = true
   }

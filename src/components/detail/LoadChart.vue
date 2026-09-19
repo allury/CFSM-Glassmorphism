@@ -45,10 +45,23 @@ import '@/utils/echarts'
  */
 const detail = useServerDetailStore()
 const theme = useThemeSettingsStore()
-const { server, sourceConfig, historyPoints, historyHours, historyState, historyIssue } = storeToRefs(detail)
+const {
+  server,
+  sourceConfig,
+  historyPoints,
+  historyHours,
+  historyState,
+  historyIssue,
+  liveMode,
+  liveRows,
+} = storeToRefs(detail)
 
 const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友好')
-const rows = computed(() => buildChartRows(historyPoints.value))
+/*
+ * 「实时」档位画的是本次打开页面后 WebSocket 推来的样本（store 里的缓冲），
+ * 历史档位画的是取回的那份历史。两者互不混合：同一条线上不会既有桶聚合值又有秒级样本。
+ */
+const rows = computed(() => (liveMode.value ? liveRows.value : buildChartRows(historyPoints.value)))
 const context = computed<LoadChartContext>(() => ({
   rows: rows.value,
   hours: historyHours.value,
@@ -56,18 +69,26 @@ const context = computed<LoadChartContext>(() => ({
   series: getChartSeriesPalette(accessible.value),
   theme: getChartThemeColors(theme.resolvedTheme === 'dark'),
 }))
-const loading = computed(() => historyState.value === 'loading')
+const loading = computed(() => !liveMode.value && historyState.value === 'loading')
 const errorCopy = computed(() => issueCopy(historyIssue.value, 'history'))
 
-const rangeItems: AppTabItem[] = HISTORY_HOURS.map((hours) => ({
-  value: String(hours),
-  label: HISTORY_RANGE_LABELS[hours],
-}))
+const LIVE_RANGE = 'live'
+const rangeItems: AppTabItem[] = [
+  { value: LIVE_RANGE, label: '实时' },
+  ...HISTORY_HOURS.map((hours) => ({ value: String(hours), label: HISTORY_RANGE_LABELS[hours] })),
+]
 const rangeModel = computed({
-  get: () => String(historyHours.value),
+  get: () => (liveMode.value ? LIVE_RANGE : String(historyHours.value)),
   set: (value: string) => {
+    if (value === LIVE_RANGE) {
+      detail.setLiveMode(true)
+      return
+    }
     const hours = HISTORY_HOURS.find((item) => String(item) === value)
-    if (hours !== undefined && hours !== historyHours.value) void detail.loadHistory(hours)
+    if (hours === undefined) return
+    // 回到历史档位：窗口没变就不再请求，直接用已经取回的那份。
+    detail.setLiveMode(false)
+    if (hours !== historyHours.value) void detail.loadHistory(hours)
   },
 })
 
@@ -174,7 +195,10 @@ function retry(): void {
           重试
         </button>
       </div>
-      <AppEmpty v-else-if="rows.length === 0 && !loading" description="暂无负载数据" />
+      <AppEmpty
+        v-else-if="rows.length === 0 && !loading"
+        :description="liveMode ? '正在采集实时数据，只显示本次打开页面后收到的样本' : '暂无负载数据'"
+      />
 
       <div v-else class="metric-chart-grid">
         <article v-if="enabled('cpu')" class="metric-chart-card" data-load-chart-card="cpu" :style="orderStyle('cpu')">

@@ -155,12 +155,16 @@ describe('theme settings store', () => {
     const store = useThemeSettingsStore()
     store.initialize(storage)
     store.hydrateBackend({ themeMode: 'light' }, 'auto', true)
-    // 覆盖值不是浅色也不是深色，按「跟随」处理：下一步直接给出相反的明暗。
+    /*
+     * 覆盖值不是浅色也不是深色，按「跟随」处理：下一步给出与**站点设置**相反的明暗。
+     * 这里的站点设置是浅色，所以结果固定是深色——不能拿带覆盖的当前呈现去推，
+     * 那样在北京时间夜间跑这条用例会翻过来。
+     */
     expect(store.themeOverride).toBeNull()
-    const before = store.resolvedTheme
+    expect(store.siteThemeMode).toBe('light')
     store.cycleTheme()
-    expect(store.themeOverride).toBe(before === 'dark' ? 'light' : 'dark')
-    expect(store.resolvedTheme).not.toBe(before)
+    expect(store.themeOverride).toBe('dark')
+    expect(store.resolvedTheme).toBe('dark')
   })
 
   it('回到跟随站点设置只清除主题这一项，其它本地覆盖保留', () => {

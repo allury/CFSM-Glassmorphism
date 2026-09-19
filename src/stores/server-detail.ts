@@ -4,6 +4,7 @@ import type {
   CfsmRequestIssue,
   CfsmServer,
   CfsmSocketState,
+  HistoryPoint,
   HistorySeries,
   SiteConfig,
 } from '@/types/cfsm'
@@ -18,6 +19,13 @@ import {
   type DetailRealtimeController,
   type HistoryHours,
 } from '@/services/cfsm'
+import {
+  appendLivePoint,
+  buildChartRows,
+  liveHistoryPoint,
+  LIVE_SEED_HOURS,
+  seedLivePoints,
+} from '@/domain/server-detail'
 import { useAppStore } from './app'
 import { useThemeSettingsStore } from './theme-settings'
 
@@ -38,6 +46,12 @@ export const useServerDetailStore = defineStore('server-detail', () => {
    * 两张图共用这一个窗口，冷启动只发一次历史请求。
    */
   const historyHours = ref<HistoryHours>(1)
+  /*
+   * 「实时」档位：只画本次打开页面后 WebSocket 推来的样本，不发任何请求。
+   * 缓冲随节点切换清空，离开或刷新就重新开始；窗口与条数上限在 `domain/server-detail.ts`。
+   */
+  const liveMode = ref(false)
+  const livePoints = ref<HistoryPoint[]>([])
   /*
    * 上游负载图与延迟图各有一条时间范围选择，因为那边是两个独立端点
    * （`/records/load` 与 `/records/ping`）。CFSM 只有一个 `/api/history/all`，
@@ -80,6 +94,32 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const pingHistoryState = computed(() => (pingFollowsHistory.value ? historyState.value : ownPingHistoryState.value))
   const pingHistoryIssue = computed(() => (pingFollowsHistory.value ? historyIssue.value : ownPingHistoryIssue.value))
   const pingHistoryPoints = computed(() => pingHistory.value?.points ?? [])
+  /** 「实时」缓冲的绘图行，与历史走同一套缺口规则。 */
+  const liveRows = computed(() => buildChartRows(livePoints.value))
+  /*
+   * 切换「实时」档位。历史窗口保持不变，回到历史档位时不重新请求；延迟区不跟随，
+   * 它仍然画自己的历史窗口。
+   *
+   * 缓冲是空的时候（刚打开页面就切过来）先取一次最近 10 分钟的历史垫底，否则要等
+   * 第一条推送才有东西，看起来像坏了。这份历史与推送样本同源，只是服务端按约 10 秒
+   * 一桶聚合过；垫底之后由推送接着往右画。取不到就空着等推送，不编数据。
+   */
+  async function setLiveMode(enabled: boolean): Promise<void> {
+    liveMode.value = enabled
+    if (!enabled || livePoints.value.length > 0) return
+    const current = server.value
+    const controller = requestController
+    if (!current || !controller) return
+    try {
+      const seed = await fetchHistory(current.id, LIVE_SEED_HOURS, current.source.base, {
+        signal: controller.signal,
+      })
+      if (controller.signal.aborted || !liveMode.value) return
+      livePoints.value = seedLivePoints(seed.points, livePoints.value, Date.now())
+    } catch {
+      // 垫底失败不影响实时本身：继续等推送。
+    }
+  }
 
   function stopRealtime(): void {
     realtime?.dispose()
@@ -100,6 +140,8 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     }
     server.value = current
     lastRealtimeAt.value = receivedAt
+    // 每条推送留一份快照给「实时」档位；与历史各走各的，互不覆盖。
+    livePoints.value = appendLivePoint(livePoints.value, liveHistoryPoint(current, receivedAt))
   }
 
   function startRealtime(): void {
@@ -141,6 +183,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       if (!controller.signal.aborted) {
         server.value = refreshed
         refreshIssue.value = null
+        /*
+         * WebSocket 不可用时会退化成 REST 轮询，这条路径同样要往实时缓冲补点，
+         * 否则「实时」档位在降级期间会停住不动。间隔随轮询间隔变宽，点仍是真实采样。
+         */
+        livePoints.value = appendLivePoint(livePoints.value, liveHistoryPoint(refreshed, Date.now()))
       }
     } catch (error) {
       if (controller.signal.aborted) return
@@ -272,6 +319,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     server.value = null
     sourceConfig.value = null
     history.value = null
+    livePoints.value = []
     ownPingHistory.value = null
     issue.value = null
     historyIssue.value = null
@@ -338,6 +386,10 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     sourceConfig,
     history,
     historyHours,
+    liveMode,
+    livePoints,
+    liveRows,
+    setLiveMode,
     historyPoints,
     pingHistory,
     pingHistoryHours,

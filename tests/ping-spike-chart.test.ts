@@ -309,5 +309,7 @@ describe('组件接线', () => {
 
   it('统计仍从原始历史算，不经过遮蔽', () => {
     expect(source).toMatch(/stats: probeStats\(pingHistoryPoints\.value, entry\.target\)/)
+    // 延迟区不跟随负载图的「实时」档位，仍然画自己的历史窗口。
+    expect(source).not.toContain('liveRows')
   })
 })

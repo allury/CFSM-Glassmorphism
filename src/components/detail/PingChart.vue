@@ -72,6 +72,7 @@ const {
 } = storeToRefs(detail)
 
 const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友好')
+/* 延迟区只画取回的那份历史：负载图的「实时」档位不带它一起走。 */
 const rows = computed(() => buildChartRows(pingHistoryPoints.value))
 const loading = computed(() => pingHistoryState.value === 'loading')
 const errorCopy = computed(() => issueCopy(pingHistoryIssue.value, 'history'))
