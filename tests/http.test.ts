@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   CfsmRequestError,
   cfsmGet,
@@ -35,7 +35,50 @@ class MemoryStorage implements Storage {
   }
 }
 
+afterEach(() => vi.useRealTimers())
+
 describe('CFSM HTTP transport', () => {
+  it.each(['timeout', 'caller'] as const)('keeps %s cancellation active while reading the body', async (reason) => {
+    vi.useFakeTimers()
+    const caller = new AbortController()
+    let signal: AbortSignal | null | undefined
+    let bodyController: ReadableStreamDefaultController<Uint8Array> | undefined
+    const fetcher: typeof fetch = async (_input, init) => {
+      signal = init?.signal
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          bodyController = controller
+          signal?.addEventListener('abort', () => controller.error(new DOMException('Aborted', 'AbortError')))
+        },
+      })
+      return new Response(body)
+    }
+    const request = cfsmGet('/api/config', {
+      base: 'https://status.example', fetcher, signal: caller.signal, timeoutMs: 50,
+    })
+    const rejected = expect(request).rejects.toMatchObject({
+      code: reason === 'timeout' ? 'timeout' : 'networkError',
+    })
+    // Response headers have already arrived; the body is deliberately still pending.
+    await Promise.resolve()
+    if (reason === 'timeout') await vi.advanceTimersByTimeAsync(50)
+    else caller.abort('page closed')
+    const wasAborted = signal?.aborted
+    // Also settle the pre-fix implementation, so a regression fails instead of hanging.
+    if (!wasAborted) bodyController?.error(new Error('body never aborted'))
+    await rejected
+    expect(wasAborted).toBe(true)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('wraps a broken response stream as a network error', async () => {
+    const fetcher: typeof fetch = async () => new Response(new ReadableStream({
+      start(controller) { controller.error(new TypeError('connection lost during body')) },
+    }))
+    await expect(cfsmGet('/api/config', { base: 'https://status.example', fetcher }))
+      .rejects.toMatchObject({ code: 'networkError', path: '/api/config' })
+  })
+
   it('sends JWT and the reusable Turnstile credential', async () => {
     const storage = new MemoryStorage()
     storage.setItem(STORAGE_KEYS.jwt, 'jwt-value')

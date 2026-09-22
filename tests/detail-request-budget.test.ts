@@ -146,6 +146,47 @@ afterEach(() => {
 })
 
 describe('detail page request budget', () => {
+  it('reuses a still-pending primary config request instead of duplicating it', async () => {
+    const calls: string[] = []
+    let releaseConfig: ((response: Response) => void) | undefined
+    vi.stubGlobal('document', { querySelector: () => ({ content: BASE }) })
+    vi.stubGlobal('window', { location: { origin: BASE } })
+    vi.stubGlobal('fetch', async (input: unknown) => {
+      const url = String(input)
+      calls.push(url)
+      if (url.includes('/api/config')) {
+        return new Promise<Response>((resolve) => {
+          releaseConfig = resolve
+        })
+      }
+      if (url.includes('/api/server?')) return jsonResponse({ id: 'node-1', name: 'Node 1' })
+      if (url.includes('/api/history/all')) return jsonResponse([])
+      return jsonResponse({})
+    })
+    vi.stubGlobal('WebSocket', class {
+      static readonly OPEN = 1
+      readyState = 0
+      close(): void {}
+      send(): void {}
+      addEventListener(): void {}
+      removeEventListener(): void {}
+    })
+    setActivePinia(createPinia())
+
+    const app = useAppStore()
+    const initializing = app.initialize()
+    const detail = useServerDetailStore()
+    const opening = detail.open('node-1', [BASE])
+    await Promise.resolve()
+    await Promise.resolve()
+
+    expect(configCalls(calls)).toHaveLength(1)
+    releaseConfig?.(jsonResponse({ site_title: '真实站点', version: '2.8.5' }))
+    await Promise.all([initializing, opening])
+    expect(detail.sourceConfig?.siteTitle).toBe('真实站点')
+    expect(configCalls(calls)).toHaveLength(1)
+  })
+
   it('reuses the loaded site config instead of asking /api/config a second time', async () => {
     const calls = stubNetwork()
     setActivePinia(createPinia())
@@ -196,6 +237,65 @@ describe('detail page request budget', () => {
     expect(detail.historyHours).toBe(1)
     expect(detail.pingHistoryHours).toBe(1)
     expect(detail.pingHistory).toBe(detail.history)
+  })
+
+  it('does not let a slower REST refresh roll a newer detail WebSocket sample back', async () => {
+    const calls: string[] = []
+    let releaseRefresh: ((response: Response) => void) | undefined
+    let detailRequests = 0
+    vi.stubGlobal('fetch', async (input: unknown) => {
+      const url = String(input)
+      calls.push(url)
+      if (url.includes('/api/server?')) {
+        detailRequests += 1
+        if (detailRequests === 1) return jsonResponse({ id: 'node-1', name: 'Node 1', cpu: 10 })
+        return new Promise<Response>((resolve) => {
+          releaseRefresh = resolve
+        })
+      }
+      if (url.includes('/api/history/all')) return jsonResponse([])
+      return jsonResponse({ site_title: 'demo', version: '2.8.5' })
+    })
+    class Socket {
+      static readonly OPEN = 1
+      readyState = 1
+      onopen: (() => void) | null = null
+      onmessage: ((event: { data: unknown }) => void) | null = null
+      onerror: (() => void) | null = null
+      onclose: ((event: { code: number }) => void) | null = null
+      constructor() {
+        queueMicrotask(() => this.onopen?.())
+      }
+      send(): void {}
+      close(): void {}
+    }
+    const sockets: Socket[] = []
+    vi.stubGlobal('WebSocket', class extends Socket {
+      constructor() {
+        super()
+        sockets.push(this)
+      }
+    })
+    setActivePinia(createPinia())
+    const app = useAppStore()
+    app.apiBases = [BASE]
+    app.applyConfig(normalizeSiteConfig({ site_title: 'demo', version: '2.8.5' }))
+    const detail = useServerDetailStore()
+    await detail.open('node-1', [BASE])
+
+    const refreshing = detail.refresh()
+    await Promise.resolve()
+    sockets.at(-1)?.onmessage?.({
+      data: JSON.stringify({
+        type: 'batchUpdate',
+        updates: [{ serverId: 'node-1', samples: [{ ts: 1_700_000_010, data: { cpu: 88 } }] }],
+      }),
+    })
+    releaseRefresh?.(jsonResponse({ id: 'node-1', name: 'Node 1', cpu: 20 }))
+    await refreshing
+
+    expect(detail.server?.cpu).toBe(88)
+    expect(calls.filter((url) => url.includes('/api/server?'))).toHaveLength(2)
   })
 
   it('moves both charts together when the load window changes, with one request', async () => {
@@ -356,6 +456,34 @@ describe('detail page request budget', () => {
       expect(detail.historyState).toBe('ready')
       expect(detail.history?.points.at(0)?.cpu).toBe(42)
       expect(detail.historyIssue).toBeNull()
+    })
+
+    it('retains the last real snapshot when a same-window refresh fails', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+      expect(detail.history?.points.at(0)?.cpu).toBe(1)
+
+      const refresh = detail.loadHistory(1)
+      await gate.fail(1)
+      await refresh
+
+      expect(detail.historyState).toBe('error')
+      expect(detail.history?.points.at(0)?.cpu).toBe(1)
+      expect(detail.historyIssue).not.toBeNull()
+    })
+
+    it('clears the old range while a different history window is pending', async () => {
+      const gate = gateNetwork()
+      setActivePinia(createPinia())
+      const detail = await openGated(gate)
+
+      const pending = detail.loadHistory(24)
+      expect(detail.historyHours).toBe(24)
+      expect(detail.history).toBeNull()
+      await gate.release(24)
+      await pending
+      expect(detail.history?.points.at(0)?.cpu).toBe(24)
     })
 
     it('opening another node discards the response still in flight for the old one', async () => {

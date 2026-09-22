@@ -19,6 +19,8 @@ apiBase 的来源是 HTML 中可选的 `<meta name="apiBase" content="https://a.
 
 Transport 位于 `src/services/cfsm/http.ts`，endpoint orchestration 位于 `src/services/cfsm/api.ts`，所有 wire payload 都在 `src/services/cfsm/adapters.ts` 从 `unknown` 转为领域类型。Vue 组件不直接调用 `fetch`。
 
+v1.1.12 维护预览只收敛请求生命周期：默认 15 秒超时和调用方取消持续到响应体读取完成，响应流中断使用既有 `networkError` 分类。端点、鉴权、状态码、请求参数与 probe 三态不变；没有新增轮询或写接口。
+
 ## 第三方汇率数据源（v1.1.7）
 
 财务合计与详情页剩余价值需要把节点原币换算成显示币种。CFSM 没有汇率接口，本主题沿用上游的做法，由访客浏览器直接读取公开日汇率，不经过 Worker，也不新增 CFSM 请求。

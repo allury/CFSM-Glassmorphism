@@ -191,7 +191,9 @@ describe('站点级展示开关下发到每台节点（BUG-003 回归）', () =>
    * `/api/servers` 恰好 1 次，节点选择器也随之补齐到 10 项。
    */
   it('详情冷启动补一次已有的列表请求，且只在 store 为空时触发', () => {
-    expect(detailView).toContain('if (serverStore.collections.length === 0) await serverStore.load()')
+    expect(detailView).toContain('serverStore.collections.length === 0')
+    expect(detailView).toContain("const configPromise = app.state === 'idle' ? app.initialize() : Promise.resolve()")
+    expect(detailView).toContain('await Promise.all([configPromise, loadCurrent(), listPromise])')
     // 不允许出现轮询或定时重取站点开关。
     expect(detailView).not.toMatch(/setInterval\([^)]*serverStore\.load/)
   })
@@ -199,7 +201,8 @@ describe('站点级展示开关下发到每台节点（BUG-003 回归）', () =>
   it('站点开关未知时先隐藏，拿到之后再决定，避免把已关闭的价格闪出来', () => {
     expect(detailView).toContain('const siteVisibilityKnown = computed(')
     expect(detailView).toContain('if (!siteVisibilityKnown.value) return false')
-    expect(detailView).toContain('serverStore.loadedAt !== null')
+    expect(detailView).toContain('serverStore.hasLoadedSource(server.value.source.base)')
+    expect(detailView).not.toContain('serverStore.loadedAt !== null')
   })
 })
 

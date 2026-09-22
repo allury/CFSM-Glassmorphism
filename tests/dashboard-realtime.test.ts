@@ -47,6 +47,34 @@ function connectionFactory() {
 afterEach(() => vi.useRealTimers())
 
 describe('dashboard realtime coordination', () => {
+  it.each([false, true])('recovers after two visibility cycles during one REST refresh (dispose=%s)', async (dispose) => {
+    const visibility = new FakeVisibility()
+    const factory = connectionFactory()
+    let finish: (() => void) | undefined
+    const refreshRest = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))
+    const controller = createDashboardRealtime({
+      getSources: () => [{ base: 'https://a.example', ids: ['a-1'] }],
+      getTimeoutMinutes: () => 0,
+      refreshRest,
+      onSampleBatches: vi.fn(), onSourceState: vi.fn(), onFallbackChange: vi.fn(),
+      onTimeoutChange: vi.fn(), onPausedChange: vi.fn(),
+      createSocket: factory.createSocket, documentRef: visibility,
+    })
+    controller.start()
+    for (let i = 0; i < 2; i += 1) {
+      visibility.hidden = true
+      visibility.emit()
+      visibility.hidden = false
+      visibility.emit()
+    }
+    expect(refreshRest).toHaveBeenCalledOnce()
+    expect(factory.connections).toHaveLength(1)
+    if (dispose) controller.dispose()
+    finish?.()
+    await vi.waitFor(() => expect(factory.connections).toHaveLength(dispose ? 1 : 2))
+    controller.dispose()
+  })
+
   it('creates exactly one connection per API base with only source-owned IDs', () => {
     let sources: DashboardRealtimeSource[] = [
       { base: 'https://a.example', ids: ['a-1', 'same-id'] },
@@ -109,9 +137,7 @@ describe('dashboard realtime coordination', () => {
     expect(refreshRest).toHaveBeenCalledOnce()
     expect(factory.connections).toHaveLength(1)
     finishRefresh?.()
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(factory.connections).toHaveLength(2)
+    await vi.waitFor(() => expect(factory.connections).toHaveLength(2))
     controller.dispose()
   })
 

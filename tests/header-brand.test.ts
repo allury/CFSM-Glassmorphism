@@ -48,6 +48,23 @@ describe('header brand mark', () => {
     expect(html).not.toContain('brand__mark-initial')
   })
 
+  it('uses stable placeholders instead of a fake initial while the title is pending', async () => {
+    const html = await render({ title: null, titlePending: true })
+    expect(html).toContain('brand__mark-dot')
+    expect(html).toContain('brand__title-placeholder skeleton')
+    expect(html).not.toContain('brand__mark-initial')
+    expect(html).not.toContain('CF Server Monitor')
+  })
+
+  it('keeps a fixed pending-title geometry inside the existing brand column', () => {
+    const start = stylesheet.indexOf('.brand__title-placeholder {')
+    expect(start).toBeGreaterThan(-1)
+    const block = stylesheet.slice(start, stylesheet.indexOf('}', start))
+    expect(block).toContain('width: min(152px, 32vw)')
+    expect(block).toContain('height: 22px')
+    expect(stylesheet).toContain('.brand__copy > span:not(.brand__title-placeholder)')
+  })
+
   it('reads the injected link tag rather than assuming /favicon.ico exists', () => {
     expect(source).toContain('link[rel~="icon"]')
     // 取不到注入的那条时才退到固定路径。

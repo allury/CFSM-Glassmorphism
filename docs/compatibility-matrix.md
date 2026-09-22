@@ -167,6 +167,8 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 
 ## 关键审计结论
 
+- v1.1.12 维护预览不改变本表的能力边界：修复快速前后台切换时的 REST/WS 恢复竞态与资源释放，保留 Angel `wss_report_interval`、历史点位、probe 三态和配置含义；Issue #1 继续作为上游限制记录，不采用主题端绕过方案。预览从 `preview-main` 安装，稳定版仍是 v1.1.11。
+
 - CFSM 的 dashboard 公共接口不返回管理端 `note`，也不返回服务器实际 IP、ASN 或城市；这些能力不得由占位值补齐。
 - `gpu` 已废弃，适配只读取 `gpu_info`。REST 可能返回 JSON 字符串，WebSocket 新数据返回数组。
 - `disk` 只有六个指标中至少一个非零时才有意义；缺失、格式错误或全零都视为不可用。

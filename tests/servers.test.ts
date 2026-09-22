@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { watch } from 'vue'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { normalizeServer } from '@/services/cfsm/adapters'
 import { apiSource } from '@/services/cfsm/config'
 import { useServersStore } from '@/stores/servers'
@@ -25,6 +25,8 @@ function collection(base: string, cpu: number): ServerCollection {
   }
 }
 
+afterEach(() => vi.unstubAllGlobals())
+
 describe('realtime server store', () => {
   it('merges samples only into the owning API base and preserves missing fields', () => {
     setActivePinia(createPinia())
@@ -33,6 +35,8 @@ describe('realtime server store', () => {
       collection('https://a.example', 10),
       collection('https://b.example', 20),
     ]
+    expect(store.hasLoadedSource('https://a.example')).toBe(true)
+    expect(store.hasLoadedSource('https://missing.example')).toBe(false)
 
     store.applyRealtimeSamples('https://a.example', [{
       serverId: 'same-id',
@@ -99,5 +103,70 @@ describe('realtime server store', () => {
     expect(store.servers[0]?.online).toBe(true)
     store.expireStaleServers(1_700_000_301_000)
     expect(store.servers[0]).toMatchObject({ online: false, cpu: 10 })
+  })
+
+  it('does not let an older REST list overwrite a WebSocket sample received in flight', async () => {
+    setActivePinia(createPinia())
+    const store = useServersStore()
+    store.collections = [collection('https://a.example', 10)]
+    let release: ((response: Response) => void) | undefined
+    vi.stubGlobal('fetch', () => new Promise<Response>((resolve) => {
+      release = resolve
+    }))
+
+    const loading = store.load(['https://a.example'])
+    store.applyRealtimeSamples('https://a.example', [{
+      serverId: 'same-id',
+      timestamp: 1_700_000_010,
+      data: { cpu: 77 },
+    }], 1_700_000_010_000)
+    release?.(new Response(JSON.stringify({
+      servers: [{ id: 'same-id', cpu: 20, is_online: true }],
+      stats: {},
+    }), { status: 200 }))
+    await loading
+
+    expect(store.servers[0]?.cpu).toBe(77)
+    expect(store.state).toBe('ready')
+  })
+
+  it('shares one in-flight server list request across route consumers', async () => {
+    setActivePinia(createPinia())
+    const store = useServersStore()
+    let release: ((response: Response) => void) | undefined
+    const fetcher = vi.fn(() => new Promise<Response>((resolve) => {
+      release = resolve
+    }))
+    vi.stubGlobal('fetch', fetcher)
+
+    const first = store.load(['https://a.example'])
+    const second = store.load(['https://a.example'])
+    expect(fetcher).toHaveBeenCalledTimes(1)
+    release?.(new Response('{"servers":[],"stats":{}}', { status: 200 }))
+    await Promise.all([first, second])
+
+    expect(store.state).toBe('ready')
+    expect(store.collections).toHaveLength(1)
+  })
+
+  it('does not let an in-flight server list repopulate the store after clear', async () => {
+    setActivePinia(createPinia())
+    const store = useServersStore()
+    let release: ((response: Response) => void) | undefined
+    vi.stubGlobal('fetch', () => new Promise<Response>((resolve) => {
+      release = resolve
+    }))
+
+    const loading = store.load(['https://a.example'])
+    store.clear()
+    release?.(new Response(JSON.stringify({
+      servers: [{ id: 'stale-id', name: 'stale node', is_online: true }],
+      stats: {},
+    }), { status: 200 }))
+    await loading
+
+    expect(store.state).toBe('idle')
+    expect(store.collections).toEqual([])
+    expect(store.servers).toEqual([])
   })
 })

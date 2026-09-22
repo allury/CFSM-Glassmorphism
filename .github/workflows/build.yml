@@ -63,6 +63,32 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  # main 保留源码；只有通过质量门的构建才进入可安装的滚动预览分支。
+  # 不打标签、不创建 Release，也不改稳定版 theme-dist。
+  preview-main:
+    if: github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: publish-preview-main
+      cancel-in-progress: false
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download verified theme archive
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.verify.outputs.artifact-name }}
+          path: archive
+
+      - name: Publish installable main preview
+        run: node scripts/publish-preview.mjs "archive/${{ needs.verify.outputs.artifact-name }}" "$GITHUB_SHA"
+
   # CFSM 主题商店支持「自定义主题 URL」，它把
   # https://github.com/<owner>/<repo>/tree/<ref> 解析为
   # https://raw.githubusercontent.com/<owner>/<repo>/<ref>/ 并直接拉取

@@ -173,6 +173,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   let activeStorage: Storage | undefined
   let mediaQuery: MediaQueryList | null = null
   let storageListenerInstalled = false
+  let saveInFlight: Promise<ThemeSaveOutcome> | null = null
 
   const resolvedTheme = computed(() => resolveThemeMode(
     runtime.value.themeMode,
@@ -410,7 +411,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
       : '当前会话已使用后端配置，但浏览器拒绝更新本地存储；重新加载后旧覆盖可能恢复。'
   }
 
-  async function saveBackend(base: string, options: ThemeSaveOptions = {}): Promise<ThemeSaveOutcome> {
+  async function performBackendSave(base: string, options: ThemeSaveOptions = {}): Promise<ThemeSaveOutcome> {
     previewDraft()
     if (draftIssues.value.length > 0) {
       saveState.value = 'error'
@@ -480,6 +481,22 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
         : '设置已保存；但配置回读与持久化本地覆盖清理均失败，当前会话使用保存响应。'
       return { saved: true, config: null, refetchWarning: warning }
     }
+  }
+
+  function saveBackend(base: string, options: ThemeSaveOptions = {}): Promise<ThemeSaveOutcome> {
+    // disabled 属性更新前的同步双击也只能产生一次写请求；所有调用方共享其结果。
+    if (saveInFlight) return saveInFlight
+    const pending = performBackendSave(base, options)
+    saveInFlight = pending
+    void pending.then(
+      () => {
+        if (saveInFlight === pending) saveInFlight = null
+      },
+      () => {
+        if (saveInFlight === pending) saveInFlight = null
+      },
+    )
+    return pending
   }
 
   function clearStatus(): void {

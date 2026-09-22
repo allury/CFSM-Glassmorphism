@@ -36,6 +36,7 @@ UI (render and user intent only)
 位置：`src/services/cfsm/http.ts`。
 
 - 只处理 URL、method、JSON、credentials、15 秒默认超时和可取消 signal。
+- 超时和调用方取消覆盖响应头及响应体读取全过程；流中断统一归类为网络错误，完成后释放计时器与取消监听。
 - 从 CFSM 兼容存储键附加 JWT 与 Turnstile header。
 - 把非 2xx 统一转换为带 status、path、code、details 的 `CfsmRequestError`。
 - 401 清 JWT，403 清 Turnstile；不自动导航，不吞掉 409/503。
@@ -51,10 +52,13 @@ UI (render and user intent only)
 - `websocket.ts` 只负责单一 base 的 URL、订阅帧、消息适配、连接时限、keepalive 和有界退避。
 - `dashboard-realtime.ts` 负责首页多 base 协调、visibility 生命周期、REST 补偿与用户超时决策；不会跨来源拼接订阅 ID。
 - `detail-realtime.ts` 只建立 owning base 的 `subscribe=<serverId>` 连接；页面恢复可见时先刷新单节点 REST，失败时以单个低频 REST 循环补偿。
+- 首页与详情的可见性恢复共享正在进行的 REST 刷新；快速隐藏/显示时只允许最新 visibility revision 在刷新结束后恢复连接，卸载后不再重连。WebSocket 订阅、心跳或 error 失败统一关闭旧连接并进入原有退避流程。
 - `errors.ts` 把 400/401/403/404/409/5xx（含 503）、网络错误与未知错误转换为稳定 issue（含 `forbidden` 与 `server-error`）；UI 只选择对应文案，不解析响应体。
 - `identifiers.ts` 提供统一的 `normalizeServerId` 白名单校验，`api.ts` 详情/历史请求与 `websocket.ts` 订阅 ID 清洗共用；非法 id 在发请求前即被拒绝（400 `invalidServerId`）。
 
 ### Adapter
+
+v1.1.12 维护预览没有更改 adapter、normalized model 或 wire 契约。详情 `open` 持有本次请求的局部 AbortController，避免 `close` 清空 store 控制器后，延迟返回的成功/失败分支访问空引用。
 
 位置：`src/services/cfsm/adapters.ts`。
 
@@ -80,14 +84,14 @@ UI (render and user intent only)
 
 位置：`src/stores/`。
 
-- `app.ts` 管理 apiBases、站点 config、加载状态与官方管理端地址。
+- `app.ts` 管理 apiBases、站点 config、加载状态与官方管理端地址。并发消费者共享同一个配置请求；revision 阻止旧初始化覆盖保存后的回读，暂时失败时保留最后一份真实配置。
 - `servers.ts` 管理按来源分开的集合，以 `base::id` 作为稳定键，避免不同站点 UUID 冲突。
-- `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。
+- `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。首页与详情共享进行中的列表请求，列表请求期间收到的较新 WSS 样本不会被旧 REST 覆盖，`clear()` 会使在途响应失效。
 - `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
 - `dashboard-preferences.ts` 只保存以 source+id 标识的收藏。旧快照中的主题、视图与离线排序由 theme settings 层一次性迁移，避免同一外观状态有两个写入者。
-- `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。
+- `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。同一时刻的重复后端保存共享一个 Promise，避免按钮状态提交前的快速双击产生重复 POST。
 - `finance.ts`（v1.1.7）管理财务偏好（显示币种、排除免费节点、手动汇率）与汇率状态：当日缓存、单个进行中的请求、失败后退回旧缓存或参考表。偏好只存浏览器本地，不进入 `theme_options`。
-- `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。
+- `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。配置、单节点、可见性列表与 History 并发启动；owning config 有独立 pending/ready/error 状态，慢配置不阻塞节点。History 切换范围会清除上一范围，原范围 revalidate 失败则保留最后真实快照；revision 与局部 AbortController 共同阻止旧请求、卸载后请求和慢 REST 覆盖新 WSS。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
 
 ### UI
@@ -105,6 +109,7 @@ UI (render and user intent only)
 - 节点卡片与列表行的主点击直达 `/#/server/:id`（与 Komari 一致），中间不再插入任何快速查看或二次确认层。
 - 首页节点区直接遍历同一份 `visibleServers` 渲染 NodeCard 或 NodeList；分组仍作为真实字段筛选条件，但不再包一层偏离 Komari 的视觉分组容器。高级工具展开状态属于 `dashboard-view` 会话状态，默认关闭，不进入 theme settings 或后端快照。
 - 首页与详情共用 `AppHeader`。详情主层级为顶部节点导航、资源卡、硬件/系统/存储/网络信息卡，再接 CFSM 真实可用的 probe、GPU、磁盘 IO 与 History；共享视觉结构不改变详情只消费 normalized model 的边界。
+- `src/domain/site-title.ts` 是站点标题的唯一状态机：配置 pending 时 Header 使用固定尺寸占位且不猜站点名；请求明确失败后才使用既有 fallback；详情只组合 owning source 的标题，切换 source 时不会泄漏上一来源标题、版本或授权状态。
 - `ServerDetailView` 只消费 `CfsmServer`、`HistoryPoint` 与纯 domain 图表模型。ECharts 折线图按真实时间戳绘制，`connectNulls: false` 使缺失/超时形成断点，不补点；probe 图例额外保留有效/超时/缺失计数。
 
 ## Theme Options

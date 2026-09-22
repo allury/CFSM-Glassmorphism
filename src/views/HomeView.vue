@@ -37,6 +37,7 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { parseSettingKeys } from '@/theme/settings'
+import { resolveSiteTitle } from '@/domain/site-title'
 import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
 const app = useAppStore()
@@ -57,7 +58,12 @@ const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
   '--node-item-delay': `${index * 34}ms`,
 }))
 
-const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
+const siteTitleResolution = computed(() => resolveSiteTitle(
+  app.config?.siteTitle,
+  app.config === null && (app.state === 'idle' || app.state === 'loading'),
+))
+const siteTitle = computed(() => siteTitleResolution.value.title)
+const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
 const viewMode = computed({
   get: () => theme.viewMode,
   set: (value: DashboardViewMode) => theme.setDashboardViewMode(value),
@@ -181,7 +187,7 @@ watch(groups, (nextGroups) => {
 })
 
 watch(siteTitle, (title) => {
-  document.title = title
+  if (title) document.title = title
 }, { immediate: true })
 
 async function refreshRest(): Promise<void> {
@@ -252,6 +258,7 @@ onUnmounted(() => realtime.stop())
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"
+        :title-pending="siteTitlePending"
         :version="app.config?.version ?? null"
         :loading="refreshing"
         :online="summary.online"
@@ -406,7 +413,7 @@ onUnmounted(() => realtime.stop())
             v-if="showAdvancedTools"
             :servers="glassServers"
             :settings="theme.runtime"
-            :site-title="siteTitle"
+            :site-title="siteTitle ?? ''"
             @select="openServer"
           />
 

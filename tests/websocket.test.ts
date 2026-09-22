@@ -56,6 +56,34 @@ function memoryStorage(values: Record<string, string>): Storage {
 afterEach(() => vi.useRealTimers())
 
 describe('CFSM WebSocket transport', () => {
+  it('closes the failed socket before reconnecting after a heartbeat send error', () => {
+    vi.useFakeTimers()
+    const sockets: FakeSocket[] = []
+    const onSamples = vi.fn()
+    const connection = createCfsmSocket({
+      base: 'https://a.example', ids: ['node-a'], timeoutMinutes: 0,
+      onSamples, onState: vi.fn(), onTimeout: vi.fn(),
+      socketFactory: () => {
+        const socket = new FakeSocket()
+        sockets.push(socket)
+        return socket
+      },
+    })
+    const first = sockets[0]!
+    first.open()
+    vi.spyOn(first, 'send').mockImplementation(() => { throw new Error('send failed') })
+    vi.advanceTimersByTime(30_000)
+    expect(first.closes).toHaveLength(1)
+    first.onerror?.()
+    first.remoteClose(1006)
+    vi.advanceTimersByTime(1_000)
+    expect(sockets).toHaveLength(2)
+    expect(first.closes).toHaveLength(1)
+    expect(onSamples).not.toHaveBeenCalled()
+    connection.close()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('builds source-aware URLs and exposes JWT only to a cross-host socket', () => {
     const storage = memoryStorage({ jwt_token: 'secret-token' })
 

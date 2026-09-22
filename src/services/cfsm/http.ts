@@ -98,6 +98,7 @@ export async function cfsmRequest(
 
   const timeout = setTimeout(() => controller.abort('timeout'), timeoutMs)
   let response: Response
+  let payload: unknown
   try {
     response = await fetcher(apiUrl(options.base, path), {
       method: options.method ?? 'GET',
@@ -106,6 +107,8 @@ export async function cfsmRequest(
       credentials: 'include',
       signal: controller.signal,
     })
+    // Receiving headers is not completion: the body can still stall or be cancelled.
+    payload = await responseBody(response)
   } catch (cause) {
     const timedOut = controller.signal.aborted && controller.signal.reason === 'timeout'
     throw new CfsmRequestError(
@@ -116,8 +119,6 @@ export async function cfsmRequest(
     clearTimeout(timeout)
     options.signal?.removeEventListener('abort', abortFromCaller)
   }
-
-  const payload = await responseBody(response)
 
   if (response.status === 401) writeStorage(STORAGE_KEYS.jwt, null, options.storage)
   if (response.status === 403) {

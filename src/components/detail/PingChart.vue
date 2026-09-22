@@ -65,6 +65,7 @@ const theme = useThemeSettingsStore()
 const {
   server,
   sourceConfig,
+  sourceConfigState,
   pingHistoryPoints,
   pingHistoryHours,
   pingHistoryState,
@@ -74,7 +75,10 @@ const {
 const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友好')
 /* 延迟区只画取回的那份历史：负载图的「实时」档位不带它一起走。 */
 const rows = computed(() => buildChartRows(pingHistoryPoints.value))
-const loading = computed(() => pingHistoryState.value === 'loading')
+const sourceConfigPending = computed(() => (
+  sourceConfigState.value === 'idle' || sourceConfigState.value === 'loading'
+))
+const loading = computed(() => pingHistoryState.value === 'loading' || sourceConfigPending.value)
 const errorCopy = computed(() => issueCopy(pingHistoryIssue.value, 'history'))
 const selected = ref<ProbeTarget[]>([])
 /* 开关状态只活在本组件的生命周期里；实时推送、主题切换与重绘都不会重置它。 */
@@ -101,7 +105,7 @@ const rangeModel = computed({
 /** 任务颜色按任务在完整列表里的位置取序列板，与上游 `getTaskColor` 一致。 */
 const tasks = computed<PingTask[]>(() => {
   const current = server.value
-  if (!current) return []
+  if (!current || sourceConfigPending.value) return []
   const palette = getChartSeriesPalette(accessible.value)
   const labels = sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS
   return labeledProbeTargets(activeProbeTargets(current, pingHistoryPoints.value), labels)
@@ -123,7 +127,7 @@ watch(() => (server.value ? `${server.value.source.base}::${server.value.id}` : 
  * 上游在每次取回数据后、选择为空时全选。这里只跟随历史数据本身变化，
  * 不跟随实时快照：否则用户点了「全不选」，下一次 WebSocket 推送又会全选回来。
  */
-watch(pingHistoryPoints, () => {
+watch([pingHistoryPoints, sourceConfigState], () => {
   if (selected.value.length === 0) selected.value = tasks.value.map((task) => task.target)
 }, { immediate: true })
 

@@ -14,6 +14,7 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { THEME_SETTING_KEYS, type ThemeSettings } from '@/theme/settings'
 import { message } from '@/utils/message'
+import { resolveSiteTitle } from '@/domain/site-title'
 
 /*
  * Komari 自己没有设置页：48 项设置写在 `komari-theme.json` 的 managed configuration 里，
@@ -31,7 +32,12 @@ const copying = ref(false)
 const realtime = useRealtimeStore()
 const groups = THEME_SETTINGS_FORM
 const primaryBase = computed(() => app.primaryBase)
-const siteTitle = computed(() => app.config?.siteTitle ?? 'CF Server Monitor')
+const siteTitleResolution = computed(() => resolveSiteTitle(
+  app.config?.siteTitle,
+  app.config === null && (app.state === 'idle' || app.state === 'loading'),
+))
+const siteTitle = computed(() => siteTitleResolution.value.title)
+const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
 const authorized = computed(() => (
   app.config?.authorization === true && theme.hasBackendCredential
 ))
@@ -193,8 +199,11 @@ watch(() => theme.refetchWarning, (warning) => {
 
 onMounted(async () => {
   if (app.state === 'idle' || app.state === 'error') await app.initialize()
-  document.title = `主题设置 · ${siteTitle.value}`
 })
+
+watch(siteTitle, (title) => {
+  document.title = title ? `主题设置 · ${title}` : '主题设置'
+}, { immediate: true })
 </script>
 
 <template>
@@ -203,6 +212,7 @@ onMounted(async () => {
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"
+        :title-pending="siteTitlePending"
         :version="app.config?.version ?? null"
         :loading="app.state === 'loading'"
         :admin-url="visibleAdminUrl"

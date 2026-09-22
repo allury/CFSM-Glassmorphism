@@ -582,7 +582,13 @@ a {
   white-space: nowrap;
 }
 
-.brand__copy > span {
+.brand__title-placeholder {
+  width: min(152px, 32vw);
+  height: 22px;
+  border-radius: 6px;
+}
+
+.brand__copy > span:not(.brand__title-placeholder) {
   display: none;
 }
 

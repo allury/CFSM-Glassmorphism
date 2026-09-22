@@ -181,6 +181,11 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
     socket = null
     clearConnectionTimers()
     scheduleReconnect()
+    try {
+      current.close()
+    } catch {
+      // The reconnect timer already owns recovery, even if closing the old socket fails.
+    }
   }
 
   function sendSubscription(current: CfsmSocketLike): boolean {
@@ -199,11 +204,6 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
       return true
     } catch {
       disconnectCurrent(current)
-      try {
-        current.close()
-      } catch {
-        // The reconnect timer already owns recovery.
-      }
       return false
     }
   }
@@ -268,11 +268,6 @@ export function createCfsmSocket(options: CfsmSocketOptions): CfsmSocketConnecti
     current.onerror = () => {
       if (socket !== current) return
       disconnectCurrent(current)
-      try {
-        current.close()
-      } catch {
-        // The reconnect timer already owns recovery.
-      }
     }
 
     current.onclose = (event) => {

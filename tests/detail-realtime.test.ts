@@ -63,6 +63,29 @@ function options(
 afterEach(() => vi.useRealTimers())
 
 describe('detail realtime coordination', () => {
+  it.each([false, true])('shares the pending REST refresh across rapid visibility changes (dispose=%s)', async (dispose) => {
+    const visibility = new FakeVisibility()
+    const factory = connectionFactory()
+    let finish: (() => void) | undefined
+    const refreshRest = vi.fn(() => new Promise<void>((resolve) => { finish = resolve }))
+    const controller = createDetailRealtime(options(factory, { documentRef: visibility, refreshRest }))
+    controller.start()
+    for (let i = 0; i < 2; i += 1) {
+      visibility.hidden = true
+      visibility.emit()
+      visibility.hidden = false
+      visibility.emit()
+    }
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(factory.connections).toHaveLength(1)
+    expect(refreshRest).toHaveBeenCalledOnce()
+    if (dispose) controller.dispose()
+    finish?.()
+    await vi.waitFor(() => expect(factory.connections).toHaveLength(dispose ? 1 : 2))
+    controller.dispose()
+  })
+
   it('opens exactly one owning-base socket subscribed only to the current server', () => {
     const factory = connectionFactory()
     const onSamples = vi.fn()
@@ -112,9 +135,7 @@ describe('detail realtime coordination', () => {
     expect(refreshRest).toHaveBeenCalledOnce()
     expect(factory.connections).toHaveLength(1)
     finishRefresh?.()
-    await Promise.resolve()
-    await Promise.resolve()
-    expect(factory.connections).toHaveLength(2)
+    await vi.waitFor(() => expect(factory.connections).toHaveLength(2))
     controller.dispose()
   })
 

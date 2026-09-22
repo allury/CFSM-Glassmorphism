@@ -142,6 +142,23 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
     expect(cards[2]).toMatchObject({ key: 'downloadSpeed', label: '实时下行', value: '1.0', unit: 'MB/s' })
   })
 
+  it('任一节点累计流量缺一向时不显示伪完整总量', () => {
+    const cards = buildGeneralCards(
+      [glass({
+        network: {
+          inSpeed: 1,
+          outSpeed: 1,
+          received: 1024,
+          transmitted: null,
+          monthlyReceived: null,
+          monthlyTransmitted: null,
+        },
+      })],
+      customGeneral('totalTraffic'),
+    )
+    expect(cards).toEqual([])
+  })
+
   it('计数类卡片用 `/ 总数`、`台`、`个` 作单位', () => {
     const servers = [glass(), glass({ key: 'source:b', id: 'b', online: false })]
     const cards = buildGeneralCards(servers, customGeneral('onlineNodes\nofflineNodes\nexpiringNodes\nregionDistribution'))

@@ -79,6 +79,16 @@ https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist
 
 如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.10` 重新应用。
 
+### main 开发预览（非稳定版）
+
+希望提前体验 v1.1.12 维护改动，可在主题商店应用：
+
+```text
+https://github.com/allury/CFSM-Glassmorphism/tree/preview-main
+```
+
+`main` 保留源码，不能作为主题安装地址；`preview-main` 只包含通过 Actions 完整质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。它是滚动预览，不创建版本标签或 Release，不推进稳定版 `theme-dist`；包版本仍保留最近稳定版号，预览以来源 SHA 区分。更新后可能需要重新应用主题以刷新 CFSM 缓存；回退可重新应用上面的稳定标签。维护范围与验证记录见 [v1.1.12 Bug 审计](docs/v1.1.12-bug-audit.md)。
+
 ### 二、调整主题设置
 
 应用主题后，点击右上角齿轮图标，或直接访问 `https://<你的站点>/#/settings`。
@@ -149,3 +159,5 @@ bun run validate:dist
 ```
 
 构建产物根目录只包含 `index.html` 与 `assets/`，符合 CFSM 对第三方主题的目录约定。CI 在推送 main、版本标签、Pull Request 时执行同一组质量门；推送 `v<版本>` 标签会发布 ZIP、更新 `theme-dist` 分支并创建不可变的 `theme-v<版本>` 标签。
+
+main 的校验通过后自动更新 `preview-main`；Pull Request 只校验、不发布预览。

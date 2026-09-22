@@ -69,7 +69,7 @@ export function createDetailRealtime(options: DetailRealtimeOptions): DetailReal
   let connection: CfsmSocketConnection | null = null
   let fallbackTimer: IntervalHandle | null = null
   let fallbackActive = false
-  let refreshInFlight = false
+  let refreshInFlight: Promise<void> | null = null
   let started = false
   let disposed = false
   let timedOut = false
@@ -98,15 +98,18 @@ export function createDetailRealtime(options: DetailRealtimeOptions): DetailReal
   }
 
   async function refreshRest(): Promise<void> {
-    if (refreshInFlight || disposed || !visible()) return
-    refreshInFlight = true
-    try {
-      await options.refreshRest()
-    } catch {
-      // The detail store owns the visible error while retaining its last real snapshot.
-    } finally {
-      refreshInFlight = false
-    }
+    if (disposed || !visible() || timedOut || paused) return
+    // All callers must await the active refresh before a new socket may deliver samples.
+    refreshInFlight ??= (async () => {
+      try {
+        await options.refreshRest()
+      } catch {
+        // The detail store owns the visible error while retaining its last real snapshot.
+      }
+    })()
+    const pending = refreshInFlight
+    await pending
+    if (refreshInFlight === pending) refreshInFlight = null
   }
 
   function closeConnection(): void {

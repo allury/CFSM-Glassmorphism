@@ -109,8 +109,8 @@ export function sortServers(
       }
       case 'traffic':
         result = compareNullable(
-          left.network.received === null && left.network.transmitted === null ? null : (left.network.received ?? 0) + (left.network.transmitted ?? 0),
-          right.network.received === null && right.network.transmitted === null ? null : (right.network.received ?? 0) + (right.network.transmitted ?? 0),
+          left.network.received !== null && left.network.transmitted !== null ? left.network.received + left.network.transmitted : null,
+          right.network.received !== null && right.network.transmitted !== null ? right.network.received + right.network.transmitted : null,
           -1,
         )
         break

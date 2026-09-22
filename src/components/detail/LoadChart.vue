@@ -48,6 +48,7 @@ const theme = useThemeSettingsStore()
 const {
   server,
   sourceConfig,
+  sourceConfigState,
   historyPoints,
   historyHours,
   historyState,
@@ -95,7 +96,7 @@ const rangeModel = computed({
 const families = computed(() => resolveChartFamilies(theme.runtime))
 const probeTargets = computed(() => {
   const current = server.value
-  if (!current) return []
+  if (!current || sourceConfigState.value === 'idle' || sourceConfigState.value === 'loading') return []
   return labeledProbeTargets(
     activeProbeTargets(current, historyPoints.value),
     sourceConfig.value?.probeLabels ?? DEFAULT_PROBE_LABELS,

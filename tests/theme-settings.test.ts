@@ -290,6 +290,47 @@ describe('theme settings store', () => {
     expect(store.draft.alertTitle).toBe('Retained draft')
   })
 
+  it('coalesces rapid save clicks into one backend write and one config readback', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.jwt, 'credential')
+    let releaseWrite: (() => void) | undefined
+    let writes = 0
+    let reads = 0
+    const fetcher: typeof fetch = async (input) => {
+      const url = String(input)
+      if (url.endsWith('/api/theme_options')) {
+        writes += 1
+        await new Promise<void>((resolve) => {
+          releaseWrite = resolve
+        })
+        return new Response(JSON.stringify({
+          success: true,
+          theme_options: { themeMode: 'dark' },
+        }), { status: 200 })
+      }
+      reads += 1
+      return new Response(JSON.stringify({
+        authorization: true,
+        theme_options: { themeMode: 'dark' },
+      }), { status: 200 })
+    }
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({ themeMode: 'light' }, 'auto', true)
+    store.draft.themeMode = 'dark'
+
+    const first = store.saveBackend('https://status.example', { storage, fetcher })
+    const second = store.saveBackend('https://status.example', { storage, fetcher })
+    expect(writes).toBe(1)
+    releaseWrite?.()
+    const outcomes = await Promise.all([first, second])
+
+    expect(outcomes.every((outcome) => outcome.saved)).toBe(true)
+    expect(writes).toBe(1)
+    expect(reads).toBe(1)
+    expect(store.runtime.themeMode).toBe('dark')
+  })
+
   it.each([
     { label: '400', response: new Response('{"error":"invalidThemeOptionsFormat"}', { status: 400 }), kind: 'invalid-format' },
     { label: '401', response: new Response('{"message":"unauthorized"}', { status: 401 }), kind: 'unauthorized' },

@@ -65,6 +65,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   const theme = useThemeSettingsStore()
   const server = shallowRef<CfsmServer | null>(null)
   const sourceConfig = shallowRef<SiteConfig | null>(null)
+  const sourceConfigState = ref<DetailLoadState>('idle')
   const history = shallowRef<HistorySeries | null>(null)
   /*
    * 默认 1 小时。CFSM 对两类窗口都分桶取样，只是上限不同：大于 1 小时用站点配置的
@@ -209,13 +210,16 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+    const expectedRevision = revision
     try {
       const refreshed = await fetchServer(current.id, current.source.base, {
         signal: controller.signal,
       })
-      if (!controller.signal.aborted) {
-        server.value = refreshed
+      if (!controller.signal.aborted && expectedRevision === revision) {
         refreshIssue.value = null
+        // WSS 在 REST 请求期间已经推进过快照时，不允许较早的 REST 值回跳覆盖。
+        if (server.value !== current) return
+        server.value = refreshed
         /*
          * WebSocket 不可用时会退化成 REST 轮询，这条路径同样要往实时缓冲补点，
          * 否则「实时」档位在降级期间会停住不动。间隔随轮询间隔变宽，点仍是真实采样。
@@ -223,7 +227,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
         livePoints.value = appendLivePoint(livePoints.value, liveHistoryPoint(refreshed, Date.now()))
       }
     } catch (error) {
-      if (controller.signal.aborted) return
+      if (controller.signal.aborted || expectedRevision !== revision) return
       const nextIssue = classifyCfsmRequestError(error)
       refreshIssue.value = nextIssue
       if (nextIssue.kind === 'not-found') {
@@ -240,6 +244,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+    const rangeChanged = hours !== historyHours.value
     historyHours.value = hours
     // 用户把负载图调回延迟图正在用的窗口时，重新跟随，避免两份相同的历史。
     if (!pingFollowsHistory.value && ownPingHistoryHours.value === hours) {
@@ -251,6 +256,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     }
     historyState.value = 'loading'
     historyIssue.value = null
+    if (rangeChanged) history.value = null
     const expectedRevision = revision
     const seq = ++historySeq
     const stale = (): boolean => (
@@ -268,7 +274,6 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       }
     } catch (error) {
       if (stale()) return
-      history.value = null
       historyState.value = 'error'
       historyIssue.value = classifyCfsmRequestError(error)
     }
@@ -288,10 +293,12 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+    const rangeChanged = pingFollowsHistory.value || hours !== ownPingHistoryHours.value
     pingFollowsHistory.value = false
     ownPingHistoryHours.value = hours
     ownPingHistoryState.value = 'loading'
     ownPingHistoryIssue.value = null
+    if (rangeChanged) ownPingHistory.value = null
     const expectedRevision = revision
     const seq = ++pingHistorySeq
     // 回到共享窗口也要作废在途的独立请求，否则它晚到时会把图切回独立那份数据。
@@ -310,7 +317,6 @@ export const useServerDetailStore = defineStore('server-detail', () => {
       ownPingHistoryState.value = result.points.length > 0 ? 'ready' : 'empty'
     } catch (error) {
       if (stale()) return
-      ownPingHistory.value = null
       ownPingHistoryState.value = 'error'
       ownPingHistoryIssue.value = classifyCfsmRequestError(error)
     }
@@ -328,17 +334,38 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const current = server.value
     const controller = requestController
     if (!current || !controller) return
+    sourceConfigState.value = 'loading'
 
-    if (app.config && app.primaryBase === current.source.base) {
-      if (expectedRevision === revision) sourceConfig.value = app.config
-      return
+    if (app.primaryBase === current.source.base) {
+      // 从首页快速进入详情时，主配置可能仍在途中；复用 app store 的同一请求，
+      // 不能为同一个 base 再发一次 `/api/config`。
+      if (!app.config && (app.state === 'idle' || app.state === 'loading' || app.state === 'error')) {
+        await app.initialize()
+      }
+      if (controller.signal.aborted || expectedRevision !== revision) return
+      if (app.config) {
+        sourceConfig.value = app.config
+        sourceConfigState.value = 'ready'
+        return
+      }
+      if (app.state === 'error') {
+        sourceConfig.value = null
+        sourceConfigState.value = 'error'
+        return
+      }
     }
 
     try {
       const config = await fetchSiteConfig(current.source.base, { signal: controller.signal })
-      if (!controller.signal.aborted && expectedRevision === revision) sourceConfig.value = config
+      if (!controller.signal.aborted && expectedRevision === revision) {
+        sourceConfig.value = config
+        sourceConfigState.value = 'ready'
+      }
     } catch {
-      if (!controller.signal.aborted && expectedRevision === revision) sourceConfig.value = null
+      if (!controller.signal.aborted && expectedRevision === revision) {
+        sourceConfig.value = null
+        sourceConfigState.value = 'error'
+      }
     }
   }
 
@@ -351,9 +378,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
     const expectedRevision = revision
     requestController?.abort('detail changed')
     stopRealtime()
-    requestController = new AbortController()
+    const controller = new AbortController()
+    requestController = controller
     server.value = null
     sourceConfig.value = null
+    sourceConfigState.value = 'idle'
     history.value = null
     livePoints.value = []
     ownPingHistory.value = null
@@ -368,9 +397,9 @@ export const useServerDetailStore = defineStore('server-detail', () => {
 
     try {
       const result = await fetchServerFromSources(id, bases, {
-        signal: requestController.signal,
+        signal: controller.signal,
       }, preferredBase)
-      if (requestController.signal.aborted || expectedRevision !== revision) return
+      if (controller.signal.aborted || expectedRevision !== revision) return
       server.value = result
       state.value = 'ready'
       const configPromise = loadSourceConfig(expectedRevision)
@@ -380,11 +409,11 @@ export const useServerDetailStore = defineStore('server-detail', () => {
         ? Promise.resolve()
         : loadPingHistory(ownPingHistoryHours.value)
       await configPromise
-      if (requestController.signal.aborted || expectedRevision !== revision) return
+      if (controller.signal.aborted || expectedRevision !== revision) return
       startRealtime()
       await Promise.all([historyPromise, pingHistoryPromise])
     } catch (error) {
-      if (requestController.signal.aborted || expectedRevision !== revision) return
+      if (controller.signal.aborted || expectedRevision !== revision) return
       issue.value = classifyCfsmRequestError(error)
       state.value = 'error'
     }
@@ -420,6 +449,7 @@ export const useServerDetailStore = defineStore('server-detail', () => {
   return {
     server,
     sourceConfig,
+    sourceConfigState,
     history,
     historyHours,
     liveMode,

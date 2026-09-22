@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { buildDetailCards, resolveDetailCardKeys } from '@/domain/theme-presentation'
+import { buildDetailCards, resolveDetailCardKeys, trafficUsageBytes } from '@/domain/theme-presentation'
 import {
   detailExpireStatus,
   formatDetailExpireText,
@@ -89,6 +89,29 @@ describe('详情页运行时间与到期文案（Komari InstanceDetail 规则）
 })
 
 describe('详情指标卡对齐 Komari getDetailMetricCard', () => {
+  it('月流量缺一向时保持未知，不把缺失伪造成 0 或无限流量', () => {
+    expect(trafficUsageBytes(100, null, 'sum')).toBeNull()
+    expect(trafficUsageBytes(null, 100, 'max')).toBeNull()
+    expect(trafficUsageBytes(100, null, 'dl')).toBe(100)
+    expect(trafficUsageBytes(null, 100, 'ul')).toBe(100)
+
+    const cards = buildDetailCards(node({
+      traffic_limit: '1 TiB',
+      traffic_calc_type: 'sum',
+      net_rx_monthly: 100,
+      net_tx_monthly: null,
+    }), detailSettings('财务'))
+    expect(cards.find((card) => card.key === 'trafficQuota')).toMatchObject({
+      value: '-',
+      hint: '— / 1.00 TB',
+    })
+  })
+
+  it('累计流量缺一向时隐藏总量卡，不显示不完整合计', () => {
+    const cards = buildDetailCards(node({ net_rx: 100, net_tx: null }), detailSettings('综合'))
+    expect(cards.find((card) => card.key === 'totalTraffic')).toBeUndefined()
+  })
+
   it('value / unit 分离：价格、剩余时间、速率、百分比与流量', () => {
     const cards = buildDetailCards(
       node({ price: '18', billing_cycle: 'year', currency: 'USD', expire_date: '2026-10-10' }),

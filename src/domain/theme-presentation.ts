@@ -262,16 +262,28 @@ export function parseTrafficLimitBytes(value: string | null): number | null {
   return amount * (1024 ** (power[unit] ?? 3))
 }
 
+export function trafficUsageBytes(
+  received: number | null,
+  transmitted: number | null,
+  calculationType: string | null,
+): number | null {
+  const calculation = calculationType?.trim().toLowerCase()
+  if (calculation === 'dl') return received
+  if (calculation === 'ul') return transmitted
+  // MAX 与 SUM 都需要两向数据完整；缺一向时不能把未知伪装成 0。
+  if (received === null || transmitted === null) return null
+  return calculation === 'max'
+    ? Math.max(received, transmitted)
+    : received + transmitted
+}
+
 export function trafficUsage(server: GlassServer): { used: number, limit: number, percent: number } | null {
   if (!server.showTraffic) return null
   const limit = parseTrafficLimitBytes(server.trafficLimit)
   const rx = server.network.monthlyReceived
   const tx = server.network.monthlyTransmitted
-  if (limit === null || (rx === null && tx === null)) return null
-  const calculation = server.trafficCalculationType?.toLowerCase()
-  const used = calculation === 'dl' ? rx : calculation === 'ul' ? tx
-    : calculation === 'max' ? Math.max(rx ?? 0, tx ?? 0) : (rx ?? 0) + (tx ?? 0)
-  if (used === null) return null
+  const used = trafficUsageBytes(rx, tx, server.trafficCalculationType)
+  if (limit === null || used === null) return null
   return { used, limit, percent: (used / limit) * 100 }
 }
 
@@ -307,6 +319,12 @@ function average(values: Array<number | null>): number | null {
 function sum(values: Array<number | null>): number | null {
   const samples = values.filter((value): value is number => value !== null)
   return samples.length ? samples.reduce((total, value) => total + value, 0) : null
+}
+
+function completeSum(values: Array<number | null>): number | null {
+  return values.length > 0 && values.every((value): value is number => value !== null)
+    ? values.reduce((total, value) => total + value, 0)
+    : null
 }
 
 /**
@@ -557,9 +575,9 @@ export function buildGeneralCards(
   const memory = resources((server) => server.memory)
   const disk = resources((server) => server.disk)
   const swap = resources((server) => server.swap)
-  const trafficUp = sum(servers.map((server) => server.network.transmitted))
-  const trafficDown = sum(servers.map((server) => server.network.received))
-  const totalTraffic = trafficUp === null && trafficDown === null ? null : (trafficUp ?? 0) + (trafficDown ?? 0)
+  const trafficUp = completeSum(servers.map((server) => server.network.transmitted))
+  const trafficDown = completeSum(servers.map((server) => server.network.received))
+  const totalTraffic = trafficUp !== null && trafficDown !== null ? trafficUp + trafficDown : null
   const upload = sum(online.map((server) => server.network.outSpeed))
   const download = sum(online.map((server) => server.network.inSpeed))
   const peak = peakSpeedNode(online)
@@ -701,18 +719,15 @@ export function buildDetailCards(
   finance: DetailFinanceContext = DEFAULT_DETAIL_FINANCE,
 ): PresentationCard[] {
   const percent = (used: number | null, total: number | null) => used !== null && total !== null && total > 0 ? Math.min(100, Math.max(0, used / total * 100)) : null
-  const totalTraffic = server.networkReceived === null && server.networkTransmitted === null ? null : (server.networkReceived ?? 0) + (server.networkTransmitted ?? 0)
+  const totalTraffic = server.networkReceived !== null && server.networkTransmitted !== null
+    ? server.networkReceived + server.networkTransmitted
+    : null
   const gpu = average(server.gpus.map((item) => item.utilization))
   const days = daysUntilExpiry(server.expireDate, now)
   const quotaLimit = parseTrafficLimitBytes(server.trafficLimit)
   const rx = server.monthlyNetworkReceived
   const tx = server.monthlyNetworkTransmitted
-  const calculation = server.trafficCalculationType?.toLowerCase()
-  const quotaUsed = rx === null && tx === null ? null
-    : calculation === 'dl' ? rx
-      : calculation === 'ul' ? tx
-        : calculation === 'max' ? Math.max(rx ?? 0, tx ?? 0)
-          : (rx ?? 0) + (tx ?? 0)
+  const quotaUsed = trafficUsageBytes(rx, tx, server.trafficCalculationType)
   const monthly = monthlyAverageCost(server)
   const priceText = server.price === null ? null : formatDisplayPrice(server.price, server.currency, server.billingCycle)
   const remaining = detailRemainingValue(server, now, finance)
@@ -761,7 +776,12 @@ export function buildDetailCards(
     uploadSpeed: server.networkOutSpeed === null ? null : card('uploadSpeed', 'tabler:chevrons-up', '实时上行', uploadSplit.value, uploadSplit.unit),
     downloadSpeed: server.networkInSpeed === null ? null : card('downloadSpeed', 'tabler:chevrons-down', '实时下行', downloadSplit.value, downloadSplit.unit),
     totalTraffic: totalTraffic === null ? null : card('totalTraffic', 'tabler:arrows-transfer-up-down', '累计流量', trafficSplit.value, trafficSplit.unit, `↑ ${formatDisplayBytes(server.networkTransmitted)} / ↓ ${formatDisplayBytes(server.networkReceived)}`),
-    trafficQuota: !server.trafficLimit ? null : card('trafficQuota', 'tabler:gauge', '流量配额', hasQuota ? (quotaPercent ?? 0).toFixed(1) : '∞', hasQuota ? '%' : '', hasQuota ? `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}` : '无限流量'),
+    trafficQuota: !server.trafficLimit ? null
+      : quotaLimit === null
+        ? card('trafficQuota', 'tabler:gauge', '流量配额', '∞', '', '无限流量')
+        : quotaUsed === null
+          ? card('trafficQuota', 'tabler:gauge', '流量配额', '-', '', `— / ${formatDisplayBytes(quotaLimit)}`)
+          : card('trafficQuota', 'tabler:gauge', '流量配额', (quotaPercent ?? 0).toFixed(1), '%', `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}`),
   }
   return resolveDetailCardKeys(settings).flatMap((key) => model[key] ? [model[key] as PresentationCard] : [])
 }

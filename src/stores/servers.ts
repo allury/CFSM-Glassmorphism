@@ -29,6 +29,8 @@ export const useServersStore = defineStore('servers', () => {
   const sourceFailures = ref<ServerSourceFailure[]>([])
   const loadedAt = ref<number | null>(null)
   const lastRealtimeAt = ref<number | null>(null)
+  let loadInFlight: Promise<void> | null = null
+  let loadRevision = 0
 
   const servers = computed<CfsmServer[]>(() => collections.value.flatMap((item) => item.servers))
   const bySourceAndId = computed(() => new Map(
@@ -48,17 +50,39 @@ export const useServersStore = defineStore('servers', () => {
     return collections.value.find((item) => item.source.base === base)?.systemConfig
   }
 
-  async function load(bases = getApiBases()): Promise<void> {
+  function hasLoadedSource(base: string): boolean {
+    return collections.value.some((item) => item.source.base === base)
+  }
+
+  async function performLoad(bases: string[], expectedRevision: number): Promise<void> {
+    const baselineByKey = new Map(
+      servers.value.map((server) => [serverKey(server.source.base, server.id), server]),
+    )
     state.value = 'loading'
     error.value = null
     sourceFailures.value = []
     try {
       const result = await fetchAllServerSources(bases)
+      if (expectedRevision !== loadRevision) return
       const previousByBase = new Map(
         collections.value.map((collection) => [collection.source.base, collection]),
       )
+      const latestByKey = new Map(
+        collections.value.flatMap((collection) => collection.servers.map(
+          (server) => [serverKey(collection.source.base, server.id), server] as const,
+        )),
+      )
       const refreshedByBase = new Map(
-        result.collections.map((collection) => [collection.source.base, collection]),
+        result.collections.map((collection) => [collection.source.base, {
+          ...collection,
+          servers: collection.servers.map((refreshed) => {
+            const key = serverKey(collection.source.base, refreshed.id)
+            const baseline = baselineByKey.get(key)
+            const latest = latestByKey.get(key)
+            // 该对象在请求期间被 WSS 替换过：旧 REST 快照不得把它回写成较早值。
+            return baseline && latest && latest !== baseline ? latest : refreshed
+          }),
+        }]),
       )
       for (const failure of result.failures) {
         const previous = previousByBase.get(failure.source.base)
@@ -80,9 +104,26 @@ export const useServersStore = defineStore('servers', () => {
         error.value = result.failures.map((failure) => failure.message).join('; ')
       }
     } catch (reason) {
+      if (expectedRevision !== loadRevision) return
       state.value = collections.value.length > 0 ? 'partial' : 'error'
       error.value = reason instanceof Error ? reason.message : 'Unknown CFSM server error'
     }
+  }
+
+  function load(bases = getApiBases()): Promise<void> {
+    if (loadInFlight) return loadInFlight
+    const expectedRevision = ++loadRevision
+    const pending = performLoad([...bases], expectedRevision)
+    loadInFlight = pending
+    void pending.then(
+      () => {
+        if (loadInFlight === pending) loadInFlight = null
+      },
+      () => {
+        if (loadInFlight === pending) loadInFlight = null
+      },
+    )
+    return pending
   }
 
   function applyRealtimeBatches(
@@ -148,6 +189,8 @@ export const useServersStore = defineStore('servers', () => {
   }
 
   function clear(): void {
+    loadRevision += 1
+    loadInFlight = null
     collections.value = []
     state.value = 'idle'
     error.value = null
@@ -166,6 +209,7 @@ export const useServersStore = defineStore('servers', () => {
     lastRealtimeAt,
     findServer,
     siteVisibility,
+    hasLoadedSource,
     load,
     applyRealtimeBatches,
     applyRealtimeSamples,

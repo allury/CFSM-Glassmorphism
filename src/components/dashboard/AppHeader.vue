@@ -9,7 +9,8 @@ import AppTooltip from '@/components/ui/AppTooltip.vue'
  * 首页的高级工具开关属于控制区，不放在 Header 里。
  */
 const props = withDefaults(defineProps<{
-  title: string
+  title: string | null
+  titlePending?: boolean
   version: string | null
   loading: boolean
   online?: number
@@ -33,6 +34,7 @@ const props = withDefaults(defineProps<{
   sourceCount: 0,
   showStatus: true,
   themeOverride: null,
+  titlePending: false,
 })
 
 defineEmits<{
@@ -65,7 +67,9 @@ const themeLabel = computed(() => {
  */
 const faviconSource = ref('')
 const faviconFailed = ref(false)
-const brandInitial = computed(() => props.title.trim().slice(0, 1))
+const brandInitial = computed(() => (
+  props.titlePending ? '' : (props.title?.trim().slice(0, 1) ?? '')
+))
 const brandImage = computed(() => (faviconFailed.value ? '' : faviconSource.value))
 
 function resolveFavicon(): string {
@@ -106,7 +110,8 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
           <span v-else class="brand__mark-dot" />
         </span>
         <div class="brand__copy">
-          <strong>{{ title }}</strong>
+          <span v-if="titlePending" class="brand__title-placeholder skeleton" aria-hidden="true" />
+          <strong v-else>{{ title }}</strong>
           <span>
             CFSM Glassmorphism Theme
             <template v-if="version">· v{{ version }}</template>

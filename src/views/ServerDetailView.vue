@@ -16,10 +16,11 @@ import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { issueCopy } from '@/domain/issue-copy'
 import { resolveNodeProvider } from '@/domain/provider'
 import { needsExchangeRate } from '@/domain/finance'
-import { buildDetailCards, parseTrafficLimitBytes, resolveDetailCardKeys } from '@/domain/theme-presentation'
+import { buildDetailCards, parseTrafficLimitBytes, resolveDetailCardKeys, trafficUsageBytes } from '@/domain/theme-presentation'
 import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
+import { detailDocumentTitle, resolveSiteTitle } from '@/domain/site-title'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
@@ -46,6 +47,7 @@ const serverStore = useServersStore()
 const {
   server,
   sourceConfig,
+  sourceConfigState,
   state,
   historyState,
   pingHistoryState,
@@ -71,7 +73,30 @@ const requestedSource = computed(() => {
   const source = route.query.source
   return typeof source === 'string' && multiSource.value ? source : undefined
 })
-const siteTitle = computed(() => sourceConfig.value?.siteTitle ?? app.config?.siteTitle ?? 'CF Server Monitor')
+/*
+ * 配置必须属于当前节点的 owning source。多源详情在 B 的配置未返回前不能借用
+ * primary(A) 的标题、版本或授权状态；单源/primary 节点则继续复用已加载配置，
+ * 不额外请求 `/api/config`。
+ */
+const expectedSourceBase = computed(() => server.value?.source.base ?? requestedSource.value ?? null)
+const owningConfig = computed(() => {
+  if (sourceConfig.value) return sourceConfig.value
+  const base = expectedSourceBase.value
+  if (app.config && (
+    (base !== null && base === app.primaryBase)
+    || (base === null && !multiSource.value)
+  )) return app.config
+  return null
+})
+const siteTitleResolution = computed(() => resolveSiteTitle(
+  owningConfig.value?.siteTitle,
+  state.value === 'idle'
+    || state.value === 'loading'
+    || (state.value === 'ready'
+      && (sourceConfigState.value === 'idle' || sourceConfigState.value === 'loading')),
+))
+const siteTitle = computed(() => siteTitleResolution.value.title)
+const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
 const pageLoading = computed(() => state.value === 'loading' && server.value === null)
 const refreshing = computed(() => (
   state.value === 'loading' || historyState.value === 'loading' || pingHistoryState.value === 'loading'
@@ -105,8 +130,7 @@ const siteVisibility = computed(() => (
  */
 const siteVisibilityKnown = computed(() => (
   server.value?.systemConfig !== undefined
-  || siteVisibility.value !== undefined
-  || serverStore.loadedAt !== null
+  || (server.value !== null && serverStore.hasLoadedSource(server.value.source.base))
 ))
 function visibilityFlag(flag: 'showPrice' | 'showExpire' | 'showTraffic'): boolean {
   if (!siteVisibilityKnown.value) return false
@@ -115,7 +139,7 @@ function visibilityFlag(flag: 'showPrice' | 'showExpire' | 'showTraffic'): boole
 const showPrice = computed(() => {
   const current = server.value
   if (!current) return false
-  const authorized = sourceConfig.value?.authorization ?? app.config?.authorization ?? false
+  const authorized = owningConfig.value?.authorization ?? false
   if (theme.runtime.hidePriceWhenLoggedOut && !authorized) return false
   return visibilityFlag('showPrice')
     && (current.price !== null || current.billingCycle !== null || current.currency !== null)
@@ -338,17 +362,16 @@ const trafficQuota = computed<{ used: number, limit: number, percent: number } |
   const limit = parseTrafficLimitBytes(current.trafficLimit)
   const received = current.monthlyNetworkReceived
   const transmitted = current.monthlyNetworkTransmitted
-  if (limit === null || (received === null && transmitted === null)) return null
-  const calculation = current.trafficCalculationType?.toLowerCase()
-  const used = calculation === 'dl' ? (received ?? 0)
-    : calculation === 'ul' ? (transmitted ?? 0)
-      : calculation === 'max' ? Math.max(received ?? 0, transmitted ?? 0)
-        : (received ?? 0) + (transmitted ?? 0)
+  const used = trafficUsageBytes(received, transmitted, current.trafficCalculationType)
+  if (limit === null || used === null) return null
   return { used, limit, percent: Math.min(100, (used / limit) * 100) }
 })
 const trafficUsageText = computed(() => {
   const quota = trafficQuota.value
-  if (!quota) return '无限流量'
+  if (!quota) {
+    const limit = parseTrafficLimitBytes(server.value?.trafficLimit ?? null)
+    return limit === null ? '无限流量' : `— / ${formatDisplayBytes(limit)}`
+  }
   return `${formatDisplayBytes(quota.used)} / ${formatDisplayBytes(quota.limit)}`
 })
 const trafficProgressTone = computed(() => {
@@ -369,10 +392,12 @@ async function refresh(): Promise<void> {
 }
 
 onMounted(async () => {
-  if (app.state === 'idle') await app.initialize()
+  // initialize() 会在第一次 await 之前同步解析 apiBases；不要在这里等待配置响应，
+  // 否则慢 `/api/config` 会把 `/api/server`、列表和历史一起串行阻塞。
+  // 详情 store 会复用同一份配置 Promise，因此并发启动也不会重复请求配置。
+  const configPromise = app.state === 'idle' ? app.initialize() : Promise.resolve()
   mounted.value = true
   normalizeSourceQuery()
-  await loadCurrent()
   /*
    * 站点级 show_price / show_expire / show_tf 只出现在 `/api/servers` 的顶层
    * `sysConfig`，`/api/server` 没有。从首页点进来时 store 里已经有这份数据，
@@ -382,7 +407,10 @@ onMounted(async () => {
    * 不新增请求形态，也不轮询：只在 store 为空时触发一次。
    * 顺带把顶部的上一台 / 选择器 / 下一台在冷启动时也补齐。
    */
-  if (serverStore.collections.length === 0) await serverStore.load()
+  const listPromise = serverStore.collections.length === 0
+    ? serverStore.load()
+    : Promise.resolve()
+  await Promise.all([configPromise, loadCurrent(), listPromise])
 })
 
 watch([routeId, requestedSource], () => {
@@ -395,7 +423,9 @@ watch(() => route.query.source, () => {
 })
 
 watch([server, siteTitle], () => {
-  document.title = server.value ? `${server.value.name} · ${siteTitle.value}` : siteTitle.value
+  const title = detailDocumentTitle(server.value?.name, siteTitleResolution.value)
+  // 切换 source 时先清掉上一页的标题；保留旧 A 标题直到 B 返回同样属于串源。
+  document.title = title ?? ''
 }, { immediate: true })
 
 onUnmounted(() => detail.close())
@@ -407,7 +437,8 @@ onUnmounted(() => detail.close())
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"
-        :version="sourceConfig?.version ?? app.config?.version ?? null"
+        :title-pending="siteTitlePending"
+        :version="owningConfig?.version ?? null"
         :loading="refreshing"
         :online="headerOnline"
         :total="headerTotal"

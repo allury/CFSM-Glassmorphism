@@ -109,7 +109,7 @@ export function createDashboardRealtime(
   let fallbackTimer: IntervalHandle | null = null
   let sampleFlushTimer: TimeoutHandle | null = null
   let fallbackActive = false
-  let refreshInFlight = false
+  let refreshInFlight: Promise<void> | null = null
   let started = false
   let disposed = false
   let timedOut = false
@@ -158,17 +158,20 @@ export function createDashboardRealtime(
   }
 
   async function refreshAndSync(revision = visibilityRevision): Promise<void> {
-    if (refreshInFlight || disposed || !visible() || timedOut || paused) return
-    refreshInFlight = true
-    try {
-      await options.refreshRest()
-    } catch {
-      // The REST stores own their visible error state; existing data remains available.
-    } finally {
-      refreshInFlight = false
-      if (revision === visibilityRevision && !disposed && visible() && !timedOut && !paused) {
-        sync()
+    if (disposed || !visible() || timedOut || paused) return
+    // A second visibility cycle must wait for the same REST request, not lose its reconnect.
+    refreshInFlight ??= (async () => {
+      try {
+        await options.refreshRest()
+      } catch {
+        // The REST stores own their visible error state; existing data remains available.
       }
+    })()
+    const pending = refreshInFlight
+    await pending
+    if (refreshInFlight === pending) refreshInFlight = null
+    if (revision === visibilityRevision && !disposed && visible() && !timedOut && !paused) {
+      sync()
     }
   }
 
