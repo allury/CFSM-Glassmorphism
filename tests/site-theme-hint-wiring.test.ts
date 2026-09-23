@@ -86,6 +86,6 @@ describe('App wires confirmed config and cold-start failure to the theme hint', 
     app.state = 'ready'
     await renderApp()
     expect(useThemeSettingsStore().resolvedTheme).toBe('light')
-    expect(JSON.parse(storage.getItem(hintKey) ?? 'null')).toEqual({ version: 1, themeMode: 'light' })
+    expect(JSON.parse(storage.getItem(hintKey) ?? 'null')).toEqual({ version: 1, themeMode: 'light', backgroundEnabled: false })
   })
 })

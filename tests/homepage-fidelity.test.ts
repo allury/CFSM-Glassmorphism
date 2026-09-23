@@ -169,8 +169,9 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
     })
     const cards = buildGeneralCards([complete, incomplete], customGeneral('totalTraffic'))
 
-    // 部分合计不能只在需要点击的 tooltip 里说明；卡片单位直接标明「部分」。
-    expect(cards[0]).toMatchObject({ key: 'totalTraffic', value: '4.0', unit: 'GB · 部分' })
+    // 用户决定卡面依照上游：部分合计的单位仍是 GB，缺失数量只在提示里如实说明。
+    expect(cards[0]).toMatchObject({ key: 'totalTraffic', value: '4.0', unit: 'GB' })
+    expect(cards[0]).not.toHaveProperty('partial')
     expect(cards[0]?.hint).toBe('↑ 1.0 GB\n↓ 3.0 GB\n部分 · 1 台缺少流量数据，未计入')
   })
 

@@ -931,13 +931,6 @@ a {
   white-space: nowrap;
 }
 
-/* 只有累计流量的非全量结果需要常驻「部分」；其它单位仍按上游原样可截断。 */
-.overview-card[data-general-card-key="totalTraffic"].is-partial .overview-card__unit {
-  flex: none;
-  overflow: visible;
-  text-overflow: clip;
-}
-
 @media (min-width: 768px) {
   .overview-card {
     backdrop-filter: none;
@@ -951,17 +944,6 @@ a {
   .overview-card__unit {
     font-size: 12px;
     line-height: 16px;
-  }
-}
-
-/* 768px 左右总览区仍与 Earth 并列；仅部分累计卡缩小两段字以同时保住数值与标记。 */
-@media (min-width: 768px) and (max-width: 900px) {
-  .overview-card[data-general-card-key="totalTraffic"].is-partial .overview-card__number {
-    font-size: 20px;
-  }
-
-  .overview-card[data-general-card-key="totalTraffic"].is-partial .overview-card__unit {
-    font-size: 11px;
   }
 }
 

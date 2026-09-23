@@ -74,27 +74,6 @@ function block(selector: string): string {
 }
 
 describe('round 16 overview card value row', () => {
-  it('keeps a visible, non-truncated partial label on the total traffic card only', async () => {
-    const settings = cloneThemeSettings(DEFAULT_THEME_SETTINGS)
-    settings.generalCardPreset = '自定义'
-    settings.generalCardKeys = 'totalTraffic'
-    const complete = glass({ network: {
-      inSpeed: null, outSpeed: null, received: 3 * 1024 ** 3,
-      transmitted: 1024 ** 3, monthlyReceived: null, monthlyTransmitted: null,
-    } })
-    const incomplete = glass({
-      key: 'source:missing', id: 'missing', network: {
-        inSpeed: null, outSpeed: null, received: 1024, transmitted: null,
-        monthlyReceived: null, monthlyTransmitted: null,
-      },
-    })
-    const html = await renderToString(createSSRApp(OverviewCards, { servers: [complete, incomplete], settings }))
-    expect(html).toContain('data-general-card-key="totalTraffic"')
-    expect(html).toContain('is-partial')
-    expect(html).toContain('GB · 部分')
-    expect(block('.overview-card[data-general-card-key="totalTraffic"].is-partial .overview-card__unit')).toContain('overflow: visible')
-  })
-
   it('lands the call-site class on the real trigger element', async () => {
     const html = await renderOverview('memory')
     expect(html).toContain('class="app-tooltip overview-card__value-slot"')

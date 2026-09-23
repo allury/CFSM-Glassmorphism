@@ -70,6 +70,7 @@
 | 29 | 死代码残留 | — | 旧 SVG 地图 CSS 已清理；`.quick-view*` 样式仍残留（无组件引用，不可见） | — | 否 | 第 9.9 轮：已清除全部 `.quick-view*` 与旧手绘 SVG 地图残留规则，并新增回归断言防止再次进入产物 | P2 | PASS |
 | 30 | Header | 57px 高、32px logo、桌面状态区与紧凑动作按钮；移动端隐藏次要信息 | 第 9.95 轮 Header 高度、logo、状态与动作层级和真实输出有明显差异 | 不一致 | 否 | 第 10 轮按六档 localhost 几何收敛 Header，首页与详情共用同一组件 | P1 | PASS |
 | 31 | 首页节点层级与密度 | 控制区后直接渲染扁平 NodeCard/NodeList；mini/compact/comfortable/large 有固定最小列宽和密度 | 节点按分组再包一层标题/容器，控制区和四种卡片密度与浏览器输出不一致 | 不一致 | 否 | 第 10 轮移除视觉分组包装（分组筛选仍保留），收敛控制区、300/270/360/420px 栅格与 mini/large 卡片尺度 | P1 | PASS |
+| 32 | 累计流量部分数据的说明位置 | 总览卡面只有数值与纯单位 | 第二轮候选把「部分」塞进单位，窄屏挤掉主数值 | 卡面恢复一致；提示气泡不同 | **是**（CFSM 节点可能缺少双向累计流量，不能将部分合计冒充完整数据） | 卡面按上游保留纯 `GB` / `TB`，仅完整节点参与合计，提示气泡注明「部分 · N 台缺少流量数据，未计入」，全缺失时隐藏卡片 | P2 | P2-ACCEPTED |
 
 ## 第 13 轮：详情页专项审计
 
@@ -191,11 +192,12 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 
 - **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。
 - **矩阵 26（P2-ACCEPTED）**：高级工具是第 8 轮已落地、用户明确要求保留的 CFSM 能力，只让其沿用统一视觉 token，不重新设计 Komari 首页结构。
+- **矩阵 32（P2-ACCEPTED）**：累计流量卡面与上游一致；CFSM 数据缺失时仅在提示气泡里如实说明部分合计，保证手机窄卡的数值可见。
 
 ## 当前终态
 
-**P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 2。**
-31 项审计的终态分布：PASS 25、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 2。
+**P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 3。**
+32 项审计的终态分布：PASS 25、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 3。
 
 ## 数据真实性边界（不因保真而放宽）
 

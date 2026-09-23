@@ -26,7 +26,7 @@ const selectedSource = computed(() => resolveBackgroundSource(
     : theme.runtime.lightBackgroundUrl,
 ))
 const customBackground = computed(() => (
-  theme.runtime.backgroundEnabled && selectedSource.value !== ''
+  theme.configResolved && theme.runtime.backgroundEnabled && selectedSource.value !== ''
 ))
 const mediaStyle = computed(() => ({
   filter: `blur(${theme.runtime.backgroundBlur}px)`,
@@ -68,8 +68,8 @@ const overlayStyle = computed(() => {
       />
       <div class="dynamic-background__overlay" :style="overlayStyle" />
     </template>
-    <!-- 冷启动尚不知道站点是否设置了自定义背景；先留空，不下载一张随后要丢弃的默认图。 -->
-    <template v-else-if="theme.configResolved">
+    <!-- 冷启动只暂存后端开关，不缓存地址；已知自定义背景时等配置，普通站点立即显示默认图。 -->
+    <template v-else-if="theme.configResolved || !theme.coldStartBackgroundEnabled">
       <div class="dynamic-background__default" :style="{ backgroundImage: `url(${defaultBackground})` }" />
     </template>
   </div>

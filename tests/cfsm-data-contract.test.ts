@@ -208,11 +208,9 @@ describe('站点级展示开关下发到每台节点（BUG-003 回归）', () =>
 
 describe('总览卡片单位不再抢占主数值的宽度（BUG-004 回归）', () => {
   it('总览单位可收缩且没有宽度上限，与上游 truncate 一致', () => {
-    const start = stylesheet.indexOf('.overview-card__unit {')
-    // J 仅给「部分累计流量」一张卡加不截断例外；BUG-004 的约束仍锁定基础单位规则。
     const unit = stylesheet.slice(
-      start,
-      stylesheet.indexOf('}', start) + 1,
+      stylesheet.indexOf('.overview-card__unit {'),
+      stylesheet.indexOf('@media (min-width: 768px)', stylesheet.indexOf('.overview-card__unit {')),
     )
     expect(unit).not.toContain('max-width: 60%')
     expect(unit).not.toContain('flex: none')
