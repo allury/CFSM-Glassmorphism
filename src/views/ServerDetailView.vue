@@ -21,6 +21,7 @@ import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
 import { detailDocumentTitle, resolveSiteTitle } from '@/domain/site-title'
+import { configReady } from '@/domain/config-readiness'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
@@ -97,7 +98,10 @@ const siteTitleResolution = computed(() => resolveSiteTitle(
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
-const pageLoading = computed(() => state.value === 'loading' && server.value === null)
+const pageLoading = computed(() => (
+  (state.value === 'loading' && server.value === null)
+  || (server.value !== null && !configReady(owningConfig.value, sourceConfigState.value))
+))
 const refreshing = computed(() => (
   state.value === 'loading' || historyState.value === 'loading' || pingHistoryState.value === 'loading'
 ))
@@ -109,7 +113,8 @@ const headerOnline = computed(() => (
 ))
 const sourceCount = computed(() => app.apiBases.length || (sourceConfig.value ? 1 : 0))
 const visibleAdminUrl = computed(() => (
-  theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
+  !configReady(app.config, app.state)
+    || (theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true)
     ? null
     : app.administrationUrl
 ))

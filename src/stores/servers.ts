@@ -31,6 +31,7 @@ export const useServersStore = defineStore('servers', () => {
   const lastRealtimeAt = ref<number | null>(null)
   let loadInFlight: Promise<void> | null = null
   let loadRevision = 0
+  let pendingRealtimeSamples: Array<{ key: string, sample: CfsmRealtimeSample, receivedAt: number }> | null = null
 
   const servers = computed<CfsmServer[]>(() => collections.value.flatMap((item) => item.servers))
   const bySourceAndId = computed(() => new Map(
@@ -55,9 +56,10 @@ export const useServersStore = defineStore('servers', () => {
   }
 
   async function performLoad(bases: string[], expectedRevision: number): Promise<void> {
-    const baselineByKey = new Map(
-      servers.value.map((server) => [serverKey(server.source.base, server.id), server]),
-    )
+    // 只重放请求期间实际应用的推送字段；静态字段仍取最新 REST 快照。
+    // 字段归属以 mergeRealtimeSample 为唯一准则，不在 store 维护第二份清单。
+    const replay: Array<{ key: string, sample: CfsmRealtimeSample, receivedAt: number }> = []
+    pendingRealtimeSamples = replay
     state.value = 'loading'
     error.value = null
     sourceFailures.value = []
@@ -67,20 +69,21 @@ export const useServersStore = defineStore('servers', () => {
       const previousByBase = new Map(
         collections.value.map((collection) => [collection.source.base, collection]),
       )
-      const latestByKey = new Map(
-        collections.value.flatMap((collection) => collection.servers.map(
-          (server) => [serverKey(collection.source.base, server.id), server] as const,
-        )),
-      )
+      const replayByKey = new Map<string, typeof replay>()
+      for (const entry of replay) {
+        const samples = replayByKey.get(entry.key)
+        if (samples) samples.push(entry)
+        else replayByKey.set(entry.key, [entry])
+      }
       const refreshedByBase = new Map(
         result.collections.map((collection) => [collection.source.base, {
           ...collection,
           servers: collection.servers.map((refreshed) => {
             const key = serverKey(collection.source.base, refreshed.id)
-            const baseline = baselineByKey.get(key)
-            const latest = latestByKey.get(key)
-            // 该对象在请求期间被 WSS 替换过：旧 REST 快照不得把它回写成较早值。
-            return baseline && latest && latest !== baseline ? latest : refreshed
+            return (replayByKey.get(key) ?? []).reduce(
+              (current, entry) => mergeRealtimeSample(current, entry.sample, entry.receivedAt),
+              refreshed,
+            )
           }),
         }]),
       )
@@ -107,6 +110,8 @@ export const useServersStore = defineStore('servers', () => {
       if (expectedRevision !== loadRevision) return
       state.value = collections.value.length > 0 ? 'partial' : 'error'
       error.value = reason instanceof Error ? reason.message : 'Unknown CFSM server error'
+    } finally {
+      if (pendingRealtimeSamples === replay) pendingRealtimeSamples = null
     }
   }
 
@@ -148,6 +153,7 @@ export const useServersStore = defineStore('servers', () => {
       for (const sample of samples) {
         const current = updated.get(sample.serverId)
         if (!current) continue
+        pendingRealtimeSamples?.push({ key: serverKey(collection.source.base, sample.serverId), sample, receivedAt })
         updated.set(sample.serverId, mergeRealtimeSample(current, sample, receivedAt))
         collectionChanged = true
       }
@@ -191,6 +197,7 @@ export const useServersStore = defineStore('servers', () => {
   function clear(): void {
     loadRevision += 1
     loadInFlight = null
+    pendingRealtimeSamples = null
     collections.value = []
     state.value = 'idle'
     error.value = null

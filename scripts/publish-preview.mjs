@@ -11,6 +11,7 @@ const git = (args, options = {}) => execFileSync('git', args, {
   encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...options,
 }).trim()
 const sourceTip = () => git(['ls-remote', '--exit-code', 'origin', 'refs/heads/main']).split(/\s/)[0]
+const windowsTar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
 
 if (sourceTip() !== sourceSha) {
   console.log('Source main has advanced; skipping the superseded preview.')
@@ -21,7 +22,7 @@ if (sourceTip() !== sourceSha) {
     const themeDir = join(staging, 'theme')
     mkdirSync(themeDir)
     const archive = resolve(archivePath)
-    if (process.platform === 'win32') execFileSync('tar.exe', ['-xf', archive, '-C', themeDir])
+    if (process.platform === 'win32') execFileSync(windowsTar, ['-xf', archive, '-C', themeDir])
     else execFileSync('unzip', ['-q', archive, '-d', themeDir])
     if (readdirSync(themeDir).sort().join(',') !== 'assets,index.html'
       || !statSync(join(themeDir, 'index.html')).isFile()

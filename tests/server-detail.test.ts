@@ -186,7 +186,7 @@ describe('实时样本缓冲', () => {
   })
 
   it('条数也有上限，长时间停留不会无限增长', () => {
-    // 放宽时间窗口，专门验证条数上限；1 秒是 Angel 允许的最短 WSS 上报间隔。
+    // 放宽时间窗口，专门验证条数上限；1 秒是 Agent 允许的最短 WSS 上报间隔。
     const step = 1_000
     const window = step * (LIVE_MAX_POINTS + 100)
     let points = [] as ReturnType<typeof appendLivePoint>
@@ -198,7 +198,7 @@ describe('实时样本缓冲', () => {
     expect(points[points.length - 1]?.timestamp).toBe(START + (LIVE_MAX_POINTS + 49) * step)
   })
 
-  it('逐条保留 Angel 配置间隔到达的 WSS 样本，不在前端强制降成 10 秒', () => {
+  it('逐条保留 Agent 配置间隔到达的 WSS 样本，不在前端强制降成 10 秒', () => {
     for (const interval of [1_000, 2_000, 5_000]) {
       const timestamps = [0, 1, 2, 3].map((index) => START + index * interval)
       const points = timestamps.reduce<ReturnType<typeof appendLivePoint>>(
@@ -209,7 +209,7 @@ describe('实时样本缓冲', () => {
     }
   })
 
-  it('逐条回放同一个 batchUpdate 内按 Angel 间隔采集的多条样本', () => {
+  it('逐条回放同一个 batchUpdate 内按 Agent 间隔采集的多条样本', () => {
     const merged = mergeDetailLiveSamples(server, [], [
       { serverId: server.id, timestamp: START / 1000, data: { cpu: 10 } },
       { serverId: server.id, timestamp: (START + 2_000) / 1000, data: { cpu: 20 } },

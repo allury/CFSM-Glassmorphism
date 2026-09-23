@@ -331,6 +331,48 @@ describe('theme settings store', () => {
     expect(store.runtime.themeMode).toBe('dark')
   })
 
+  it('rejects a changed second submission explicitly and retains its draft for retry', async () => {
+    const storage = new MemoryStorage()
+    storage.setItem(STORAGE_KEYS.jwt, 'credential')
+    let releaseWrite: (() => void) | undefined
+    const writes: unknown[] = []
+    const fetcher: typeof fetch = async (input, init) => {
+      if (String(input).endsWith('/api/theme_options')) {
+        writes.push(JSON.parse(String(init?.body)) as unknown)
+        await new Promise<void>((resolve) => { releaseWrite = resolve })
+        return new Response(JSON.stringify({ success: true, theme_options: { alertTitle: 'First' } }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ authorization: true, theme_options: { alertTitle: 'First' } }), { status: 200 })
+    }
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({ alertTitle: 'Original' }, 'auto', true)
+    store.draft.alertTitle = 'First'
+
+    const first = store.saveBackend('https://status.example', { storage, fetcher })
+    store.draft.alertTitle = 'Second'
+    const second = await store.saveBackend('https://status.example', { storage, fetcher })
+    expect(second.saved).toBe(false)
+    expect(store.saveError?.message).toContain('上一次保存尚未完成')
+    releaseWrite?.()
+    expect((await first).saved).toBe(true)
+    expect(writes).toHaveLength(1)
+    expect(store.draft.alertTitle).toBe('Second')
+    expect(store.hasDraftChanges).toBe(true)
+
+    const retry = await store.saveBackend('https://status.example', { storage, fetcher: async (input, init) => {
+      if (String(input).endsWith('/api/theme_options')) {
+        writes.push(JSON.parse(String(init?.body)) as unknown)
+        return new Response(JSON.stringify({ success: true, theme_options: { alertTitle: 'Second' } }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ authorization: true, theme_options: { alertTitle: 'Second' } }), { status: 200 })
+    } })
+    expect(retry.saved).toBe(true)
+    expect(writes).toHaveLength(2)
+    expect(JSON.stringify(writes[1])).toContain('"alertTitle":"Second"')
+    expect(store.draft.alertTitle).toBe('Second')
+  })
+
   it.each([
     { label: '400', response: new Response('{"error":"invalidThemeOptionsFormat"}', { status: 400 }), kind: 'invalid-format' },
     { label: '401', response: new Response('{"message":"unauthorized"}', { status: 401 }), kind: 'unauthorized' },

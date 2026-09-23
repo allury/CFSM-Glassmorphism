@@ -124,7 +124,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 响应式布局 | 桌面/平板/移动 | 前端渲染 | 保留断点体验 | ✅ 一致 |
 | 减少动画 | 手动开关和系统偏好 | 前端渲染 | 同时尊重 prefers-reduced-motion | ✅ 一致 |
 | CPU/RAM/Swap/Disk/Load | 节点实时指标 | 同名 CFSM 指标 | 直接字段映射 | ✅ 一致 |
-| 实时网速与累计流量 | 网络指标 | net_in/out_speed、net_rx/tx | 单位在 adapter 后统一 | ✅ 一致 |
+| 实时网速与累计流量 | 网络指标 | net_in/out_speed、net_rx/tx | 单位在 adapter 后统一；全站累计流量仅合计双向完整的节点，缺失节点数在提示中标为「部分」，全缺失时隐藏该卡，单节点仍严格保持未知 | ✅ 一致 |
 | 进程与连接 | processes、connections | processes、tcp_conn、udp_conn | 直接字段映射 | ✅ 一致 |
 | 运行时长 | uptime | boot_time | 使用当前时间减真实启动时间 | 🟢 等价实现 |
 | OS/架构/内核/地区 | 节点元数据 | os、arch、kernel_version、region | 直接映射 | ✅ 一致 |
@@ -139,7 +139,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 延迟窗口小图 | 历史延迟序列 | `/api/servers` ping/loss 窗口 | 使用真实稀疏时间戳，不补点 | ✅ 一致 |
 | 在线状态 | Komari online 字段 | is_online 或 last_updated/timestamp | 遵循五分钟在线阈值 | 🟢 等价实现 |
 | 多 API Base | 原主题单后端 | apiBase meta 可配置多个 origin | 每个节点保存 source ownership | 🟢 等价实现 |
-| 定时刷新间隔 | dataUpdateInterval/RPC | REST 回退 + Angel 配置的 WSS 上报节奏 | 设置只控制 WebSocket 不可用时的 REST 补偿轮询；WSS 按 `wss_report_interval` 推送，前端不强制为 5 秒或 10 秒 | 🟡 降级实现 |
+| 定时刷新间隔 | dataUpdateInterval/RPC | REST 回退 + Agent 配置的 WSS 上报节奏 | 设置只控制 WebSocket 不可用时的 REST 补偿轮询；WSS 按 `wss_report_interval` 推送，前端不强制为 5 秒或 10 秒 | 🟡 降级实现 |
 | 实时订阅 | `/api/clients` | `/api/ws` | 每个 base 独立连接、订阅其自身 IDs、增量合并 | 🟢 等价实现 |
 | 单节点详情初始数据 | Komari node RPC | `/api/server?id=` | 已实现详情只拉单节点；owning base 已知时不探测其他来源 | 🟢 等价实现 |
 | 历史指标 | load/ping records | `/api/history/all?id=&hours=` | 已实现官方九种周期、稀疏点 ECharts 图表与真实空/错误状态 | 🟢 等价实现 |
@@ -167,7 +167,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 
 ## 关键审计结论
 
-- v1.1.12 稳定版不改变本表的能力边界：修复快速前后台切换时的 REST/WS 恢复竞态、请求生命周期与资源释放，保留 Angel `wss_report_interval`、历史点位、probe 三态和配置含义；Issue #1 继续作为上游限制记录，不采用主题端绕过方案。稳定安装使用 `theme-v1.1.12` 或 `theme-dist`，`preview-main` 继续作为后续 `main` 的滚动预览。
+- v1.1.12 稳定版不改变本表的能力边界：修复快速前后台切换时的 REST/WS 恢复竞态、请求生命周期与资源释放，保留 Agent `wss_report_interval`、历史点位、probe 三态和配置含义；Issue #1 继续作为上游限制记录，不采用主题端绕过方案。稳定安装使用 `theme-v1.1.12` 或 `theme-dist`，`preview-main` 继续作为后续 `main` 的滚动预览。
 
 - CFSM 的 dashboard 公共接口不返回管理端 `note`，也不返回服务器实际 IP、ASN 或城市；这些能力不得由占位值补齐。
 - `gpu` 已废弃，适配只读取 `gpu_info`。REST 可能返回 JSON 字符串，WebSocket 新数据返回数组。

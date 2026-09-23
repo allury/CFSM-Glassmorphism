@@ -223,7 +223,7 @@ export function appendLivePoint(
   windowMs = LIVE_WINDOW_MS,
   maxPoints = LIVE_MAX_POINTS,
 ): HistoryPoint[] {
-  // WSS 上报间隔由 Angel / CFSM 配置决定；每条真实推送都必须进入图表，前端不降采样。
+  // WSS 上报间隔由 Agent / CFSM 配置决定；每条真实推送都必须进入图表，前端不降采样。
   const next = [...points, point]
   const earliest = point.timestamp - windowMs
   const withinWindow = next.filter((item) => item.timestamp >= earliest)

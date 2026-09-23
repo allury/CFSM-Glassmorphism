@@ -57,7 +57,7 @@ export interface DashboardRealtimeOptions {
   scheduler?: DashboardRealtimeScheduler
   /** 固定值，或每次启动回退轮询时读取的取值函数（设置改了无需重建连接）。 */
   fallbackIntervalMs?: number | (() => number)
-  /** 同一轮分节点消息的收集窗口；由 Angel `wss_report_interval` 推导，单位毫秒。 */
+  /** 同一轮分节点消息的收集窗口；由 Agent `wss_report_interval` 推导，单位毫秒。 */
   getSampleSettleDelayMs?: () => number
 }
 

@@ -37,7 +37,7 @@ export type HistoryLoadState = 'idle' | 'loading' | 'ready' | 'empty' | 'error'
 /**
  * 按 CFSM `batchUpdate.samples[]` 的顺序逐条回放详情实时数据。
  *
- * 一个 WebSocket 消息可能装着多条由 Angel 按 `wss_report_interval` 采集的样本；这些样本
+ * 一个 WebSocket 消息可能装着多条由 Agent 按 `wss_report_interval` 采集的样本；这些样本
  * 既要逐条 partial merge，也要逐条进入实时图，不能把整个批次压成最后一个点。时间戳
  * 使用样本自己的采集时间（秒或毫秒均兼容），只有缺失时才退到消息到达时间。
  */

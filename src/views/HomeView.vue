@@ -38,6 +38,7 @@ import { useServersStore } from '@/stores/servers'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { parseSettingKeys } from '@/theme/settings'
 import { resolveSiteTitle } from '@/domain/site-title'
+import { configReady } from '@/domain/config-readiness'
 import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
 const app = useAppStore()
@@ -64,12 +65,13 @@ const siteTitleResolution = computed(() => resolveSiteTitle(
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
+const siteConfigReady = computed(() => configReady(app.config, app.state))
 const viewMode = computed({
   get: () => theme.viewMode,
   set: (value: DashboardViewMode) => theme.setDashboardViewMode(value),
 })
 const visibleAdminUrl = computed(() => (
-  theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
+  !siteConfigReady.value || (theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true)
     ? null
     : app.administrationUrl
 ))
@@ -105,7 +107,7 @@ const summary = computed(() => summarizeServers(glassServers.value))
  */
 const financeNodes = computed(() => financeNodesOf(glassServers.value))
 const generalFinance = computed(() => (
-  showGeneralCards.value
+  siteConfigReady.value && showGeneralCards.value
     ? generalFinanceContext(glassServers.value, theme.runtime, {
       priceVisible: priceVisible.value,
       target: finance.preferences.displayCurrency,
@@ -157,7 +159,7 @@ const showSource = computed(() => (
 const sourceCount = computed(() => (
   app.apiBases.length || serverStore.collections.length
 ))
-const initialLoading = computed(() => (
+const initialLoading = computed(() => !siteConfigReady.value || (
   glassServers.value.length === 0
   && (app.state === 'idle' || app.state === 'loading'
     || serverStore.state === 'idle' || serverStore.state === 'loading')
@@ -275,7 +277,7 @@ onUnmounted(() => realtime.stop())
       <main class="dashboard">
         <!-- 与 Komari 一致：公告位于总览与节点区之前，是首页第一块内容。 -->
         <section
-          v-if="theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
+          v-if="siteConfigReady && theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
           class="theme-announcement glass-panel"
           role="status"
         >

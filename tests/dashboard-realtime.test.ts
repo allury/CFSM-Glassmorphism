@@ -246,7 +246,7 @@ describe('dashboard realtime coordination', () => {
     controller.dispose()
   })
 
-  it('commits staggered per-node messages once per Angel reporting interval', async () => {
+  it('commits staggered per-node messages once per Agent reporting interval', async () => {
     vi.useFakeTimers()
     const factory = connectionFactory()
     const onSampleBatches = vi.fn()

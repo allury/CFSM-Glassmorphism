@@ -159,6 +159,31 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
     expect(cards).toEqual([])
   })
 
+  it('多节点仅合计双向完整的流量，并明确标出未计入的节点', () => {
+    const complete = glass({
+      network: { inSpeed: null, outSpeed: null, received: 3 * 1024 ** 3, transmitted: 1024 ** 3, monthlyReceived: null, monthlyTransmitted: null },
+    })
+    const incomplete = glass({
+      key: 'source:incomplete', id: 'incomplete',
+      network: { inSpeed: null, outSpeed: null, received: 9 * 1024 ** 3, transmitted: null, monthlyReceived: null, monthlyTransmitted: null },
+    })
+    const cards = buildGeneralCards([complete, incomplete], customGeneral('totalTraffic'))
+
+    expect(cards[0]).toMatchObject({ key: 'totalTraffic', value: '4.0', unit: 'GB' })
+    expect(cards[0]?.hint).toBe('↑ 1.0 GB\n↓ 3.0 GB\n部分 · 1 台缺少流量数据，未计入')
+  })
+
+  it('全部节点缺少双向流量时隐藏累计卡，不把未知渲染成零', () => {
+    const nodes = [
+      glass(),
+      glass({ key: 'source:incomplete', id: 'incomplete', network: {
+        inSpeed: null, outSpeed: null, received: 1024, transmitted: null,
+        monthlyReceived: null, monthlyTransmitted: null,
+      } }),
+    ]
+    expect(buildGeneralCards(nodes, customGeneral('totalTraffic'))).toEqual([])
+  })
+
   it('计数类卡片用 `/ 总数`、`台`、`个` 作单位', () => {
     const servers = [glass(), glass({ key: 'source:b', id: 'b', online: false })]
     const cards = buildGeneralCards(servers, customGeneral('onlineNodes\nofflineNodes\nexpiringNodes\nregionDistribution'))

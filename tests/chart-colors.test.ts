@@ -37,7 +37,7 @@ const optionsSource = readFileSync(new URL('../src/domain/detail-chart-options.t
  * `strokeStyle` / `fillStyle`，canvas **不解析 CSS 变量**，`var(--x)` 会被直接丢弃，
  * 折线被画成纯黑。所以这里断言的是「进入图表的颜色一定是具体值」。
  *
- * 第二阶段详情页 1:1 重建后，图表按上游拆成三类 option：
+ * 第二阶段详情页高保真移植后，图表按上游拆成三类 option：
  * - `LoadChart.vue` 内联卡（CPU 与负载、内存与 Swap、磁盘、实时网络、GPU、网络连接、进程）
  *   用 `getLoadChartPalette()` 的角色色，1.5 + 圆线帽，总量线 1.2 虚线；
  * - `MetricSeriesChartCard`（累计流量、Ping 延迟、Ping 丢包）1.6、无线帽；

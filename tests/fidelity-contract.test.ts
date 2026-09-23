@@ -10,7 +10,7 @@ function exists(path: string): boolean {
 }
 
 /**
- * 第 9.5 轮：正式版 1:1 高保真收敛。
+ * 第 9.5 轮：正式版高保真移植收敛。
  *
  * 这些契约锁定「向原 Komari Glassmorphism 对齐」的结果，防止后续再退回
  * CFSM 自创的中间层或 SVG 仿制渲染器。
@@ -174,7 +174,7 @@ describe('Komari fidelity contracts', () => {
     expect(header).not.toContain('toggleTools')
   })
 
-  /* 第 11 轮：首页 1:1 复刻。 */
+  /* 第 11 轮：首页高保真复刻。 */
 
   it('encodes ping bars by Komari signal tone instead of bar height', () => {
     const card = source('../src/components/dashboard/ServerCard.vue')

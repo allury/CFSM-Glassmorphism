@@ -8,6 +8,7 @@ import { afterAll, describe, expect, it } from 'vitest'
 const staging = mkdtempSync(join(tmpdir(), 'cfsm-preview-test-'))
 afterAll(() => rmSync(staging, { recursive: true, force: true }))
 const script = fileURLToPath(new URL('../scripts/publish-preview.mjs', import.meta.url))
+const windowsTar = join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
 
 function fixture() {
   const root = mkdtempSync(join(staging, 'case-'))
@@ -19,7 +20,7 @@ function fixture() {
   mkdirSync(join(theme, 'assets'), { recursive: true })
   writeFileSync(join(theme, 'index.html'), '<script src="./assets/app.js"></script>')
   writeFileSync(join(theme, 'assets/app.js'), 'console.log("fixture")')
-  if (process.platform === 'win32') execFileSync('tar.exe', ['-a', '-cf', archive, 'index.html', 'assets'], { cwd: theme })
+  if (process.platform === 'win32') execFileSync(windowsTar, ['-a', '-cf', archive, 'index.html', 'assets'], { cwd: theme })
   else execFileSync('zip', ['-qr', archive, 'index.html', 'assets'], { cwd: theme })
   const git = (...args: string[]) => execFileSync('git', args, { cwd: source, encoding: 'utf8', stdio: 'pipe' }).trim()
   git('init', '--bare', remote)

@@ -174,6 +174,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   let mediaQuery: MediaQueryList | null = null
   let storageListenerInstalled = false
   let saveInFlight: Promise<ThemeSaveOutcome> | null = null
+  let saveInFlightDraft: ThemeSettings | null = null
+  let saveInFlightBase: string | null = null
 
   const resolvedTheme = computed(() => resolveThemeMode(
     runtime.value.themeMode,
@@ -419,6 +421,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     }
 
     const normalized = normalizeThemeSettingsLayer(draft.value, persisted.value)
+    const submittedDraft = cloneThemeSettings(draft.value)
     const snapshot = createThemeOptionsSnapshot(normalized, backendRaw.value)
     const requestStorage = options.storage ?? activeStorage
     hasBackendCredential.value = hasStoredJwt(requestStorage)
@@ -455,9 +458,13 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     backendRaw.value = recordValue(result.themeOptions)
     localOverrides.value = {}
     const localLayerStored = persistOverrides()
-    previewing.value = false
-    rebuildFromLayers(true)
+    // 后端只确认这次提交的快照；请求途中产生的新编辑不能被成功回包抹掉。
+    const draftChangedDuringSave = () => !themeSettingsEqual(draft.value, submittedDraft)
+    previewing.value = draftChangedDuringSave()
+    rebuildFromLayers(!previewing.value)
+    if (previewing.value) previewDraft()
     saveState.value = 'success'
+    saveError.value = null
     message.value = localLayerStored
       ? 'CFSM 已保存设置并返回新的 theme_options。'
       : 'CFSM 已保存设置，但浏览器拒绝清除持久化本地覆盖；当前会话已使用后端结果。'
@@ -468,7 +475,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
         storage: requestStorage,
         timeoutMs: options.timeoutMs,
       })
-      hydrateBackend(config.themeOptions, config.preferredTheme, true)
+      hydrateBackend(config.themeOptions, config.preferredTheme, !draftChangedDuringSave())
+      if (draftChangedDuringSave()) previewDraft()
       message.value = localLayerStored
         ? 'CFSM 后端设置已保存并完成配置回读。'
         : 'CFSM 后端设置已保存并完成回读，但浏览器拒绝清除持久化本地覆盖。'
@@ -484,16 +492,36 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   }
 
   function saveBackend(base: string, options: ThemeSaveOptions = {}): Promise<ThemeSaveOutcome> {
-    // disabled 属性更新前的同步双击也只能产生一次写请求；所有调用方共享其结果。
-    if (saveInFlight) return saveInFlight
+    // 同一草稿的同步双击共用结果；新草稿或新来源必须明确拒绝，保留编辑待重试。
+    if (saveInFlight) {
+      if (saveInFlightBase === base && saveInFlightDraft && themeSettingsEqual(draft.value, saveInFlightDraft)) {
+        return saveInFlight
+      }
+      previewDraft()
+      saveError.value = {
+        kind: 'unknown', status: null, code: 'saveInProgress',
+        message: '上一次保存尚未完成；当前草稿已保留，请等待完成后再次保存。',
+      }
+      return Promise.resolve({ saved: false, config: null, refetchWarning: null })
+    }
+    saveInFlightDraft = cloneThemeSettings(draft.value)
+    saveInFlightBase = base
     const pending = performBackendSave(base, options)
     saveInFlight = pending
     void pending.then(
       () => {
-        if (saveInFlight === pending) saveInFlight = null
+        if (saveInFlight === pending) {
+          saveInFlight = null
+          saveInFlightDraft = null
+          saveInFlightBase = null
+        }
       },
       () => {
-        if (saveInFlight === pending) saveInFlight = null
+        if (saveInFlight === pending) {
+          saveInFlight = null
+          saveInFlightDraft = null
+          saveInFlightBase = null
+        }
       },
     )
     return pending

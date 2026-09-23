@@ -15,6 +15,7 @@ import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { THEME_SETTING_KEYS, type ThemeSettings } from '@/theme/settings'
 import { message } from '@/utils/message'
 import { resolveSiteTitle } from '@/domain/site-title'
+import { configReady } from '@/domain/config-readiness'
 
 /*
  * Komari 自己没有设置页：48 项设置写在 `komari-theme.json` 的 managed configuration 里，
@@ -38,11 +39,12 @@ const siteTitleResolution = computed(() => resolveSiteTitle(
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
+const siteConfigReady = computed(() => configReady(app.config, app.state))
 const authorized = computed(() => (
   app.config?.authorization === true && theme.hasBackendCredential
 ))
 const visibleAdminUrl = computed(() => (
-  theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true
+  !siteConfigReady.value || (theme.runtime.hideAdminEntryWhenLoggedOut && app.config?.authorization !== true)
     ? null
     : app.administrationUrl
 ))
@@ -237,7 +239,7 @@ watch(siteTitle, (title) => {
               只有明确保存后才写入本浏览器或 CFSM 后端。
             </p>
           </div>
-          <dl class="settings-layer-stats">
+          <dl v-if="siteConfigReady" class="settings-layer-stats">
             <div>
               <dt>配置来源</dt>
               <dd>默认 → 后端 → 本地</dd>
@@ -265,7 +267,11 @@ watch(siteTitle, (title) => {
           </button>
         </div>
 
-        <form class="settings-layout" @submit.prevent>
+        <section v-if="!siteConfigReady" class="detail-loading" aria-label="正在加载主题设置">
+          <span v-for="index in 4" :key="index" class="skeleton detail-loading__card" />
+        </section>
+
+        <form v-else class="settings-layout" @submit.prevent>
           <div class="settings-sections">
             <section v-for="group in groups" :key="group.title" class="settings-section glass-panel">
               <header>

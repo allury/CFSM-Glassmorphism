@@ -86,12 +86,12 @@ v1.1.12 维护预览没有更改 adapter、normalized model 或 wire 契约。�
 
 - `app.ts` 管理 apiBases、站点 config、加载状态与官方管理端地址。并发消费者共享同一个配置请求；revision 阻止旧初始化覆盖保存后的回读，暂时失败时保留最后一份真实配置。
 - `servers.ts` 管理按来源分开的集合，以 `base::id` 作为稳定键，避免不同站点 UUID 冲突。
-- `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。首页与详情共享进行中的列表请求，列表请求期间收到的较新 WSS 样本不会被旧 REST 覆盖，`clear()` 会使在途响应失效。
+- `servers.ts` 也按来源合并实时 partial sample，未知节点不会由 WebSocket 凭空创建；REST 暂时失败时保留该来源上一份真实快照。首页与详情共享进行中的列表请求；请求期间实际应用的 WSS 样本按收到顺序重放到新 REST 节点上，字段归属只由 `mergeRealtimeSample` 决定，因此新 REST 名称、标签等静态字段不会被整台旧对象挡住。`clear()` 会使在途响应失效。
 - `realtime.ts` 管理首页实时协调器的生命周期、每个来源的连接状态、五分钟离线过期、降级提示和超时后的继续/暂停动作。
 - `dashboard-preferences.ts` 只保存以 source+id 标识的收藏。旧快照中的主题、视图与离线排序由 theme settings 层一次性迁移，避免同一外观状态有两个写入者。
-- `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。同一时刻的重复后端保存共享一个 Promise，避免按钮状态提交前的快速双击产生重复 POST。
+- `theme-settings.ts` 管理 48 项 schema 的 defaults、原始 backend 快照、版本化 local override、未保存 draft 与实际 runtime。它集中完成规范化、即时预览、本地保存/清除、完整后端保存和 `/api/config` 回读；组件不读取 localStorage 或 wire `theme_options`。同一草稿的重复保存共享一个 Promise；在途期间提交不同草稿会明确拒绝并提示等待，新的编辑保留供重试，不会冒充首次保存成功。
 - `finance.ts`（v1.1.7）管理财务偏好（显示币种、排除免费节点、手动汇率）与汇率状态：当日缓存、单个进行中的请求、失败后退回旧缓存或参考表。偏好只存浏览器本地，不进入 `theme_options`。
-- `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。配置、单节点、可见性列表与 History 并发启动；owning config 有独立 pending/ready/error 状态，慢配置不阻塞节点。History 切换范围会清除上一范围，原范围 revalidate 失败则保留最后真实快照；revision 与局部 AbortController 共同阻止旧请求、卸载后请求和慢 REST 覆盖新 WSS。
+- `server-detail.ts` 管理单节点 REST、所属 source config、History、single-server WebSocket、错误/空状态和页面生命周期。首页传入 owning base；刷新直达链接时可在已配置 bases 上用 `/api/server` 解析归属，但绝不拉取全量列表。配置、单节点、可见性列表与 History 并发启动；owning config 有独立 pending/ready/error 状态，慢配置不阻塞数据请求，但 UI 在配置确定前保持骨架屏，避免设置驱动的指标卡按默认值闪现。History 切换范围会清除上一范围，原范围 revalidate 失败则保留最后真实快照；revision 与局部 AbortController 共同阻止旧请求、卸载后请求和慢 REST 覆盖新 WSS。
 - store 对异步过程提供 idle/loading/ready/partial/error，而不是让 UI 猜测；多来源之一失败时保留其他来源的真实结果与失败原因。
 
 ### UI
@@ -99,6 +99,7 @@ v1.1.12 维护预览没有更改 adapter、normalized model 或 wire 契约。�
 位置：`src/App.vue`、`src/views/`、`src/components/dashboard/` 与 `src/components/detail/`。
 
 - 只渲染领域模型和显式状态。
+- 冷启动时，首页、详情与设置页的后端设置驱动区域等到所属 `/api/config` 成功或明确失败才解除骨架屏；已有真实配置的手动刷新继续显示旧快照。失败时维持既有错误提示并使用默认设置，不会无限等待。此门禁不处理页面明暗从默认值切换到后端值的问题。
 - 缺数据时隐藏依赖组件或显示“不可用”，不展示 0 值占位来冒充采样。
 - 用户动作调用 store/service，鉴权失败保留当前页面和编辑内容。
 - 原 Glassmorphism 的组件、布局、动效和响应式策略优先复用；Komari transport 代码不能随组件一起移植。
@@ -138,7 +139,7 @@ schema defaults
 - 一条首页连接只对应一个 apiBase；它的订阅 IDs 只来自同一 base。
 - 首页连接 URL 固定为 `/api/ws?subscribe=all`，open 后发送包含本 base 真实节点 IDs 的 all-scope subscription。
 - 收到 `batchUpdate` 后提取 sample 的 `data`、`payload` 或 `metrics`，按字段合并进已有实体。
-- 同一轮上报里的节点消息可能在约数百毫秒内分批抵达。首页按当前最快 `wss_report_interval` 的一半（限制为 250～1000ms）收齐这一轮消息，再跨 apiBase 原子提交一次；每条 sample 仍按原顺序 partial merge，不降采样、不平均，也不把 Angel 的 1～5 秒上报周期改成前端固定值。
+- 同一轮上报里的节点消息可能在约数百毫秒内分批抵达。首页按当前最快 `wss_report_interval` 的一半（限制为 250～1000ms）收齐这一轮消息，再跨 apiBase 原子提交一次；每条 sample 仍按原顺序 partial merge，不降采样、不平均，也不把 Agent 的 1～5 秒上报周期改成前端固定值。
 - 高频增量缺失字段是正常情况，不得覆盖已有值；显式存在的 probe `false`、`null`、`0` 与普通数字则必须更新对应单一字段。
 - 列表 ping/loss 窗口由 REST 补齐，详情实时字段与历史序列分别管理。
 - document 隐藏时主动关闭，可见时先 REST revalidate 再连接；unmount 时释放连接与计时器。
@@ -146,7 +147,7 @@ schema defaults
 - 连接不可用时以单个低频 REST 循环补偿；任何失败都继续展示最后一份真实快照及来源错误。
 - 五分钟在线阈值在 adapter/domain 层保持一致。
 - 详情连接使用 `/api/ws?subscribe=<id>`，open 后发送 `{ type: "subscribe", scope: <id>, ids: [] }` 激活 CFSM 的 Agent 实时提示，但绝不使用 all-scope，也不订阅其他节点；只合并同 ID sample。隐藏时关闭、可见时先请求 `/api/server` 再建立新连接，连接时限仍要求用户明确选择。
-- 详情负载图的「实时」档位复用这条 single-server 连接：优先从已经加载的 History 立即取最近 10 分钟垫底，确实没有近点时才单独请求 10 分钟 History；此后把 `batchUpdate.samples[]` 按采样时间逐条 partial merge 并逐条入图，完整保留 Angel 的 `wss_report_interval` 节奏，前端不改成固定 10 秒。历史桶与 WSS 密度可以不同；实时图只在相邻真实采样超过 1 分钟时插入断点，因此刷新、节点切换或时间档位切换不会把密度变化误画成大段空白。缓冲只保留最近 10 分钟且最多 600 点，切到历史档位不会清空它。
+- 详情负载图的「实时」档位复用这条 single-server 连接：优先从已经加载的 History 立即取最近 10 分钟垫底，确实没有近点时才单独请求 10 分钟 History；此后把 `batchUpdate.samples[]` 按采样时间逐条 partial merge 并逐条入图，完整保留 Agent 的 `wss_report_interval` 节奏，前端不改成固定 10 秒。历史桶与 WSS 密度可以不同；实时图只在相邻真实采样超过 1 分钟时插入断点，因此刷新、节点切换或时间档位切换不会把密度变化误画成大段空白。缓冲只保留最近 10 分钟且最多 600 点，切到历史档位不会清空它。
 
 ## Multi API Base
 

@@ -46,7 +46,7 @@ afterEach(() => {
 })
 
 describe('dashboard sample settle delay', () => {
-  it('uses half the fastest Angel interval without crossing the next report wave', () => {
+  it('uses half the fastest Agent interval without crossing the next report wave', () => {
     expect(dashboardSampleSettleDelayMs([
       { websocketReportInterval: 5 },
       { websocketReportInterval: 2 },

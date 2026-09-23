@@ -39,7 +39,7 @@ describe('release performance contracts', () => {
       dependencies?: Record<string, string>
     }
 
-    // 第 9 轮把运行时依赖收敛到 pinia/vue/vue-router。第 9.5 轮的 1:1 高保真收敛
+    // 第 9 轮把运行时依赖收敛到 pinia/vue/vue-router。第 9.5 轮的高保真移植收敛
     // 要求恢复 Komari 真实的三套 Earth 渲染器，globe.gl + three 与 cobe 是这些渲染器
     // 本身的实现依赖，不能用 SVG 仿制替换；@vueuse/core 提供渲染器所需的元素尺寸与
     // 可见性侦测。第 9.95 轮继续按上游实现补齐 echarts + vue-echarts（History 图表族）

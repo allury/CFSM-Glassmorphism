@@ -59,7 +59,7 @@ const {
 
 const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友好')
 /*
- * 「实时」档位用最近 10 分钟历史垫底，再按 Angel 的 WSS 上报间隔逐条接续真实样本；
+ * 「实时」档位用最近 10 分钟历史垫底，再按 Agent 的 WSS 上报间隔逐条接续真实样本；
  * 历史档位画所选固定窗口。切走不会清空实时缓冲，回到实时后继续向前更新。
  */
 const rows = computed(() => (liveMode.value ? liveRows.value : buildChartRows(historyPoints.value)))

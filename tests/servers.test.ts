@@ -121,12 +121,13 @@ describe('realtime server store', () => {
       data: { cpu: 77 },
     }], 1_700_000_010_000)
     release?.(new Response(JSON.stringify({
-      servers: [{ id: 'same-id', cpu: 20, is_online: true }],
+      servers: [{ id: 'same-id', name: 'Updated REST name', tags: ['new-tag'], cpu: 20, is_online: true }],
       stats: {},
     }), { status: 200 }))
     await loading
 
     expect(store.servers[0]?.cpu).toBe(77)
+    expect(store.servers[0]).toMatchObject({ name: 'Updated REST name', tags: ['new-tag'] })
     expect(store.state).toBe('ready')
   })
 

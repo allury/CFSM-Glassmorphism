@@ -8,7 +8,7 @@ const expectedRootEntries = ['assets', 'index.html']
  * 发布体积预算。
  *
  * 第 9 轮的预算（JS 512 KiB / 总资源 768 KiB）建立在当时的单一 SVG 地图之上。
- * 第 9.5 轮按 1:1 高保真要求恢复了 Komari 的三套真实 Earth 渲染器，
+ * 第 9.5 轮按高保真移植要求恢复了 Komari 的三套真实 Earth 渲染器，
  * globe.gl 与 three 是 realistic 渲染器本身的实现依赖，原主题地球贴图是它和
  * tiled 地图的真实素材 —— 都不允许为了压体积换成 SVG 仿制。
  *

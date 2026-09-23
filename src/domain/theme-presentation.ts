@@ -321,12 +321,6 @@ function sum(values: Array<number | null>): number | null {
   return samples.length ? samples.reduce((total, value) => total + value, 0) : null
 }
 
-function completeSum(values: Array<number | null>): number | null {
-  return values.length > 0 && values.every((value): value is number => value !== null)
-    ? values.reduce((total, value) => total + value, 0)
-    : null
-}
-
 /**
  * `icon` 使用与 Komari 一致的图标名（见 `@/constants/icons`），由 `AppIcon` 渲染。
  *
@@ -575,8 +569,13 @@ export function buildGeneralCards(
   const memory = resources((server) => server.memory)
   const disk = resources((server) => server.disk)
   const swap = resources((server) => server.swap)
-  const trafficUp = completeSum(servers.map((server) => server.network.transmitted))
-  const trafficDown = completeSum(servers.map((server) => server.network.received))
+  // 单节点仍须双向完整；缺失的一向绝不能被当作 0 加进全站总量。
+  const trafficReady = servers.filter((server) => (
+    server.network.transmitted !== null && server.network.received !== null
+  ))
+  const missingTrafficCount = servers.length - trafficReady.length
+  const trafficUp = sum(trafficReady.map((server) => server.network.transmitted))
+  const trafficDown = sum(trafficReady.map((server) => server.network.received))
   const totalTraffic = trafficUp !== null && trafficDown !== null ? trafficUp + trafficDown : null
   const upload = sum(online.map((server) => server.network.outSpeed))
   const download = sum(online.map((server) => server.network.inSpeed))
@@ -609,7 +608,7 @@ export function buildGeneralCards(
     currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now), hint: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(now) },
     memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
     disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
-    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(trafficUp)}\n↓ ${formatDisplayBytes(trafficDown)}` },
+    totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(trafficUp)}\n↓ ${formatDisplayBytes(trafficDown)}${missingTrafficCount > 0 ? `\n部分 · ${missingTrafficCount} 台缺少流量数据，未计入` : ''}` },
     uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
     downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
     onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },
