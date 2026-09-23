@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import {
@@ -43,6 +43,8 @@ class MemoryStorage implements Storage {
     this.values.set(key, String(value))
   }
 }
+
+const SITE_THEME_HINT_KEY = 'cfsm-glassmorphism.site-theme-hint.v1'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -421,6 +423,93 @@ describe('theme settings store', () => {
     expect(outcome.saved).toBe(false)
     expect(store.saveError?.kind).toBe('network')
     expect(store.draft.alertTitle).toBe('Network draft')
+  })
+})
+
+describe('non-authoritative cold-start site theme hint', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-09-23T02:00:00Z')) // 北京时间白天，默认 beijing 为浅色。
+  })
+  afterEach(() => vi.useRealTimers())
+
+  it('without a hint starts at the default and switches after confirmed backend config', () => {
+    const storage = new MemoryStorage()
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    expect(store.resolvedTheme).toBe('light')
+    store.hydrateBackend({ themeMode: 'dark' }, 'auto', true)
+    expect(store.resolvedTheme).toBe('dark')
+    expect(JSON.parse(storage.getItem(SITE_THEME_HINT_KEY) ?? 'null')).toEqual({ version: 1, themeMode: 'dark' })
+  })
+
+  it('uses a validated dark hint before config and keeps it out of all setting layers', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(SITE_THEME_HINT_KEY, JSON.stringify({ version: 1, themeMode: 'dark' }))
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    expect(store.resolvedTheme).toBe('dark')
+    expect(store.siteThemeMode).toBe('dark')
+    expect(store.runtime.themeMode).toBe('beijing')
+    expect(store.draft.themeMode).toBe('beijing')
+    expect(store.persisted.themeMode).toBe('beijing')
+    expect(store.localOverrideCount).toBe(0)
+    expect(storage.getItem(THEME_SETTINGS_STORAGE_KEY)).not.toContain('site-theme-hint')
+    expect(JSON.stringify(store.draftSnapshot)).not.toContain('site-theme-hint')
+  })
+
+  it('visitor override beats hint, while successful config writes the backend mode only', () => {
+    const storage = new MemoryStorage()
+    storage.setItem(SITE_THEME_HINT_KEY, JSON.stringify({ version: 1, themeMode: 'dark' }))
+    storage.setItem(THEME_SETTINGS_STORAGE_KEY, JSON.stringify(themeStorageSnapshot({ themeMode: 'light' })))
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    expect(store.resolvedTheme).toBe('light')
+    store.hydrateBackend({ themeMode: 'dark' }, 'auto', true)
+    expect(store.resolvedTheme).toBe('light')
+    expect(JSON.parse(storage.getItem(SITE_THEME_HINT_KEY) ?? 'null')).toEqual({ version: 1, themeMode: 'dark' })
+    expect(parseThemeStorageSnapshot(storage.getItem(THEME_SETTINGS_STORAGE_KEY))?.overrides).toEqual({ themeMode: 'light' })
+    expect(Object.keys(store.draftSnapshot)).not.toContain('site-theme-hint')
+  })
+
+  it('maps preferred_theme when theme_options has no themeMode', () => {
+    const storage = new MemoryStorage()
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    store.hydrateBackend({}, 'dark', true)
+    expect(JSON.parse(storage.getItem(SITE_THEME_HINT_KEY) ?? 'null')).toEqual({ version: 1, themeMode: 'dark' })
+  })
+
+  it('on cold-start config failure drops the hint for this render but preserves storage', () => {
+    const storage = new MemoryStorage()
+    const saved = JSON.stringify({ version: 1, themeMode: 'dark' })
+    storage.setItem(SITE_THEME_HINT_KEY, saved)
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    expect(store.resolvedTheme).toBe('dark')
+    store.resolveConfigFailure()
+    expect(store.resolvedTheme).toBe('light')
+    expect(storage.getItem(SITE_THEME_HINT_KEY)).toBe(saved)
+  })
+
+  it.each(['not-json', '{"version":2,"themeMode":"dark"}', '{"version":1,"themeMode":"violet"}'])('ignores invalid cached payload %s', (raw) => {
+    const storage = new MemoryStorage()
+    storage.setItem(SITE_THEME_HINT_KEY, raw)
+    const store = useThemeSettingsStore()
+    store.initialize(storage)
+    expect(store.resolvedTheme).toBe('light')
+  })
+
+  it('storage read/write exceptions never prevent theme initialization or hydration', () => {
+    const storage = new MemoryStorage()
+    vi.spyOn(storage, 'getItem').mockImplementation(() => { throw new Error('blocked') })
+    vi.spyOn(storage, 'setItem').mockImplementation(() => { throw new Error('blocked') })
+    const store = useThemeSettingsStore()
+    expect(() => store.initialize(storage)).not.toThrow()
+    expect(store.resolvedTheme).toBe('light')
+    expect(() => store.hydrateBackend({ themeMode: 'dark' }, 'auto', true)).not.toThrow()
+    expect(store.resolvedTheme).toBe('dark')
   })
 })
 

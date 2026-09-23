@@ -12,6 +12,10 @@
 
 冷启动配置未返回前只显示设置骨架屏，避免先展示默认草稿再切换。相同草稿的重复后端保存只写一次；若上一笔尚未结束而草稿已变化，第二次提交会明确提示“上一次保存尚未完成”，不会伪报成功，新草稿保留待用户再次保存。
 
+第 1.1.13 候选的第二轮只增加独立的冷启动明暗暂存：`cfsm-glassmorphism.site-theme-hint.v1` 只保存上一次成功回读 `/api/config` 后由 `theme_options.themeMode`（缺省时由 `preferred_theme`）确定的站点模式。配置尚未确定时，显示优先级为访客本地覆盖 → 暂存 → 默认；成功后以后端与本地覆盖为准，失败后回到默认与本地覆盖，但不删除暂存。暂存值不属于下方三层设置，不进入设置页草稿、配置来源统计、本地覆盖计数、复制 JSON 或 `POST /api/theme_options` 快照；存储异常时直接忽略。
+
+应用户在测量后追加的要求，背景层同样等待配置明确成功或失败：冷启动未知是否存在自定义背景时不挂载默认图，成功后直接按后端设置渲染自定义图/视频或默认图，失败后显示默认图。这样不会为随后被自定义图替换的默认图产生一次无用请求；不增加背景设置项或后端字段。
+
 设置页现已开放并真实兑现总览卡片预设 / 自定义 keys、五套快捷控制方案、列表 metadata 与 provider aliases、高负载 / 流量 / 到期阈值、详情卡片预设 / 自定义 keys、图表预设 / 自定义指标族以及 GPU 图表开关。不可用 key 在领域注册表边界被忽略；字段存在但当前节点没有数据时对应卡片或序列自动收起。
 
 第 8 轮继续复用同一 48 项 schema 与保存协议，并启用 `earthRenderer`、`stopEarth`、`hideEarth`、`homeToolsEnabled` 和 `exportSecondaryPassword` 的实际界面。Earth 只按显式 region 的国家/地区中心放点；高级工具只在 `/api/config.authorization === true` 时显示，并消费首页已加载的 normalized snapshot。导出二次口令只提供客户端确认，不宣称后端安全边界。磁盘耗尽预测仍等待独立轮次；`rpcTransportMode` 固定为 `http`（语义为官方 REST + WebSocket），`visitorInfoEnabled` 强制为 `false`。`remainingValue`、精确换汇、ASN、城市与外部 IP Geo 等缺失能力不会为了填满预设而合成。（后续：v1.1.7 起剩余价值与费用合计按浏览器取得的公开日汇率换算，来源如实标注，见 `docs/finance-parity.md`。）

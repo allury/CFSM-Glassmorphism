@@ -68,7 +68,8 @@ const overlayStyle = computed(() => {
       />
       <div class="dynamic-background__overlay" :style="overlayStyle" />
     </template>
-    <template v-else>
+    <!-- 冷启动尚不知道站点是否设置了自定义背景；先留空，不下载一张随后要丢弃的默认图。 -->
+    <template v-else-if="theme.configResolved">
       <div class="dynamic-background__default" :style="{ backgroundImage: `url(${defaultBackground})` }" />
     </template>
   </div>

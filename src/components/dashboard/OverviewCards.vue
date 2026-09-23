@@ -60,7 +60,7 @@ function onKeydown(event: KeyboardEvent, card: PresentationCard): void {
       v-for="card in cards"
       :key="card.key"
       class="overview-card"
-      :class="{ 'is-actionable': card.action }"
+      :class="{ 'is-actionable': card.action, 'is-partial': card.partial }"
       :data-general-card-key="card.key"
       :role="card.action ? 'button' : undefined"
       :tabindex="card.action ? 0 : undefined"

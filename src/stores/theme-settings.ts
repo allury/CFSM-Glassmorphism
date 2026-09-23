@@ -34,6 +34,11 @@ import {
   resolveGlassSurfaces,
   type GlassSurfaces,
 } from '@/domain/glass-surfaces'
+import {
+  backendSiteThemeMode,
+  parseSiteThemeHint,
+  SITE_THEME_HINT_STORAGE_KEY,
+} from '@/theme/site-theme-hint'
 
 export type ThemeSaveState = 'idle' | 'saving' | 'success' | 'error'
 export type ThemeSaveErrorKind = 'invalid-format' | 'unauthorized' | 'forbidden' | 'network' | 'unknown'
@@ -157,7 +162,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   const initialized = ref(false)
   const backendRaw = ref<Record<string, unknown>>({})
   const localOverrides = ref<Record<string, unknown>>({})
-  const preferredTheme = ref<'auto' | 'light' | 'dark'>('auto')
+  // /api/config 返回前并不知道 preferred_theme；此时应保持真正的 beijing 默认值。
+  const preferredTheme = ref<'auto' | 'light' | 'dark' | undefined>(undefined)
   const persisted = ref<ThemeSettings>(cloneThemeSettings(DEFAULT_THEME_SETTINGS))
   const runtime = ref<ThemeSettings>(cloneThemeSettings(DEFAULT_THEME_SETTINGS))
   const draft = ref<ThemeSettings>(cloneThemeSettings(DEFAULT_THEME_SETTINGS))
@@ -170,6 +176,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   const systemDark = ref(false)
   const hasBackendCredential = ref(false)
   const clock = ref(Date.now())
+  const siteThemeHint = ref<ThemeMode | null>(null)
+  const configResolved = ref(false)
   let activeStorage: Storage | undefined
   let mediaQuery: MediaQueryList | null = null
   let storageListenerInstalled = false
@@ -177,11 +185,19 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   let saveInFlightDraft: ThemeSettings | null = null
   let saveInFlightBase: string | null = null
 
-  const resolvedTheme = computed(() => resolveThemeMode(
-    runtime.value.themeMode,
-    systemDark.value,
-    new Date(clock.value),
-  ))
+  const resolvedTheme = computed(() => {
+    // 暂存值只影响首次 /api/config 仍未确定时的显示，不修改草稿或三层设置。
+    const localMode = localOverrides.value.themeMode
+    const pendingMode = localMode === 'auto' ? 'system'
+      : localMode === 'beijing' || localMode === 'system' || localMode === 'light' || localMode === 'dark'
+        ? localMode
+        : siteThemeHint.value ?? runtime.value.themeMode
+    return resolveThemeMode(
+      configResolved.value ? runtime.value.themeMode : pendingMode,
+      systemDark.value,
+      new Date(clock.value),
+    )
+  })
   const viewMode = computed(() => dashboardViewMode(runtime.value))
   const localOverrideCount = computed(() => Object.keys(localOverrides.value).length)
   const hasLocalOverrides = computed(() => localOverrideCount.value > 0)
@@ -258,6 +274,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     activeStorage = storage
     hasBackendCredential.value = hasStoredJwt(storage)
     localOverrides.value = readInitialOverrides(storage)
+    siteThemeHint.value = parseSiteThemeHint(readStoredValue(SITE_THEME_HINT_STORAGE_KEY, storage))
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
       mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       systemDark.value = mediaQuery.matches
@@ -294,6 +311,20 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     preferredTheme.value = sitePreferredTheme
     hasBackendCredential.value = hasStoredJwt(activeStorage)
     rebuildFromLayers(forceReseed)
+    configResolved.value = true
+    try {
+      storageTarget(activeStorage)?.setItem(SITE_THEME_HINT_STORAGE_KEY, JSON.stringify({
+        version: 1,
+        themeMode: backendSiteThemeMode(options, sitePreferredTheme),
+      }))
+    } catch {
+      // 禁用的 localStorage 不妨碍使用刚确认的后端配置。
+    }
+  }
+
+  /** 冷启动配置明确失败：本次显示恢复默认/本地覆盖，保留磁盘上的旧暂存供下次访问。 */
+  function resolveConfigFailure(): void {
+    configResolved.value = true
   }
 
   function previewDraft(): void {
@@ -350,11 +381,11 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
   }
 
   /** 站点自己配置的主题模式：忽略本地覆盖后剩下的那一层。 */
-  const siteThemeMode = computed<ThemeMode>(() => resolveThemeSettings(
-    backendRaw.value,
-    withoutKey(localOverrides.value, 'themeMode'),
-    preferredTheme.value,
-  ).themeMode)
+  const siteThemeMode = computed<ThemeMode>(() => (
+    configResolved.value
+      ? resolveThemeSettings(backendRaw.value, withoutKey(localOverrides.value, 'themeMode'), preferredTheme.value).themeMode
+      : siteThemeHint.value ?? DEFAULT_THEME_SETTINGS.themeMode
+  ))
 
   /** 顶栏按钮写入的本地覆盖；没有覆盖时跟随站点设置。 */
   const themeOverride = computed<'light' | 'dark' | null>(() => {
@@ -538,6 +569,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
 
   return {
     initialized,
+    configResolved,
     backendRaw,
     localOverrides,
     persisted,
@@ -559,6 +591,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     hasBackendCredential,
     initialize,
     hydrateBackend,
+    resolveConfigFailure,
     previewDraft,
     resetDraft,
     setLocalSetting,

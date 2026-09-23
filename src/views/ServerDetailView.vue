@@ -100,7 +100,12 @@ const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
 const pageLoading = computed(() => (
   (state.value === 'loading' && server.value === null)
-  || (server.value !== null && !configReady(owningConfig.value, sourceConfigState.value))
+  // 指标/布局取主后端 theme_options，标题和授权仍取节点所属后端。
+  // B 的配置即使先返回，也不能在 A 尚未确定时以默认主题闪现详情内容。
+  || (server.value !== null && (
+    !configReady(owningConfig.value, sourceConfigState.value)
+    || !configReady(app.config, app.state)
+  ))
 ))
 const refreshing = computed(() => (
   state.value === 'loading' || historyState.value === 'loading' || pingHistoryState.value === 'loading'

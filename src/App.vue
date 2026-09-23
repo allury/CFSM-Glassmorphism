@@ -11,6 +11,9 @@ theme.initialize()
 watch(() => app.config, (config) => {
   if (config) theme.hydrateBackend(config.themeOptions, config.preferredTheme)
 }, { immediate: true })
+watch(() => app.state, (state) => {
+  if (state === 'error' && app.config === null) theme.resolveConfigFailure()
+}, { immediate: true })
 </script>
 
 <template>
