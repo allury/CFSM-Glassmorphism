@@ -221,6 +221,12 @@ body.has-modal {
   overflow: hidden;
 }
 
+/* 背景现在由 App.vue 挂在路由外；把负 z-index 限定在应用层内，避免落到 html 底色后面。 */
+#app {
+  position: relative;
+  isolation: isolate;
+}
+
 button,
 input,
 select {

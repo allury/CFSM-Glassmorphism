@@ -200,6 +200,10 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 3. 冷启动只暂存后端 `backgroundEnabled` 布尔值，不存地址：已知自定义背景时，配置前和首张媒体加载期间不请求默认图；首张图片失败才挂默认图，暂存过期则配置确定后立即挂默认图。首访无暂存时则按上游始终保留默认图直到图片加载完成。该请求门是用户要求的 CFSM 冷启动差异；视频期间显示上游的加载层。
 4. 图片预加载器设置 `referrerPolicy='no-referrer'`，最终媒体用带 `referrerpolicy="no-referrer"` 的 `<img>` 而非上游 `div + background-image`，避免向第三方图床泄露状态页地址。其 `object-fit:cover` / `object-position:center` 与上游 `background-size:cover` / `background-position:center` 视觉等价。
 
+## v1.1.13 候选第五轮：背景层 P
+
+`DynamicBackground` 与上游一样只由 `App.vue` 在路由外挂载一次，首页、详情、设置页不再各自创建背景实例。自定义背景切页不再重新预加载或重放 0.8 秒淡入；默认背景切页表现不变。`#app` 建立独立层叠上下文，保留媒体容器 `z-index:-1`，三个页面根容器仍透明。源码回归测试与两种站点的 localhost 切页实测见 `docs/v1.1.13-round5-audit.md`；第四轮状态机及四项 CFSM 必要差异均未改动。
+
 ## 保留的 P2
 
 - **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。

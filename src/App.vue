@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { watch } from 'vue'
+import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import AppToaster from '@/components/ui/AppToaster.vue'
 import { useAppStore } from '@/stores/app'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
@@ -17,6 +18,7 @@ watch(() => app.state, (state) => {
 </script>
 
 <template>
+  <DynamicBackground />
   <RouterView />
   <AppToaster />
 </template>

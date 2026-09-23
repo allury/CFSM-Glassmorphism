@@ -3,7 +3,6 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
-import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import LoadChart from '@/components/detail/LoadChart.vue'
 import PingChart from '@/components/detail/PingChart.vue'
 import AppBadge from '@/components/ui/AppBadge.vue'
@@ -443,7 +442,6 @@ onUnmounted(() => detail.close())
 
 <template>
   <div class="app-root detail-root">
-    <DynamicBackground />
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"

@@ -2,7 +2,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
-import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import {
   isFieldEnabled,
@@ -210,7 +209,6 @@ watch(siteTitle, (title) => {
 
 <template>
   <div class="app-root settings-root">
-    <DynamicBackground />
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"

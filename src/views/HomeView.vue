@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import AdvancedTools from '@/components/dashboard/AdvancedTools.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
-import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import EarthMap from '@/components/dashboard/EarthMap.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
@@ -256,7 +255,6 @@ onUnmounted(() => realtime.stop())
 
 <template>
   <div class="app-root">
-    <DynamicBackground />
     <div class="app-shell">
       <AppHeader
         :title="siteTitle"
