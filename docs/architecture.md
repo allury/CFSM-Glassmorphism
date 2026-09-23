@@ -127,7 +127,7 @@ schema defaults
 - **Backend** 是跨设备共享的完整配置快照。
 - **Local** 只覆盖当前浏览器，必须可单独清除，不能显示成“已经保存到后端”。
 - `src/theme/site-theme-hint.ts` 另存非权威的上次站点明暗模式与自定义背景开关，不存背景地址；旧 v1 记录缺少背景字段时按未启用处理。它不参与三层合并，也不进入草稿、统计、复制 JSON 或保存快照。store 初始化即读取并应用；无暂存的明暗猜测恢复为未配置站点的 `preferred_theme=auto`，即跟随系统。确认配置后只以成功回读的后端模式及背景开关更新；冷启动失败时本次回到未配置站点的解析结果（旧暂存保留供下次访问），本地覆盖始终优先。
-- `DynamicBackground` 在配置未确定且背景开关猜测为未启用时立即挂载默认图片；猜测为启用时留空等配置，避免重复下载默认图。首次访问自定义背景站点没有暂存时会先显示默认图；配置明确失败则回退默认图。没有新增 `/api` 请求。
+- `DynamicBackground` 通过 `useBackgroundMedia` 执行 Komari `Background.vue` 的图片预加载、视频 `loadeddata` / `canplay` / `error`、默认/加载/回退/媒体四层显示条件与 0.8 秒淡入淡出。图片预加载及最终 `<img>` 都不发送 Referer。配置未确定且背景开关猜测为未启用时立即挂载默认图；猜测为启用时配置前及首张图加载期间留空，不请求默认图，图片失败才回退。首次访问无暂存的自定义背景站点则在图片加载期间保持默认图；配置明确失败或暂存过期也回退默认图。明暗切换换地址会重置预加载并在等待时显示默认图。遮罩和容器透明度作用于默认与自定义两种背景；没有新增 `/api` 请求。
 - 保存后端时先把 defaults、当前 backend 和允许持久化的用户编辑合并为完整对象，再调用 `POST /api/theme_options`。
 - 本地专属状态（例如一次性 UI 展开状态、JWT、Turnstile 凭证）绝不混入后端快照。
 - 保存成功后以后端响应替换 backend 层；401/403/400 时保留草稿并显示准确动作。
@@ -285,7 +285,7 @@ normalized data model 未改动；纯显示问题一律在格式化与样式层�
 - **默认背景**：`src/assets/background/default-background-v2.webp` 是上游同一份资产
   （32436 bytes，SHA-256 `4237796…c551b`）。放在 `src/assets/` 由 Vite 输出到
   `dist/assets/`，不放 `public/`——主题 ZIP 根目录只允许 `index.html` 与 `assets/`。
-  自定义图片 / 视频、blur 与 overlay 能力不受影响，替换的只是「无自定义背景时」那一层。
+  第四轮背景专项将容器恢复为上游的 `z-index:-1`、无自带渐变底色；所有层不显示时露出的是与上游相同的 `html --background`，`body` 仍透明。自定义媒体使用 `img`（而非上游的 CSS `background-image`），是为保留 `referrerpolicy="no-referrer"`；`object-fit:cover` / `object-position:center` 对齐上游 cover / center。
 - **表面令牌按运行时取值**：总览卡片与节点卡片在上游是**两套**表面。
   前者是 `--background` 的 50%、无边框、`--radius`、无阴影；
   后者才命中 `[data-slot='card']` 的 `!important`。逐项以浏览器计算值为准，

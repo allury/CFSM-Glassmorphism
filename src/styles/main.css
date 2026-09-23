@@ -206,7 +206,7 @@
 html {
   min-width: 320px;
   min-height: 100%;
-  background: var(--page);
+  background: var(--background);
   color: var(--ink);
 }
 
@@ -273,18 +273,9 @@ a {
 .dynamic-background {
   position: fixed;
   inset: 0;
-  z-index: -2;
+  z-index: -1;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% -12%, rgb(255 255 255 / 86%), transparent 38%),
-    linear-gradient(145deg, var(--page-soft), var(--page));
   pointer-events: none;
-}
-
-:root[data-theme='dark'] .dynamic-background {
-  background:
-    radial-gradient(circle at 48% -10%, rgb(30 48 72 / 58%), transparent 38%),
-    linear-gradient(145deg, var(--page-soft), var(--page));
 }
 
 /*
@@ -312,6 +303,51 @@ a {
     background-position: 50% 78%;
     transform: scale(1.02);
   }
+}
+
+.dynamic-background__loading {
+  position: absolute;
+  inset: 0;
+  background-color: rgb(15 23 42);
+}
+
+:root:not([data-theme='dark']) .dynamic-background__loading {
+  background:
+    radial-gradient(circle at 50% 0%, rgb(16 185 129 / 0.08), transparent 36%),
+    linear-gradient(180deg, rgb(203 213 225), rgb(148 163 184));
+}
+
+.dynamic-background__media {
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.8s ease;
+}
+
+.dynamic-background__image,
+.dynamic-background__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dynamic-background__image {
+  object-position: center;
+}
+
+.dynamic-background__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.dynamic-background .fade-enter-active,
+.dynamic-background .fade-leave-active {
+  transition: opacity 0.8s ease;
+}
+
+.dynamic-background .fade-enter-from,
+.dynamic-background .fade-leave-to {
+  opacity: 0;
 }
 
 /*
@@ -3898,23 +3934,6 @@ a {
   .glass-panel {
     background: var(--page-soft);
   }
-}
-
-.dynamic-background__media,
-.dynamic-background__overlay {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.dynamic-background__media {
-  object-fit: cover;
-  transform-origin: center;
-}
-
-.dynamic-background__overlay {
-  pointer-events: none;
 }
 
 :root[data-color-vision='friendly'] {

@@ -41,7 +41,7 @@ describe('cold-start background request gate', () => {
     expect(await renderBackground()).toContain('dynamic-background__default')
   })
 
-  it('keeps the background empty when the cached backend switch is true, then mounts custom media', async () => {
+  it('keeps the background empty with a custom hint before config and while its image loads', async () => {
     const storage = new MemoryStorage()
     storage.setItem(SITE_THEME_HINT_STORAGE_KEY, JSON.stringify({ version: 1, themeMode: 'system', backgroundEnabled: true }))
     const theme = useThemeSettingsStore()
@@ -50,7 +50,7 @@ describe('cold-start background request gate', () => {
     expect(await renderBackground()).not.toContain('dynamic-background__media')
     theme.hydrateBackend({ backgroundEnabled: true, backgroundType: 'image', lightBackgroundUrl: '/custom.jpg' }, 'auto', true)
     const html = await renderBackground()
-    expect(html).toContain('src="/custom.jpg"')
+    expect(html).not.toContain('dynamic-background__media')
     expect(html).not.toContain('default-background-v2')
   })
 
@@ -78,13 +78,12 @@ describe('cold-start background request gate', () => {
     expect(await renderBackground()).toContain('dynamic-background__default')
   })
 
-  it('goes straight to custom background after config hydration', async () => {
+  it('keeps the default visible on a first visit while a custom image loads', async () => {
     const theme = useThemeSettingsStore()
     theme.hydrateBackend({ backgroundEnabled: true, backgroundType: 'image', lightBackgroundUrl: '/custom.jpg' }, 'auto', true)
     const html = await renderBackground()
-    expect(html).toContain('dynamic-background--custom')
-    expect(html).toContain('src="/custom.jpg"')
-    expect(html).not.toContain('default-background-v2')
+    expect(html).toContain('default-background-v2')
+    expect(html).not.toContain('dynamic-background__media')
   })
 
   it('keeps the default after a confirmed config without custom background', async () => {
@@ -103,5 +102,31 @@ describe('cold-start background request gate', () => {
     theme.resolveConfigFailure()
     const html = await renderBackground()
     expect(html).toContain('dynamic-background__default')
+  })
+
+  it('renders a transparent loading video and the loading layer before video data arrives', async () => {
+    useThemeSettingsStore().hydrateBackend({
+      backgroundEnabled: true, backgroundType: 'video', lightBackgroundUrl: '/custom.webm',
+    }, 'auto', true)
+    const html = await renderBackground()
+    expect(html).toContain('dynamic-background__loading')
+    expect(html).toContain('dynamic-background__media')
+    expect(html).toContain('opacity:0')
+    expect(html).toContain('preload="auto"')
+    expect(html).not.toContain('preload="metadata"')
+  })
+
+  it('places a positive overlay outside the default/custom branch and dims the container for negative values', async () => {
+    const theme = useThemeSettingsStore()
+    theme.hydrateBackend({ backgroundEnabled: false, backgroundOverlay: 50 }, 'auto', true)
+    const positive = await renderBackground()
+    expect(positive).toContain('dynamic-background__default')
+    expect(positive).toContain('dynamic-background__overlay')
+    expect(positive).toContain('rgba(0, 0, 0, 0.5)')
+
+    theme.hydrateBackend({ backgroundEnabled: false, backgroundOverlay: -50 }, 'auto', true)
+    const negative = await renderBackground()
+    expect(negative).toContain('opacity:0.5')
+    expect(negative).not.toContain('dynamic-background__overlay')
   })
 })

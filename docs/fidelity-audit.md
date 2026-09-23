@@ -71,6 +71,7 @@
 | 30 | Header | 57px 高、32px logo、桌面状态区与紧凑动作按钮；移动端隐藏次要信息 | 第 9.95 轮 Header 高度、logo、状态与动作层级和真实输出有明显差异 | 不一致 | 否 | 第 10 轮按六档 localhost 几何收敛 Header，首页与详情共用同一组件 | P1 | PASS |
 | 31 | 首页节点层级与密度 | 控制区后直接渲染扁平 NodeCard/NodeList；mini/compact/comfortable/large 有固定最小列宽和密度 | 节点按分组再包一层标题/容器，控制区和四种卡片密度与浏览器输出不一致 | 不一致 | 否 | 第 10 轮移除视觉分组包装（分组筛选仍保留），收敛控制区、300/270/360/420px 栅格与 mini/large 卡片尺度 | P1 | PASS |
 | 32 | 累计流量部分数据的说明位置 | 总览卡面只有数值与纯单位 | 第二轮候选把「部分」塞进单位，窄屏挤掉主数值 | 卡面恢复一致；提示气泡不同 | **是**（CFSM 节点可能缺少双向累计流量，不能将部分合计冒充完整数据） | 卡面按上游保留纯 `GB` / `TB`，仅完整节点参与合计，提示气泡注明「部分 · N 台缺少流量数据，未计入」，全缺失时隐藏卡片 | P2 | P2-ACCEPTED |
+| 33 | 背景媒体与容器 | `Background.vue` 图片预加载、视频透明加载/回退层、四层 0.8 秒 fade、正数黑遮罩/负数容器透明、无容器底色且 `z-index:-1` | 原实现图片/视频硬切、失败空白、负遮罩叠白、容器自带渐变且 `z-index:-2` | 已按上游对齐；仅保留下述 CFSM 交付/隐私/冷启动差异 | **是**（主题 ZIP 资源约束、`local:` 解析、无 Referer 与只缓存布尔值的冷启动请求门） | 第四轮 O 移植上游媒体状态机和计算样式；差异逐项见下节 | P2 | PASS |
 
 ## 第 13 轮：详情页专项审计
 
@@ -188,6 +189,17 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 
    逐项见 `docs/finance-parity.md`。
 
+## v1.1.13 候选第四轮：背景层 O
+
+`src/components/dashboard/DynamicBackground.vue` 与 `src/composables/use-background-media.ts` 按上游 `Background.vue` 恢复图片预加载、视频 `loadeddata` / `canplay` / `error`、四种图层、失败回退、0.8 秒 fade、媒体 blur 与正负遮罩。浏览器计算值对照及请求时间线见 `docs/v1.1.13-round4-audit.md`。原来容器自带的浅/深渐变已移除，`z-index` 从 -2 调整为上游 -1；无图层时露出与上游同值的 `html --background`，不是另造一层底色。骨架屏与毛玻璃面板仍可读，不需要保留原渐变。
+
+保留的 CFSM 差异逐项记录：
+
+1. 默认图片经 Vite 从 `src/assets/` 输出到 `dist/assets/`，上游从 `public/images/` 直取；这是 CFSM ZIP 根目录只允许 `index.html` 与 `assets/` 的必要差异。
+2. `local:` 继续按 CFSM 主题资产规则解析为 `/themes/user-assets/…`，不改变上游媒体状态机。
+3. 冷启动只暂存后端 `backgroundEnabled` 布尔值，不存地址：已知自定义背景时，配置前和首张媒体加载期间不请求默认图；首张图片失败才挂默认图，暂存过期则配置确定后立即挂默认图。首访无暂存时则按上游始终保留默认图直到图片加载完成。该请求门是用户要求的 CFSM 冷启动差异；视频期间显示上游的加载层。
+4. 图片预加载器设置 `referrerPolicy='no-referrer'`，最终媒体用带 `referrerpolicy="no-referrer"` 的 `<img>` 而非上游 `div + background-image`，避免向第三方图床泄露状态页地址。其 `object-fit:cover` / `object-position:center` 与上游 `background-size:cover` / `background-position:center` 视觉等价。
+
 ## 保留的 P2
 
 - **矩阵 19（P2-ACCEPTED）**：主要 token 已按 Komari 尺度校准，余下逐处 shadow / blur 强度的细粒度差异源于 Tailwind 与手写 CSS 的实现方式不同，视觉影响极小，接受保留。
@@ -197,7 +209,7 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 ## 当前终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 3。**
-32 项审计的终态分布：PASS 25、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 3。
+33 项审计的终态分布：PASS 26、NECESSARY-CFSM-DIFFERENCE 4、P2-ACCEPTED 3。
 
 ## 数据真实性边界（不因保真而放宽）
 
