@@ -190,9 +190,10 @@ describe('站点级展示开关下发到每台节点（BUG-003 回归）', () =>
    * 修复前 8 张指标卡全在，修复后只剩「累计流量 / 运行时间 / 连接数」，
    * `/api/servers` 恰好 1 次，节点选择器也随之补齐到 10 项。
    */
-  it('详情冷启动补一次已有的列表请求，且只在 store 为空时触发', () => {
+  it('详情冷启动复用预取的列表请求，之后进入详情时仍按 store 是否为空补取', () => {
     expect(detailView).toContain('serverStore.collections.length === 0')
-    expect(detailView).toContain("const configPromise = app.state === 'idle' ? app.initialize() : Promise.resolve()")
+    expect(detailView).toContain("serverStore.state === 'idle' || serverStore.state === 'loading'")
+    expect(detailView).toContain("app.state === 'idle' || (initialPage && app.state === 'loading')")
     expect(detailView).toContain('await Promise.all([configPromise, loadCurrent(), listPromise])')
     // 不允许出现轮询或定时重取站点开关。
     expect(detailView).not.toMatch(/setInterval\([^)]*serverStore\.load/)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
@@ -19,7 +19,8 @@ import { buildDetailCards, parseTrafficLimitBytes, resolveDetailCardKeys, traffi
 import { hasMultipleSources, serverDetailLocation } from '@/router/links'
 import { getCpuBenchmarkRating, getPassMarkCpuLookupUrl } from '@/utils/cpu-benchmark'
 import { osIconUrl } from '@/utils/os-icon'
-import { detailDocumentTitle, resolveSiteTitle } from '@/domain/site-title'
+import { detailDocumentTitle, injectedSiteTitleKey, injectedTitleForSource, resolveSiteTitle } from '@/domain/site-title'
+import { bootstrapKey } from '@/domain/bootstrap'
 import { configReady } from '@/domain/config-readiness'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useServersStore } from '@/stores/servers'
@@ -44,6 +45,9 @@ const theme = useThemeSettingsStore()
 const finance = useFinanceStore()
 const preferences = useDashboardPreferencesStore()
 const serverStore = useServersStore()
+const injectedSiteTitle = inject(injectedSiteTitleKey, null)
+const bootstrap = inject(bootstrapKey, null)
+const coldStartCover = bootstrap?.coverVisible ?? ref(false)
 const {
   server,
   sourceConfig,
@@ -94,6 +98,7 @@ const siteTitleResolution = computed(() => resolveSiteTitle(
     || state.value === 'loading'
     || (state.value === 'ready'
       && (sourceConfigState.value === 'idle' || sourceConfigState.value === 'loading')),
+  injectedTitleForSource(injectedSiteTitle, app.primaryBase, expectedSourceBase.value),
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
@@ -106,6 +111,11 @@ const pageLoading = computed(() => (
     || !configReady(app.config, app.state)
   ))
 ))
+// A secondary owner's config can outlive /api/server; keep the cold-start cover
+// until the existing detail gate can reveal real content rather than a skeleton.
+watch([state, pageLoading], ([nextState, loading]) => {
+  bootstrap?.reportDetailState(nextState === 'ready' && loading ? 'loading' : nextState)
+}, { immediate: true, flush: 'sync' })
 const refreshing = computed(() => (
   state.value === 'loading' || historyState.value === 'loading' || pingHistoryState.value === 'loading'
 ))
@@ -401,10 +411,12 @@ async function refresh(): Promise<void> {
 }
 
 onMounted(async () => {
+  const initialPage = bootstrap?.claimInitialPage() ?? false
   // initialize() 会在第一次 await 之前同步解析 apiBases；不要在这里等待配置响应，
   // 否则慢 `/api/config` 会把 `/api/server`、列表和历史一起串行阻塞。
   // 详情 store 会复用同一份配置 Promise，因此并发启动也不会重复请求配置。
-  const configPromise = app.state === 'idle' ? app.initialize() : Promise.resolve()
+  const configPromise = app.state === 'idle' || (initialPage && app.state === 'loading')
+    ? app.initialize() : Promise.resolve()
   mounted.value = true
   normalizeSourceQuery()
   /*
@@ -416,7 +428,10 @@ onMounted(async () => {
    * 不新增请求形态，也不轮询：只在 store 为空时触发一次。
    * 顺带把顶部的上一台 / 选择器 / 下一台在冷启动时也补齐。
    */
-  const listPromise = serverStore.collections.length === 0
+  const listNeeded = initialPage
+    ? serverStore.state === 'idle' || serverStore.state === 'loading'
+    : serverStore.collections.length === 0
+  const listPromise = listNeeded
     ? serverStore.load()
     : Promise.resolve()
   await Promise.all([configPromise, loadCurrent(), listPromise])
@@ -459,7 +474,7 @@ onUnmounted(() => detail.close())
         @cycle-theme="theme.cycleTheme"
       />
 
-      <main class="detail-page">
+      <main v-if="!coldStartCover" class="detail-page">
         <section v-if="pageLoading" class="detail-loading" aria-label="正在加载节点详情">
           <span class="skeleton detail-loading__hero" />
           <span v-for="index in 8" :key="index" class="skeleton detail-loading__card" />
@@ -740,7 +755,7 @@ onUnmounted(() => detail.close())
         </template>
       </main>
 
-      <footer class="app-footer">
+      <footer v-if="!coldStartCover" class="app-footer">
         <span>Powered by <a href="https://github.com/huilang-me/CF-Server-Monitor/">CF-Server-Monitor<template v-if="sourceConfig?.version"> v{{ sourceConfig.version }}</template></a></span>
         <span>Glassmorphism Theme · Server Detail</span>
       </footer>

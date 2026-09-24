@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
@@ -36,7 +36,8 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { useServersStore } from '@/stores/servers'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { parseSettingKeys } from '@/theme/settings'
-import { resolveSiteTitle } from '@/domain/site-title'
+import { bootstrapKey } from '@/domain/bootstrap'
+import { injectedSiteTitleKey, injectedTitleForPrimary, resolveSiteTitle } from '@/domain/site-title'
 import { configReady } from '@/domain/config-readiness'
 import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
@@ -48,6 +49,9 @@ const theme = useThemeSettingsStore()
 const finance = useFinanceStore()
 const router = useRouter()
 const glassServerMapper = createGlassServerMapper()
+const injectedSiteTitle = inject(injectedSiteTitleKey, null)
+const bootstrap = inject(bootstrapKey, null)
+const coldStartCover = bootstrap?.coverVisible ?? ref(false)
 
 // 首页浏览状态放在会话级 store 中，保证「首页 → 详情 → 返回首页」后
 // 搜索词、分组、排序与快捷筛选保持不变，不需要刷新或重新筛选。
@@ -61,6 +65,7 @@ const NODE_ITEM_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
 const siteTitleResolution = computed(() => resolveSiteTitle(
   app.config?.siteTitle,
   app.config === null && (app.state === 'idle' || app.state === 'loading'),
+  injectedTitleForPrimary(injectedSiteTitle, app.primaryBase),
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
@@ -246,7 +251,14 @@ function quickAction(key: QuickControlKey): void {
 
 onMounted(async () => {
   preferences.initialize()
-  await refreshRest()
+  if (bootstrap?.claimInitialPage()) {
+    await Promise.all([
+      app.state === 'idle' || app.state === 'loading' ? app.initialize() : Promise.resolve(),
+      serverStore.state === 'idle' || serverStore.state === 'loading' ? serverStore.load() : Promise.resolve(),
+    ])
+  } else {
+    await refreshRest()
+  }
   realtime.start(refreshRest)
 })
 
@@ -272,7 +284,7 @@ onUnmounted(() => realtime.stop())
         @cycle-theme="theme.cycleTheme"
       />
 
-      <main class="dashboard">
+      <main v-if="!coldStartCover" class="dashboard">
         <!-- 与 Komari 一致：公告位于总览与节点区之前，是首页第一块内容。 -->
         <section
           v-if="siteConfigReady && theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
@@ -508,7 +520,7 @@ onUnmounted(() => realtime.stop())
         </template>
       </main>
 
-      <footer class="app-footer">
+      <footer v-if="!coldStartCover" class="app-footer">
         <span>
           Powered by
           <a href="https://github.com/huilang-me/CF-Server-Monitor/">

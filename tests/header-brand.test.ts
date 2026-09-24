@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 
 /*
@@ -35,6 +35,27 @@ const source = readFileSync(new URL('../src/components/dashboard/AppHeader.vue',
 const stylesheet = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
 
 describe('header brand mark', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  it('renders the CFSM-injected favicon on the first render, before mounted', async () => {
+    vi.stubGlobal('document', {
+      querySelector: (selector: string) => selector === 'link[rel~="icon"]'
+        ? { getAttribute: () => 'data:image/svg+xml,%3Csvg%3E%3C/svg%3E' }
+        : null,
+    })
+    const html = await render()
+    expect(html).toContain('class="brand__mark-image"')
+    expect(html).toContain('src="data:image/svg+xml,%3Csvg%3E%3C/svg%3E"')
+    expect(html).not.toContain('brand__mark-initial')
+  })
+
+  it('uses /favicon.ico on the first render when CFSM did not inject an icon', async () => {
+    vi.stubGlobal('document', { querySelector: () => null })
+    const html = await render()
+    expect(html).toContain('class="brand__mark-image"')
+    expect(html).toContain('src="/favicon.ico"')
+  })
+
   /* SSR 没有 document，favicon 取不到，正好覆盖第二级回退。 */
   it('falls back to the site initial when no icon is available', async () => {
     const html = await render()

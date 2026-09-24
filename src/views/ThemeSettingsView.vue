@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
 import AppIcon from '@/components/ui/AppIcon.vue'
@@ -13,7 +13,8 @@ import { useRealtimeStore } from '@/stores/realtime'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 import { THEME_SETTING_KEYS, type ThemeSettings } from '@/theme/settings'
 import { message } from '@/utils/message'
-import { resolveSiteTitle } from '@/domain/site-title'
+import { bootstrapKey } from '@/domain/bootstrap'
+import { injectedSiteTitleKey, injectedTitleForPrimary, resolveSiteTitle } from '@/domain/site-title'
 import { configReady } from '@/domain/config-readiness'
 
 /*
@@ -27,6 +28,9 @@ import { configReady } from '@/domain/config-readiness'
 const app = useAppStore()
 const theme = useThemeSettingsStore()
 const router = useRouter()
+const injectedSiteTitle = inject(injectedSiteTitleKey, null)
+const bootstrap = inject(bootstrapKey, null)
+const coldStartCover = bootstrap?.coverVisible ?? ref(false)
 const copying = ref(false)
 
 const realtime = useRealtimeStore()
@@ -35,6 +39,7 @@ const primaryBase = computed(() => app.primaryBase)
 const siteTitleResolution = computed(() => resolveSiteTitle(
   app.config?.siteTitle,
   app.config === null && (app.state === 'idle' || app.state === 'loading'),
+  injectedTitleForPrimary(injectedSiteTitle, app.primaryBase),
 ))
 const siteTitle = computed(() => siteTitleResolution.value.title)
 const siteTitlePending = computed(() => siteTitleResolution.value.state === 'pending')
@@ -199,7 +204,8 @@ watch(() => theme.refetchWarning, (warning) => {
 })
 
 onMounted(async () => {
-  if (app.state === 'idle' || app.state === 'error') await app.initialize()
+  const initialPage = bootstrap?.claimInitialPage() ?? false
+  if (app.state === 'idle' || (!initialPage && app.state === 'error')) await app.initialize()
 })
 
 watch(siteTitle, (title) => {
@@ -224,7 +230,7 @@ watch(siteTitle, (title) => {
         @cycle-theme="theme.cycleTheme"
       />
 
-      <main class="settings-page">
+      <main v-if="!coldStartCover" class="settings-page">
         <section class="settings-intro glass-panel">
           <div class="settings-intro__copy">
             <button class="detail-back" type="button" @click="router.push({ name: 'home' })">

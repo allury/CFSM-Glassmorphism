@@ -65,7 +65,6 @@ const themeLabel = computed(() => {
  * 两者都取不到、或图片加载失败时退回站点名首字，首字也没有才用内置几何标记——
  * 任何一步都不会让这个位置空着。
  */
-const faviconSource = ref('')
 const faviconFailed = ref(false)
 const brandInitial = computed(() => (
   props.titlePending ? '' : (props.title?.trim().slice(0, 1) ?? '')
@@ -73,18 +72,19 @@ const brandInitial = computed(() => (
 const brandImage = computed(() => (faviconFailed.value ? '' : faviconSource.value))
 
 function resolveFavicon(): string {
-  if (typeof document === 'undefined') return ''
+  if (typeof document === 'undefined' || typeof document.querySelector !== 'function') return ''
   const link = document.querySelector<HTMLLinkElement>('link[rel~="icon"]')
   const href = link?.getAttribute('href')?.trim() ?? ''
   return href === '' ? '/favicon.ico' : href
 }
+
+const faviconSource = ref(resolveFavicon())
 
 function updateScrolled(): void {
   scrolled.value = window.scrollY > 12
 }
 
 onMounted(() => {
-  faviconSource.value = resolveFavicon()
   updateScrolled()
   window.addEventListener('scroll', updateScrolled, { passive: true })
 })
@@ -102,7 +102,7 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
             class="brand__mark-image"
             :src="brandImage"
             alt=""
-            decoding="async"
+            decoding="sync"
             referrerpolicy="no-referrer"
             @error="faviconFailed = true"
           >
