@@ -88,7 +88,12 @@ const priceText = computed(() => {
   const text = formatDisplayPrice(props.server.price, props.server.currency, props.server.billingCycle)
   return text === '—' ? '' : text
 })
-const expireVisible = computed(() => props.server.showExpire && props.server.expireDate !== null)
+const expireVisible = computed(() => props.server.showExpire && daysUntilExpiry(props.server.expireDate) !== null)
+const hasPublicPositivePrice = computed(() => {
+  if (!props.priceVisible || !props.server.showPrice) return false
+  const price = Number(props.server.price)
+  return Number.isFinite(price) && price > 0
+})
 const expiryInfo = computed(() => {
   const days = daysUntilExpiry(props.server.expireDate)
   if (days === null) return { text: '—', prefix: '', value: '', unit: '', tone: 'neutral' }
@@ -486,6 +491,12 @@ function hideMissingImage(event: Event): void {
             >
               <AppIcon name="tabler:coins" :size="11" />
               <span class="node-box__text">{{ remainingValueText }}</span>
+            </span>
+          </template>
+          <template v-else-if="hasPublicPositivePrice">
+            <span class="node-box__row node-box__row--remaining">
+              <AppIcon name="tabler:calendar-stats" :size="11" />
+              <span class="node-box__text">—</span>
             </span>
           </template>
           <template v-else>
