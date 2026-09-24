@@ -1,12 +1,14 @@
 # 第二阶段 Test 1 报告
 
+> 站点地址与站点名已匿名化；`https://status.example` 仅是示例地址，不是可访问的验收站点。
+
 | 项目 | 值 |
 |---|---|
 | 起点正式版 | `v1.1.0`（tag 对象 `7a4156a`，解引用源码 commit `bec06b9`） |
 | 起点后的 main 提交 | `70bec62` / `5b3fd1a` / `2a3f71f`（发布说明重写）、`c4ec5ba`（Release 正文同步 job），均为文档与 CI，无功能改动 |
 | 本轮候选版本 | `v1.1.1-test.1`（`v1.1.1*` 在远端未占用） |
 | Komari 基准 | `bf8376587c720de915ac48789a8a180357c762d6`（本轮 `git fetch` 复核，上游默认分支仍是该 commit） |
-| 真实环境 | https://sr.706632.xyz |
+| 真实环境 | https://status.example |
 | 实际 Worker 版本 | `2.8.5 Beta5`（页脚与 `/api/config` 双重确认） |
 | 探针 Agent | `1.0.16`（详情页系统信息读出；本地 fixture 为 `1.5.2`） |
 
@@ -19,13 +21,13 @@ v1.1.0 的线上应用状态**不再只是「用户确认」**，本轮完成了
 | `index.html` 引用 | `assets/index-CWXLo61-.css`、`assets/index-DxhZ0WpF.js` | 同上 | 文件名一致 |
 | `assets/index-CWXLo61-.css` | SHA-256 `f5f1661e8cd5e1c9…` | 同 | **逐字节一致** |
 | `assets/index-DxhZ0WpF.js` | SHA-256 `54b600ae1edc7319…` | 同 | **逐字节一致** |
-| `index.html` 本身 | 摘要不同 | — | 差异仅为 CFSM 注入的站点标题 `养鸡场`、favicon 与 Cloudflare 挑战脚本，资源引用部分完全相同 |
+| `index.html` 本身 | 摘要不同 | — | 差异仅为 CFSM 注入的站点标题 `示例站点`、favicon 与 Cloudflare 挑战脚本，资源引用部分完全相同 |
 
 即线上运行的就是 v1.1.0 的产物，**「资产独立核对未完成」这一条本轮关闭**。
 
 ## 2. v1.1.0 线上回归（只读）
 
-全部在 https://sr.706632.xyz 实测，未修改任何后台配置、未重启探针、未迁移数据库。
+全部在 https://status.example 实测，未修改任何后台配置、未重启探针、未迁移数据库。
 
 | 项 | 线上实测 | 结论 |
 |---|---|---|

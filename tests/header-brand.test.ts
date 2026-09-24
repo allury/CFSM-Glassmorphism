@@ -18,7 +18,7 @@ import AppHeader from '@/components/dashboard/AppHeader.vue'
  */
 
 const props = {
-  title: '养鸡场',
+  title: '示例站点',
   version: '2.8.5',
   loading: false,
   adminUrl: null,
@@ -59,7 +59,7 @@ describe('header brand mark', () => {
   /* SSR 没有 document，favicon 取不到，正好覆盖第二级回退。 */
   it('falls back to the site initial when no icon is available', async () => {
     const html = await render()
-    expect(html).toContain('<b class="brand__mark-initial">养</b>')
+    expect(html).toContain('<b class="brand__mark-initial">示</b>')
     expect(html).not.toContain('brand__mark-image')
   })
 

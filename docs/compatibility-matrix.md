@@ -167,7 +167,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 
 ## 关键审计结论
 
-- v1.1.12 稳定版不改变本表的能力边界：修复快速前后台切换时的 REST/WS 恢复竞态、请求生命周期与资源释放，保留 Agent `wss_report_interval`、历史点位、probe 三态和配置含义；Issue #1 继续作为上游限制记录，不采用主题端绕过方案。稳定安装使用 `theme-v1.1.12` 或 `theme-dist`，`preview-main` 继续作为后续 `main` 的滚动预览。
+- v1.1.13 稳定版不改变本表的能力边界：保留 Agent `wss_report_interval`、历史点位、probe 三态和配置含义；Issue #1 继续作为上游限制记录，不采用主题端绕过方案。稳定安装使用 `theme-v1.1.13`；`preview-main` 仅用于临时验证，发布后维护改为每次以租约保护替换一个无父产物提交，应固定最新完整 SHA 安装，不用滚动分支地址。
 
 - CFSM 的 dashboard 公共接口不返回管理端 `note`，也不返回服务器实际 IP、ASN 或城市；这些能力不得由占位值补齐。
 - `gpu` 已废弃，适配只读取 `gpu_info`。REST 可能返回 JSON 字符串，WebSocket 新数据返回数组。

@@ -86,7 +86,7 @@ describe('价格、周期与到期', () => {
     expect(parseBillingPrice('-1')).toEqual({ status: 'free' })
     expect(parseBillingPrice('0')).toEqual({ status: 'free' })
     expect(parseBillingPrice('0.00')).toEqual({ status: 'free' })
-    expect(parseBillingPrice('69.98')).toEqual({ status: 'paid', amount: 69.98 })
+    expect(parseBillingPrice('42.50')).toEqual({ status: 'paid', amount: 42.5 })
     expect(parseBillingPrice(' 12 ')).toEqual({ status: 'paid', amount: 12 })
     expect(parseBillingPrice('-5')).toEqual({ status: 'invalid' })
     expect(parseBillingPrice('abc')).toEqual({ status: 'invalid' })
@@ -106,27 +106,27 @@ describe('价格、周期与到期', () => {
     expect(parseBillingExpiry('')).toEqual({ status: 'missing' })
     expect(parseBillingExpiry(null)).toEqual({ status: 'missing' })
     expect(parseBillingExpiry('2026-02-30')).toEqual({ status: 'invalid' })
-    expect(parseBillingExpiry('2031-03-21')).toEqual({ status: 'date', at: Date.UTC(2031, 2, 21, 12) })
+    expect(parseBillingExpiry('2030-09-17')).toEqual({ status: 'date', at: Date.UTC(2030, 8, 17, 12) })
   })
 })
 
 describe('原币月均与剩余价值（固定样本）', () => {
-  const vps = { price: '69.98', billingCycle: 'five_years', expireDate: '2031-03-21' }
+  const sampleFiveYear = { price: '30.00', billingCycle: 'five_years', expireDate: '2030-09-17' }
 
-  it('€69.98 / 五年：月均 1.1504，剩余价值 63.1162', () => {
-    const monthly = monthlyCost(vps)
-    const remaining = remainingValueOf(vps, NOW)
-    expect(monthly.status === 'ok' && monthly.amount).toBeCloseTo(1.15036, 4)
-    expect(remaining.status === 'ok' && remaining.amount).toBeCloseTo(63.1162, 4)
+  it('虚构样本 €30.00 / 五年：月均 0.4932，剩余价值 24.0164', () => {
+    const monthly = monthlyCost(sampleFiveYear)
+    const remaining = remainingValueOf(sampleFiveYear, NOW)
+    expect(monthly.status === 'ok' && monthly.amount).toBeCloseTo(0.49315, 4)
+    expect(remaining.status === 'ok' && remaining.amount).toBeCloseTo(24.0164, 4)
   })
 
   it('月 / 季 / 年 / 五年都按天数折算成 30 天口径', () => {
-    // 内部保持浮点精度（1.99 ÷ 30 × 30 = 1.9900000000000002），只在展示时舍入。
-    const month = monthlyCost({ price: '1.99', billingCycle: 'month', expireDate: null })
-    expect(month.status === 'ok' && month.amount).toBeCloseTo(1.99, 10)
+    // 虚构金额仍保留浮点边界：内部保持精度，只在展示时舍入。
+    const month = monthlyCost({ price: '1.93', billingCycle: 'month', expireDate: null })
+    expect(month.status === 'ok' && month.amount).toBeCloseTo(1.93, 10)
     expect(monthlyCost({ price: '90', billingCycle: 'quarter', expireDate: null })).toEqual({ status: 'ok', amount: 30 })
-    const yearly = monthlyCost({ price: '36.90', billingCycle: 'year', expireDate: null })
-    expect(yearly.status === 'ok' && yearly.amount).toBeCloseTo(3.03288, 4)
+    const yearly = monthlyCost({ price: '24.00', billingCycle: 'year', expireDate: null })
+    expect(yearly.status === 'ok' && yearly.amount).toBeCloseTo(1.97260, 4)
     const five = monthlyCost({ price: '1825', billingCycle: 'five_years', expireDate: null })
     expect(five).toEqual({ status: 'ok', amount: 30 })
   })
@@ -139,8 +139,8 @@ describe('原币月均与剩余价值（固定样本）', () => {
   })
 
   it('剩余价值：缺失到期不是 0，过期才是 0，超长期按全价，封顶为原价', () => {
-    expect(remainingValueOf({ price: '11.88', billingCycle: 'year', expireDate: '' }, NOW)).toEqual({ status: 'unavailable', reason: 'expiry-missing' })
-    expect(remainingValueOf({ price: '11.88', billingCycle: 'year', expireDate: 'soon' }, NOW)).toEqual({ status: 'unavailable', reason: 'expiry-invalid' })
+    expect(remainingValueOf({ price: '18.00', billingCycle: 'year', expireDate: '' }, NOW)).toEqual({ status: 'unavailable', reason: 'expiry-missing' })
+    expect(remainingValueOf({ price: '18.00', billingCycle: 'year', expireDate: 'soon' }, NOW)).toEqual({ status: 'unavailable', reason: 'expiry-invalid' })
     expect(remainingValueOf({ price: '10', billingCycle: 'year', expireDate: '2026-01-01' }, NOW)).toEqual({ status: 'ok', amount: 0 })
     // 过期判断先于周期：已过期的节点即使周期未知也是 0。
     expect(remainingValueOf({ price: '10', billingCycle: 'weekly', expireDate: '2026-01-01' }, NOW)).toEqual({ status: 'ok', amount: 0 })
@@ -225,9 +225,9 @@ describe('合成汇率：手动 → 网络 / 缓存 → 参考', () => {
 
 describe('汇总与明细', () => {
   const nodes: BillableNode[] = [
-    node({ key: 'vps', name: 'V.PS', price: '10', currency: '€', billingCycle: 'year', expireDate: '2027-09-17' }),
-    node({ key: 'dmit', name: 'DMIT', price: '10', currency: '$', billingCycle: 'month', expireDate: '2026-10-02' }),
-    node({ key: 'netcup', name: 'NETCUP', price: '10', currency: '€', billingCycle: 'year', expireDate: '' }),
+    node({ key: 'vps', name: '节点 B', price: '10', currency: '€', billingCycle: 'year', expireDate: '2027-09-17' }),
+    node({ key: 'dmit', name: '节点 A', price: '10', currency: '$', billingCycle: 'month', expireDate: '2026-10-02' }),
+    node({ key: 'netcup', name: '节点 D', price: '10', currency: '€', billingCycle: 'year', expireDate: '' }),
     node({ key: 'odd', name: '怪币', price: '10', currency: '元宝', billingCycle: 'month', expireDate: '2026-10-02' }),
     node({ key: 'free', name: '免费', price: '-1', currency: '$', billingCycle: 'month', expireDate: '2026-10-02' }),
     node({ key: 'tag', name: '白嫖', price: '10', currency: '¥', billingCycle: 'month', expireDate: '2026-10-02', tags: ['白嫖中'] }),
@@ -247,7 +247,7 @@ describe('汇总与明细', () => {
 
   it('跨币种直接按数值合计，不可换算的节点不按 0 计入并记下原因', () => {
     const summary = summarizeFinance(nodes, options)
-    // 月均：V.PS 10€/年 → 80/365*30 CNY；DMIT 10$/月 → 100 CNY；NETCUP 同 V.PS；怪币跳过。
+    // 月均：节点 B 10€/年 → 80/365*30 CNY；节点 A 10$/月 → 100 CNY；节点 D 同 节点 B；怪币跳过。
     expect(summary.monthly.amount).toBeCloseTo(80 / 365 * 30 * 2 + 100, 10)
     expect(summary.monthly.counted).toBe(3)
     expect(summary.monthly.skipped).toEqual({ 'currency-unknown': 1 })
@@ -263,7 +263,7 @@ describe('汇总与明细', () => {
     expect(summary.remaining.skipped).toEqual({ 'expiry-missing': 1, 'currency-unknown': 1 })
     expect(summary.rows.find((row) => row.node.key === 'netcup')?.remaining).toEqual({ status: 'none', reason: 'expiry-missing' })
     expect(describeSkipped(summary.remaining)).toEqual(['1 台未设置到期时间，未计入', '1 台币种无法识别，未计入'])
-    // V.PS 封顶为原价 10€ = 80 CNY；DMIT 还剩 15 天 = 5$ = 50 CNY。
+    // 节点 B 封顶为原价 10€ = 80 CNY；节点 A 还剩 15 天 = 5$ = 50 CNY。
     expect(summary.remaining.amount).toBeCloseTo(80 + 50, 6)
   })
 

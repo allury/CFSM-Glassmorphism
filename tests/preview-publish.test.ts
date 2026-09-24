@@ -40,22 +40,60 @@ function fixture() {
 }
 
 describe('installable main preview publishing', { timeout: 30_000 }, () => {
-  it('creates and fast-forwards only preview-main, preserving the source tree and index', () => {
+  it('creates an orphan preview when preview-main does not exist', () => {
+    const f = fixture()
+    expect(f.git('ls-remote', 'origin', 'refs/heads/preview-main')).toBe('')
+    expect(f.publish().status).toBe(0)
+    f.git('fetch', 'origin', 'preview-main')
+    expect(f.git('show', '-s', '--format=%P', 'FETCH_HEAD')).toBe('')
+    expect(f.git('rev-list', '--count', 'FETCH_HEAD')).toBe('1')
+    expect(f.git('ls-tree', '--name-only', 'FETCH_HEAD').split('\n')).toEqual(['assets', 'index.html'])
+    expect(f.git('show', '-s', '--format=%B', 'FETCH_HEAD')).toContain(`Source: ${f.sha}`)
+  })
+
+  it('replaces preview-main with one new orphan commit, preserving the source tree and index', () => {
     const f = fixture()
     expect(f.publish().status).toBe(0)
     f.git('fetch', 'origin', 'preview-main')
     const first = f.git('rev-parse', 'FETCH_HEAD')
-    expect(f.git('ls-tree', '--name-only', 'FETCH_HEAD').split('\n')).toEqual(['assets', 'index.html'])
-    expect(f.git('show', '-s', '--format=%B', 'FETCH_HEAD')).toContain(`Source: ${f.sha}`)
     expect(f.publish().status).toBe(0)
     f.git('fetch', 'origin', 'preview-main')
-    expect(f.git('rev-parse', 'FETCH_HEAD^')).toBe(first)
+    // 旧断言要求第二次提交以第一次为父；现在刻意只有最新的一个孤儿提交。
+    expect(f.git('rev-parse', 'FETCH_HEAD')).not.toBe(first)
+    expect(f.git('show', '-s', '--format=%P', 'FETCH_HEAD')).toBe('')
+    expect(f.git('rev-list', '--count', 'FETCH_HEAD')).toBe('1')
+    expect(f.git('ls-tree', '--name-only', 'FETCH_HEAD').split('\n')).toEqual(['assets', 'index.html'])
+    expect(f.git('show', '-s', '--format=%B', 'FETCH_HEAD')).toContain(`Source: ${f.sha}`)
     expect(f.git('branch', '--show-current')).toBe('main')
     expect(f.git('rev-parse', 'HEAD')).toBe(f.sha)
     expect(f.git('status', '--porcelain')).toBe('')
     expect(readFileSync(join(f.source, 'source.txt'), 'utf8')).toBe('keep source files and index')
     expect(f.git('ls-remote', '--heads', 'origin').split('\n')).toHaveLength(2)
     expect(f.git('ls-remote', '--tags', 'origin')).toBe('')
+  })
+
+  it('rejects a concurrent remote change after reading the lease without overwriting it', () => {
+    const f = fixture()
+    expect(f.publish().status).toBe(0)
+    const previous = f.git('ls-remote', 'origin', 'refs/heads/preview-main').split(/\s/)[0]
+    expect(previous).not.toBe(f.sha)
+
+    // Git runs pre-push after the script has read its lease, just before sending
+    // the update. Simulate another publisher moving the remote ref in that gap.
+    const hook = join(f.source, '.git', 'hooks', 'pre-push')
+    writeFileSync(hook, `#!/bin/sh\nremote="$(git config --get remote.origin.url)"\ngit --git-dir="$remote" update-ref refs/heads/preview-main ${f.sha}\n`, { mode: 0o755 })
+    f.git('config', 'core.hooksPath', join(f.source, '.git', 'hooks'))
+    expect(f.publish().status).not.toBe(0)
+    expect(f.git('ls-remote', 'origin', 'refs/heads/preview-main').split(/\s/)[0]).toBe(f.sha)
+  })
+
+  it('rejects a branch created after observing preview-main as absent', () => {
+    const f = fixture()
+    const hook = join(f.source, '.git', 'hooks', 'pre-push')
+    writeFileSync(hook, `#!/bin/sh\nremote="$(git config --get remote.origin.url)"\ngit --git-dir="$remote" update-ref refs/heads/preview-main ${f.sha}\n`, { mode: 0o755 })
+    f.git('config', 'core.hooksPath', join(f.source, '.git', 'hooks'))
+    expect(f.publish().status).not.toBe(0)
+    expect(f.git('ls-remote', 'origin', 'refs/heads/preview-main').split(/\s/)[0]).toBe(f.sha)
   })
 
   it('skips a superseded source without creating a preview branch', () => {

@@ -76,15 +76,17 @@ https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.13
 
 如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.12` 再应用；切换到不同的标签地址会使用不同的缓存键。
 
-### main 滚动预览（非稳定版）
+### main 临时预览（非稳定版）
 
-希望提前体验已经通过完整质量门的 `main` 最新源码，推荐在主题商店使用 `preview-main` **当前完整提交 SHA** 对应的不可变地址，而不是滚动分支地址。例如，下方是本次文档编写时的预览产物提交；安装更新的预览前，请先查询 `preview-main` 的最新 40 位 SHA 并替换 URL 末尾：
+希望提前体验已通过完整质量门的 `main` 最新源码，请使用**本次预览交付的完整 40 位提交 SHA** 作为主题地址中的引用：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/20b89aa61026df0ec98c1e42d5d1c147f58a3a93
+https://github.com/allury/CFSM-Glassmorphism/tree/<本次 preview-main 的完整 40 位提交 SHA>
 ```
 
-可用 `git ls-remote https://github.com/allury/CFSM-Glassmorphism.git refs/heads/preview-main` 查询最新提交 SHA；也可在仓库的 `preview-main` 分支提交记录中复制完整 SHA。`main` 保留源码，不能作为主题安装地址；`preview-main` 只包含通过 Actions 完整质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。它随 `main` 前移，不创建版本标签或 Release，也不推进稳定版 `theme-dist`。直接使用 `preview-main` 分支地址时，更新后最长约 1 小时内可能取到新旧混用的文件而出现空白；重新应用不会清缓存。固定到完整提交 SHA 的地址则不会因分支前移而混用文件，但该地址本身会缓存约 1 天；要安装新版，请改用**新版的完整 SHA 地址**。回退时使用上面的稳定标签地址。
+可用 `git ls-remote https://github.com/allury/CFSM-Glassmorphism.git refs/heads/preview-main` 查询最新完整 SHA；交付记录也会直接给出可安装地址。`main` 保留源码，不能作为主题安装地址；`preview-main` 仅包含已通过 Actions 质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。此分支每次以一个新的无父提交替换，只保留最新一次预览；它不创建版本标签或 Release，也不推进稳定版 `theme-dist`。
+
+**不要用 `preview-main` 分支名安装**：分支前移后，CFSM 对页面和资源的约 1 小时缓存可能产生新旧文件混用与空白；重新应用不会清缓存。固定完整 SHA 可避免分支前移导致的混用，但该地址本身约缓存 1 天。新预览发布后，旧 SHA 不再属于任何分支，GitHub 不保证它能继续访问；预览仅适合临时验证，请及时换成新 SHA 地址或上方的稳定版标签地址。
 
 ### 二、调整主题设置
 
@@ -157,4 +159,4 @@ bun run validate:dist
 
 构建产物根目录只包含 `index.html` 与 `assets/`，符合 CFSM 对第三方主题的目录约定。CI 在推送 main、版本标签、Pull Request 时执行同一组质量门；推送 `v<版本>` 标签会发布 ZIP、更新 `theme-dist` 分支并创建不可变的 `theme-v<版本>` 标签。
 
-main 的校验通过后自动更新 `preview-main`；Pull Request 只校验、不发布预览。
+main 的校验通过后以租约保护更新单提交的 `preview-main`；Pull Request 只校验、不发布预览。

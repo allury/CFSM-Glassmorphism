@@ -12,10 +12,10 @@ const homeView = readFileSync(new URL('../src/views/HomeView.vue', import.meta.u
 
 describe('site title resolution', () => {
   it('uses a verified same-origin HTML title before config resolves, without a placeholder', () => {
-    const injected = captureInjectedSiteTitle(' 养鸡场 ', 'https://site.example', ['https://site.example'])
-    expect(injected).toEqual({ title: '养鸡场', primaryBase: 'https://site.example', sourceCount: 1 })
+    const injected = captureInjectedSiteTitle(' 示例站点 ', 'https://site.example', ['https://site.example'])
+    expect(injected).toEqual({ title: '示例站点', primaryBase: 'https://site.example', sourceCount: 1 })
     expect(resolveSiteTitle(null, true, injectedTitleForSource(injected, null, null)))
-      .toEqual({ state: 'injected', title: '养鸡场' })
+      .toEqual({ state: 'injected', title: '示例站点' })
   })
 
   it.each(['CFSM-Glassmorphism', 'Cloudflare Server Monitor', '  '])(
@@ -28,25 +28,25 @@ describe('site title resolution', () => {
   )
 
   it('does not use a page-origin title for a cross-origin primary API base', () => {
-    expect(captureInjectedSiteTitle('养鸡场', 'https://site.example', ['https://api.example'])).toBeNull()
+    expect(captureInjectedSiteTitle('示例站点', 'https://site.example', ['https://api.example'])).toBeNull()
   })
 
   it('lets the fetched config replace a different HTML title', () => {
-    expect(resolveSiteTitle('新站名', true, '养鸡场')).toEqual({ state: 'ready', title: '新站名' })
+    expect(resolveSiteTitle('新站名', true, '示例站点')).toEqual({ state: 'ready', title: '新站名' })
   })
 
   it('captures the HTML title once instead of reading a later document-title mutation', () => {
-    const html = { title: '养鸡场' }
+    const html = { title: '示例站点' }
     const injected = captureInjectedSiteTitle(html.title, 'https://site.example', ['https://site.example'])
-    html.title = '节点 · 养鸡场'
-    expect(injectedTitleForSource(injected, null, null)).toBe('养鸡场')
+    html.title = '节点 · 示例站点'
+    expect(injectedTitleForSource(injected, null, null)).toBe('示例站点')
   })
 
   it('uses the hint only for the page-origin owning source on multi-source detail', () => {
-    const injected = captureInjectedSiteTitle('养鸡场', 'https://site.example', ['https://site.example', 'https://other.example'])
+    const injected = captureInjectedSiteTitle('示例站点', 'https://site.example', ['https://site.example', 'https://other.example'])
     expect(injectedTitleForSource(injected, null, null)).toBeNull()
     expect(injectedTitleForSource(injected, 'https://site.example', 'https://other.example')).toBeNull()
-    expect(injectedTitleForSource(injected, 'https://site.example', 'https://site.example')).toBe('养鸡场')
+    expect(injectedTitleForSource(injected, 'https://site.example', 'https://site.example')).toBe('示例站点')
     expect(injectedTitleForSource(injected, 'https://other.example', 'https://site.example')).toBeNull()
   })
 
@@ -55,7 +55,7 @@ describe('site title resolution', () => {
   })
 
   it('uses a real title immediately and only falls back after resolution', () => {
-    expect(resolveSiteTitle('  养鸡场  ', true)).toEqual({ state: 'ready', title: '养鸡场' })
+    expect(resolveSiteTitle('  示例站点  ', true)).toEqual({ state: 'ready', title: '示例站点' })
     expect(resolveSiteTitle(null, false)).toEqual({ state: 'fallback', title: 'CF Server Monitor' })
   })
 

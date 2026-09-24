@@ -47,8 +47,8 @@ function glass(overrides: Partial<GlassServer>): GlassServer {
 }
 
 const servers: GlassServer[] = [
-  glass({ key: 'vps', name: 'V.PS', price: '10', currency: '€', billingCycle: 'year', expireDate: '2027-09-17' }),
-  glass({ key: 'dmit', name: 'DMIT', price: '10', currency: '$', billingCycle: 'month', expireDate: '2026-10-02' }),
+  glass({ key: 'vps', name: '节点 B', price: '10', currency: '€', billingCycle: 'year', expireDate: '2027-09-17' }),
+  glass({ key: 'dmit', name: '节点 A', price: '10', currency: '$', billingCycle: 'month', expireDate: '2026-10-02' }),
 ]
 
 function financeSettings(preset: (typeof DEFAULT_THEME_SETTINGS)['generalCardPreset'] = '财务') {
