@@ -2,7 +2,7 @@
 
 面向 [CF-Server-Monitor](https://github.com/huilang-me/CF-Server-Monitor) 的第三方毛玻璃风格主题，基于 [Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism) 移植，使用 Vue 3 + TypeScript + Vite 构建。
 
-当前稳定版本 **v1.1.12**。
+当前稳定版本 **v1.1.13**。
 
 ## 预览
 
@@ -62,32 +62,29 @@
 
 ### 一、安装主题
 
-在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，填入下面任一地址后点「应用自定义」：
+在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，推荐填入稳定版的不可变标签地址，再点「应用自定义」：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.12
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.13
 ```
 
-```text
-https://github.com/allury/CFSM-Glassmorphism/tree/theme-dist
-```
+- `theme-v1.1.13` 指向该版本已验证的构建产物，内容不随分支更新，适合稳定安装。
+- CFSM 根据主题地址从 GitHub 拉取 `index.html` 和 `assets/`，并按地址、引用和文件分别缓存：分支或标签引用约 **1 小时**，完整的 40 位提交 SHA 约 **1 天**。重新点击「应用自定义」**不会清除这些缓存**。
+- `theme-dist` 是滚动稳定版分支。发布后其分支地址在最长约 1 小时内可能取到新旧混用的文件，导致页面空白；等待缓存到期，或改用上方的不可变标签地址。不要依赖重新应用来刷新缓存。
 
-- `theme-v1.1.12` 是不可变标签，指向该版本已验证的构建产物，**推荐使用**：内容不会变，升级时机由你决定。
-- `theme-dist` 是滚动分支，始终跟随最新稳定版。用它可以自动拿到新版本，但**发布新版后可能需要手动重新应用一次**：CFSM 按地址分别缓存 `index.html` 与各个资源文件，分支前移时两者的缓存不一定同时刷新，可能出现页面暂时空白。重新应用一次即可恢复，固定标签不存在这个问题。
+也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.13.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
-也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.12.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
-
-如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.11` 重新应用。
+如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.12` 再应用；切换到不同的标签地址会使用不同的缓存键。
 
 ### main 滚动预览（非稳定版）
 
-希望提前体验已经通过完整质量门的 `main` 最新源码，可在主题商店应用：
+希望提前体验已经通过完整质量门的 `main` 最新源码，推荐在主题商店使用 `preview-main` **当前完整提交 SHA** 对应的不可变地址，而不是滚动分支地址。例如，下方是本次文档编写时的预览产物提交；安装更新的预览前，请先查询 `preview-main` 的最新 40 位 SHA 并替换 URL 末尾：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/preview-main
+https://github.com/allury/CFSM-Glassmorphism/tree/20b89aa61026df0ec98c1e42d5d1c147f58a3a93
 ```
 
-`main` 保留源码，不能作为主题安装地址；`preview-main` 只包含通过 Actions 完整质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。它会随 `main` 前移，不创建版本标签或 Release，也不推进稳定版 `theme-dist`；当 `main` 没有新改动时，预览内容可能与当前稳定版相同。更新后可能需要重新应用主题以刷新 CFSM 缓存；回退可重新应用上面的稳定标签。
+可用 `git ls-remote https://github.com/allury/CFSM-Glassmorphism.git refs/heads/preview-main` 查询最新提交 SHA；也可在仓库的 `preview-main` 分支提交记录中复制完整 SHA。`main` 保留源码，不能作为主题安装地址；`preview-main` 只包含通过 Actions 完整质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。它随 `main` 前移，不创建版本标签或 Release，也不推进稳定版 `theme-dist`。直接使用 `preview-main` 分支地址时，更新后最长约 1 小时内可能取到新旧混用的文件而出现空白；重新应用不会清缓存。固定到完整提交 SHA 的地址则不会因分支前移而混用文件，但该地址本身会缓存约 1 天；要安装新版，请改用**新版的完整 SHA 地址**。回退时使用上面的稳定标签地址。
 
 ### 二、调整主题设置
 
