@@ -757,7 +757,7 @@ onUnmounted(() => detail.close())
       </main>
 
       <footer v-if="!coldStartCover" class="app-footer">
-        <span>Powered by <a href="https://github.com/huilang-me/CF-Server-Monitor/">CF-Server-Monitor<template v-if="sourceConfig?.version"> v{{ sourceConfig.version }}</template></a></span>
+        <span>Powered by <a href="https://github.com/huilang-me/CF-Server-Monitor/">CF-Server-Monitor</a></span>
         <span>Glassmorphism Theme · Server Detail</span>
       </footer>
     </div>

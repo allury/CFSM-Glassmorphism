@@ -524,7 +524,7 @@ onUnmounted(() => realtime.stop())
         <span>
           Powered by
           <a href="https://github.com/huilang-me/CF-Server-Monitor/">
-            CF-Server-Monitor<template v-if="app.config?.version"> v{{ app.config.version }}</template>
+            CF-Server-Monitor
           </a>
         </span>
         <span>Glassmorphism Theme · {{ realtimeLabel }}</span>
