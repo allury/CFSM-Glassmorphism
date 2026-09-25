@@ -2448,25 +2448,53 @@ a {
   min-height: 320px;
 }
 
+/*
+ * 页脚：Komari `Footer.vue` 的计算样式。外层 `w-full max-w-[1280px] mx-auto p-4` 与内层
+ * `flex flex-row justify-between gap-4 text-xs text-muted-foreground` 合在同一个元素上。
+ * 左段对应 `flex gap-1 items-center`，右段对应 `flex flex-wrap gap-1 items-center justify-end text-right`。
+ * 链接文字是 `font-medium text-foreground`，悬停为 `hover:opacity-80`（`transition-opacity`，150ms）。
+ * 上游没有响应式变体。它的两段短文字在手机宽度也能各占一行的一半。
+ * 文字内容仍按规格第 82 节归因到 CF-Server-Monitor（审计矩阵 23），这里只对齐样式（矩阵 38）。
+ * 这段归因带版本号，比上游长。唯一的适配：外层允许换行。
+ * 放不下时右段整体移到下一行，由 `space-between` 排到行首，两行左对齐；
+ * 不在「Powered by」这类词组中间折行。放得下时与上游完全相同。
+ * `margin-top: auto` 保留本主题短页面把页脚压在底部的布局。
+ */
 .app-footer {
   display: flex;
-  width: min(100% - 32px, 1280px);
-  align-items: center;
+  width: 100%;
+  max-width: 1280px;
+  flex-flow: row wrap;
   justify-content: space-between;
+  gap: 16px;
   margin: auto auto 0;
-  padding: 18px 2px 24px;
-  color: var(--faint);
-  font-size: 9px;
+  padding: 16px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.app-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.app-footer > span:last-child {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  text-align: right;
 }
 
 .app-footer a {
   color: var(--ink);
-  font-weight: 680;
+  font-weight: 500;
   text-decoration: none;
+  transition: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-footer a:hover {
-  color: var(--emerald);
+  opacity: 0.8;
 }
 
 .metadata-list {
@@ -2532,8 +2560,7 @@ a {
 }
 
 @media (max-width: 768px) {
-  .app-header__inner,
-  .app-footer {
+  .app-header__inner {
     width: min(100% - 24px, 1280px);
   }
 
@@ -2625,20 +2652,13 @@ a {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .app-footer {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 5px;
-  }
-
   .metadata-list {
     grid-template-columns: 1fr;
   }
 }
 
 @media (max-width: 380px) {
-  .app-header__inner,
-  .app-footer {
+  .app-header__inner {
     width: min(100% - 18px, 1280px);
   }
 

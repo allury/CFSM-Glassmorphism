@@ -76,7 +76,7 @@
 | 35 | 节点卡 / 列表的不限流量 | NodeCard 没有上限时右上角 `∞`，下方显示真实的 `已用 / ∞` | 没有上限时把已用量整个当成未知，显示 `— / ∞` | 不一致 | 否 | v1.1.15 `trafficDisplay` 按 CFSM 月度收发与 `traffic_calc_type` 显示真实已用量；上限沿用 CFSM `parseFloat(traffic_limit) \|\| 0` 语义 | P2 | PASS |
 | 36 | 流量关闭或已用量缺失 | 上游没有 `show_tf` 开关；有上限但计数缺失时按 0 显示 `0.0%` 与 `0 B / 上限` | 两种情况都显示 `∞`，等于宣称不限流量，且丢掉了已知的上限 | 不一致 | **是**（第 10 条：站点隐藏的数据不呈现；未知不写成 0） | v1.1.15 关闭时显示 `-` 与 `- / -`；有上限但计数缺失时显示 `-` 与 `- / 上限`；节点卡与列表同一口径 | P2 | NECESSARY-CFSM-DIFFERENCE |
 | 37 | 无到期日付费节点的剩余信息 | 两行：`-` 与剩余价值；未知到期的剩余价值算成 0，显示「€0」 | v1.1.14 只画一行 `—` | 结构不一致 | **是**（第 10 条：未知剩余价值不写成 0） | v1.1.15 恢复两行结构：日历 `-`、硬币 `-` | P2 | NECESSARY-CFSM-DIFFERENCE |
-| 38 | Footer 样式 | `Footer.vue`：`p-4`，`text-xs`（12px / 16px）、`text-muted-foreground`，链接 `font-medium text-foreground`，悬停降低不透明度 | `.app-footer` 为 9px、`--faint` 色、`18px 2px 24px` 内边距，链接 680 字重、悬停变绿。9px 来自 2026-09-07 的早期改版，对照上游的 `3bb1501` 没有改动它 | 不一致 | 否（文字内容仍按矩阵 23 保留 CFSM 归因） | 排入下一版本：按上游计算样式对齐字号、颜色、字重、内边距与悬停效果 | P2 | FAIL |
+| 38 | Footer 样式 | `Footer.vue`：`p-4`，`text-xs`（12px / 16px）、`text-muted-foreground`，链接 `font-medium text-foreground`，悬停降低不透明度 | `.app-footer` 为 9px、`--faint` 色、`18px 2px 24px` 内边距，链接 680 字重、悬停变绿。9px 来自 2026-09-07 的早期改版，对照上游的 `3bb1501` 没有改动它 | 不一致 | 否（文字内容仍按矩阵 23 保留 CFSM 归因） | 按上游计算样式对齐：12px / 16px、`--muted`（即上游 `--muted-foreground`）、链接 500 字重的 `--ink`、`p-4` 与 `gap-4`、悬停不透明度 0.8，并删除三条移动端规则。唯一适配：CFSM 归因带版本号，比上游文字长，所以外层允许换行。手机宽度下右段整体移到下一行并左对齐，不在「Powered by」等词组中间折行；宽屏与上游完全一致。回归测试：`tests/footer-fidelity.test.ts` | P2 | PASS |
 
 ## 第 13 轮：详情页专项审计
 
@@ -234,8 +234,8 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 
 ## 当前终态
 
-**P0 = 0 ｜ P1 = 0 ｜ FAIL = 1（P2，矩阵 38 页脚样式，排入下一版本） ｜ P2-ACCEPTED = 3。**
-38 项审计的终态分布：PASS 28、NECESSARY-CFSM-DIFFERENCE 6、P2-ACCEPTED 3、FAIL 1。
+**P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 3。**
+38 项审计的终态分布：PASS 29、NECESSARY-CFSM-DIFFERENCE 6、P2-ACCEPTED 3。
 
 ## 数据真实性边界（不因保真而放宽）
 
