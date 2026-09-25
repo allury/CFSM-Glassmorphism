@@ -112,8 +112,10 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
         <div class="brand__copy">
           <span v-if="titlePending" class="brand__title-placeholder skeleton" aria-hidden="true" />
           <strong v-else>{{ title }}</strong>
-          <!-- 不输出 CFSM 版本号：即使这行被样式隐藏，DOM 里也不留服务端版本。 -->
-          <span>CFSM Glassmorphism Theme</span>
+          <span>
+            CFSM Glassmorphism Theme
+            <template v-if="version">· v{{ version }}</template>
+          </span>
         </div>
       </div>
 

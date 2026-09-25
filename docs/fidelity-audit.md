@@ -61,7 +61,7 @@
 | 20 | 公告 | `MarkdownRenderer` 受限 Markdown | 已实现受限 Markdown 渲染 | 一致 | 否 | — | — | PASS |
 | 21 | 分组 / 搜索 / 排序 / Quick Controls | 按真实字段过滤与排序 | 已实现且行为等价 | 一致 | 否 | — | — | PASS |
 | 22 | Ping / Loss 三态 | `number \| null \| false` 三态 | 已在 adapter 边界统一，旧四线路 + Node 1–4 全覆盖 | 一致 | 否 | — | — | PASS |
-| 23 | Footer | Komari 品牌页脚 | `Powered by CF-Server-Monitor vX.Y.Z` + Glassmorphism Theme | 不一致 | **是**（§82 要求指向 CFSM） | 保持 CFSM 页脚；v1.1.15 起按用户要求不显示 CFSM 版本号（§82 中版本号为「建议显示」），顶栏隐藏副标题也不再输出版本号 | — | NECESSARY-CFSM-DIFFERENCE |
+| 23 | Footer | Komari 品牌页脚 | `Powered by CF-Server-Monitor vX.Y.Z` + Glassmorphism Theme | 不一致 | **是**（§82 要求指向 CFSM） | 保持 CFSM 页脚 | — | NECESSARY-CFSM-DIFFERENCE |
 | 24 | 管理后台入口 | 主题内含登录/管理能力 | 外链 `/admin#admin` | 不一致 | **是**（第三方主题不得实现 CFSM 管理后台） | 保持外链 | — | NECESSARY-CFSM-DIFFERENCE |
 | 25 | 访客信息 / 审计日志 | `VisitorInfo`、`AuditLogPanel` | 关闭并隐藏 | 不一致 | **是**（无对应公开主题 API，禁止私有接口与外部猜测） | 保持隐藏 | — | NECESSARY-CFSM-DIFFERENCE |
 | 26 | 高级工具 | Komari 自有面板族 | 健康 / 性价比 / 快照 / 分类拓扑（登录态） | 部分一致 | 部分 | 高级工具是第 8 轮已落地且用户要求保留的 CFSM 能力；第 10 轮改为默认收起并由 Header 工具按钮显式展开，避免改变默认首页层级 | P2 | P2-ACCEPTED |

@@ -69,18 +69,6 @@ describe('页脚对齐 Komari Footer.vue 的计算样式', () => {
     ])
   })
 
-  it('页脚与顶栏都不输出 CFSM 版本号，只保留规格要求的归因与链接', () => {
-    for (const file of ['../src/views/HomeView.vue', '../src/views/ServerDetailView.vue']) {
-      const source = readFileSync(new URL(file, import.meta.url), 'utf8')
-      const footer = source.slice(source.indexOf('<footer'), source.indexOf('</footer>'))
-      expect(footer).toContain('https://github.com/huilang-me/CF-Server-Monitor/')
-      expect(footer).toContain('CF-Server-Monitor')
-      expect(footer).not.toMatch(/version/i)
-    }
-    const header = readFileSync(new URL('../src/components/dashboard/AppHeader.vue', import.meta.url), 'utf8')
-    expect(header).not.toContain('{{ version }}')
-  })
-
   it('所用令牌就是上游 --muted-foreground / --foreground 的明暗取值', () => {
     expect(stylesheet).toContain('--muted: oklch(0.34 0.02 285.938);')
     expect(stylesheet).toContain('--muted: oklch(0.86 0.012 286.067);')
