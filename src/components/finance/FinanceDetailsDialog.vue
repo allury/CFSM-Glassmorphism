@@ -21,7 +21,7 @@ import {
   type RowAmount,
 } from '@/domain/finance'
 import { useFinanceStore } from '@/stores/finance'
-import { detailExpireStatus, formatDisplayPrice } from '@/utils/format'
+import { detailExpireStatus, formatDisplayPrice, MISSING_TEXT } from '@/utils/format'
 
 /**
  * 对齐 Komari `FinanceDetailsDialog`：顶部汇总、固定账单明细与汇率设置。
@@ -75,7 +75,7 @@ function amountText(value: RowAmount, freeText: string): string {
   if (value.status === 'free') return freeText
   if (value.status === 'ok') return formatFinanceAmount(value.amount, target.value)
   if (value.status === 'pending') return '载入中'
-  return '—'
+  return MISSING_TEXT
 }
 
 function amountTitle(value: RowAmount): string | undefined {

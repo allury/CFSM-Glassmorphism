@@ -1,5 +1,13 @@
 import type { ProbeValue } from '@/types/cfsm'
 
+/**
+ * 缺失值占位符。Komari 界面上所有缺失值都显示 ASCII 短横 `-`
+ * （NodeCard 剩余天数、`formatDateTime`、`getExpireText`、图表提示等），
+ * 长破折号只出现在它的代码注释里。本主题此前统一写成 `—`，属于自定义写法，
+ * 不是 CFSM 平台差异，因此按上游对齐；所有占位都从这里取，不在组件里另写字面量。
+ */
+export const MISSING_TEXT = '-'
+
 const BYTE_UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] as const
 
 function normalizedNumber(value: number | null): number | null {
@@ -7,7 +15,7 @@ function normalizedNumber(value: number | null): number | null {
 }
 export function formatBytes(value: number | null, suffix = ''): string {
   const bytes = normalizedNumber(value)
-  if (bytes === null) return '—'
+  if (bytes === null) return MISSING_TEXT
   if (bytes === 0) return '0 B' + suffix
 
   const unitIndex = Math.min(
@@ -21,7 +29,7 @@ export function formatBytes(value: number | null, suffix = ''): string {
 
 export function formatMebibytes(value: number | null): string {
   const mebibytes = normalizedNumber(value)
-  return mebibytes === null ? '—' : formatBytes(mebibytes * 1024 * 1024)
+  return mebibytes === null ? MISSING_TEXT : formatBytes(mebibytes * 1024 * 1024)
 }
 
 export function formatSpeed(value: number | null): string {
@@ -30,29 +38,29 @@ export function formatSpeed(value: number | null): string {
 
 export function formatPercent(value: number | null): string {
   const percentage = normalizedNumber(value)
-  return percentage === null ? '—' : percentage.toFixed(1) + '%'
+  return percentage === null ? MISSING_TEXT : percentage.toFixed(1) + '%'
 }
 
 export function formatLoad(value: number | null): string {
   const load = normalizedNumber(value)
-  return load === null ? '—' : load.toFixed(2)
+  return load === null ? MISSING_TEXT : load.toFixed(2)
 }
 
 export function formatCount(value: number | null): string {
   const count = normalizedNumber(value)
-  return count === null ? '—' : Math.round(count).toLocaleString('zh-CN')
+  return count === null ? MISSING_TEXT : Math.round(count).toLocaleString('zh-CN')
 }
 
 export function formatLatency(value: ProbeValue): string {
   if (value === null) return '超时'
-  if (value === false) return '—'
+  if (value === false) return MISSING_TEXT
   const latency = normalizedNumber(value)
-  return latency === null ? '—' : latency.toFixed(latency >= 100 ? 0 : 1) + ' ms'
+  return latency === null ? MISSING_TEXT : latency.toFixed(latency >= 100 ? 0 : 1) + ' ms'
 }
 
 export function formatProbePercent(value: ProbeValue): string {
   if (value === null) return '超时'
-  if (value === false) return '—'
+  if (value === false) return MISSING_TEXT
   return formatPercent(value)
 }
 
@@ -64,9 +72,9 @@ export function normalizeTimestampMilliseconds(value: number | null): number | n
 
 export function formatTimestamp(value: number | null): string {
   const timestamp = normalizeTimestampMilliseconds(value)
-  if (timestamp === null) return '—'
+  if (timestamp === null) return MISSING_TEXT
   const date = new Date(timestamp)
-  if (Number.isNaN(date.getTime())) return '—'
+  if (Number.isNaN(date.getTime())) return MISSING_TEXT
   return new Intl.DateTimeFormat('zh-CN', {
     month: '2-digit',
     day: '2-digit',
@@ -78,7 +86,7 @@ export function formatTimestamp(value: number | null): string {
 
 export function formatUptime(bootTime: number | null, now = Date.now()): string {
   const startedAt = normalizeTimestampMilliseconds(bootTime)
-  if (startedAt === null || startedAt > now) return '—'
+  if (startedAt === null || startedAt > now) return MISSING_TEXT
   const totalMinutes = Math.floor((now - startedAt) / 60_000)
   const days = Math.floor(totalMinutes / 1440)
   const hours = Math.floor((totalMinutes % 1440) / 60)
@@ -135,7 +143,7 @@ export function formatCfsmDate(value: string | null): string {
     return `${dateOnly.year}/${String(dateOnly.month).padStart(2, '0')}/${String(dateOnly.day).padStart(2, '0')}`
   }
   const date = parseCfsmDate(value)
-  if (date === null) return '—'
+  if (date === null) return MISSING_TEXT
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: '2-digit',
@@ -149,11 +157,11 @@ function priceWithCycleLabel(
   cycleLabel: string,
 ): string {
   const normalizedPrice = price?.trim()
-  if (!normalizedPrice) return '—'
+  if (!normalizedPrice) return MISSING_TEXT
   const amount = Number(normalizedPrice)
-  if (!Number.isFinite(amount)) return '—'
+  if (!Number.isFinite(amount)) return MISSING_TEXT
   if (amount === 0 || amount === -1) return '免费'
-  if (amount < 0) return '—'
+  if (amount < 0) return MISSING_TEXT
   const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(amount)
   const prefix = currency?.trim() ?? ''
   return `${prefix}${formatted}${cycleLabel ? ` / ${cycleLabel}` : ''}`
@@ -168,7 +176,7 @@ export function formatPrice(
 }
 
 export function formatCurrencyValue(value: number | null, currency: string | null): string {
-  if (value === null || !Number.isFinite(value) || value < 0) return '—'
+  if (value === null || !Number.isFinite(value) || value < 0) return MISSING_TEXT
   const formatted = new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(value)
   return `${currency?.trim() ?? ''}${formatted}`
 }
@@ -212,7 +220,7 @@ export interface SplitAmount {
 
 export function formatDisplayBytesSplit(value: number | null): SplitAmount {
   const bytes = normalizedNumber(value)
-  if (bytes === null) return { value: '—', unit: '' }
+  if (bytes === null) return { value: MISSING_TEXT, unit: '' }
   if (bytes === 0) return { value: '0', unit: 'B' }
 
   const unitIndex = Math.min(
@@ -244,7 +252,7 @@ export function formatDisplaySpeed(value: number | null): string {
 export function formatDisplayMebibytesSplit(value: number | null): SplitAmount {
   const mebibytes = normalizedNumber(value)
   return mebibytes === null
-    ? { value: '—', unit: '' }
+    ? { value: MISSING_TEXT, unit: '' }
     : formatDisplayBytesSplit(mebibytes * 1024 * 1024)
 }
 
@@ -255,7 +263,7 @@ export function formatDisplayMebibytes(value: number | null): string {
 /** Komari NodeCard 的运行时间只显示整天数（`在线 N 天`），不显示小时。 */
 export function formatHomeUptimeDays(bootTime: number | null, now = Date.now()): string {
   const startedAt = normalizeTimestampMilliseconds(bootTime)
-  if (startedAt === null || startedAt > now) return '—'
+  if (startedAt === null || startedAt > now) return MISSING_TEXT
   return `在线 ${Math.floor((now - startedAt) / 86_400_000)} 天`
 }
 
@@ -307,7 +315,7 @@ const DETAIL_UPTIME_UNITS = [
  */
 export function formatDetailUptime(bootTime: number | null, now = Date.now()): string {
   const startedAt = normalizeTimestampMilliseconds(bootTime)
-  if (startedAt === null || startedAt > now) return '—'
+  if (startedAt === null || startedAt > now) return MISSING_TEXT
 
   let remaining = Math.floor((now - startedAt) / 1000)
   const parts: string[] = []

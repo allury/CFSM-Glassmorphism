@@ -2,7 +2,9 @@ import { createSSRApp } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { describe, expect, it } from 'vitest'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
+import { ICONS } from '@/constants/icons'
 import type { GlassServer } from '@/types/glassmorphism'
+import { MISSING_TEXT } from '@/utils/format'
 
 function server(overrides: Partial<GlassServer> = {}): GlassServer {
   return {
@@ -36,6 +38,10 @@ function rows(box: string): number {
   return (box.match(/class="node-box__row/g) ?? []).length
 }
 
+function placeholders(box: string): number {
+  return (box.match(new RegExp(`<span class="node-box__text">${MISSING_TEXT}</span>`, 'g')) ?? []).length
+}
+
 describe('首页节点卡第三个信息盒', () => {
   it('有公开到期日期时保持原有剩余天数和价值', async () => {
     const { thirdBox } = await renderCard({ expireDate: '2030-01-01' })
@@ -44,20 +50,28 @@ describe('首页节点卡第三个信息盒', () => {
     expect(rows(thirdBox)).toBe(2)
   })
 
-  it.each([null, 'not-a-date'])('有公开正价格但到期日期缺失或无效时只显示一行占位：%s', async (expireDate) => {
+  /*
+   * v1.1.14 在这里只画一行「📅 —」。v1.1.15 按上游恢复两行结构：上游是 `-` 加剩余价值，
+   * 但它把未知到期的剩余价值算成 0 显示「€0」。这里第二行同样是硬币图标，值如实为占位，
+   * 不出现任何金额。占位符也按上游从 `—` 改为 `-`。
+   */
+  it.each([null, 'not-a-date'])('有公开正价格但到期日期缺失或无效时保留两行占位，剩余价值不写成 0：%s', async (expireDate) => {
     const { html, thirdBox } = await renderCard({ expireDate })
-    expect(thirdBox).toContain('—')
-    expect(rows(thirdBox)).toBe(1)
+    expect(rows(thirdBox)).toBe(2)
+    expect(placeholders(thirdBox)).toBe(2)
+    expect(thirdBox).toContain(ICONS['tabler:calendar-stats'].body)
+    expect(thirdBox).toContain(ICONS['tabler:coins'].body)
     expect(thirdBox).not.toContain('1.11')
     expect(thirdBox).not.toContain('2.22')
     expect(thirdBox).not.toContain('USD12')
+    expect(thirdBox).not.toMatch(/USD\s*0/)
     expect(html).toMatch(/1\.11,\s*2\.22,\s*3\.33/)
   })
 
   it('隐藏到期日期时不泄露日期、剩余天数或价值', async () => {
     const { thirdBox } = await renderCard({ showExpire: false, expireDate: '2030-01-01' })
-    expect(thirdBox).toContain('—')
-    expect(rows(thirdBox)).toBe(1)
+    expect(rows(thirdBox)).toBe(2)
+    expect(placeholders(thirdBox)).toBe(2)
     expect(thirdBox).not.toContain('剩余')
     expect(thirdBox).not.toContain('2030')
     expect(thirdBox).not.toContain('USD12')

@@ -35,6 +35,7 @@ import {
   formatDisplayBytes,
   formatDisplayMebibytes,
   formatDisplaySpeed,
+  MISSING_TEXT,
 } from '@/utils/format'
 
 const route = useRoute()
@@ -306,7 +307,7 @@ watch(() => server.value?.id, () => {
  */
 const cpuName = computed(() => server.value?.cpuInfo?.trim() ?? '')
 const cpuText = computed(() => {
-  const name = cpuName.value || '—'
+  const name = cpuName.value || MISSING_TEXT
   const cores = server.value?.cpuCores
   return cores === null || cores === undefined ? name : `${name} (${formatCount(cores)} vCPU)`
 })
@@ -389,7 +390,7 @@ const trafficUsageText = computed(() => {
   const quota = trafficQuota.value
   if (!quota) {
     const limit = parseTrafficLimitBytes(server.value?.trafficLimit ?? null)
-    return limit === null ? '无限流量' : `— / ${formatDisplayBytes(limit)}`
+    return limit === null ? '无限流量' : `${MISSING_TEXT} / ${formatDisplayBytes(limit)}`
   }
   return `${formatDisplayBytes(quota.used)} / ${formatDisplayBytes(quota.limit)}`
 })

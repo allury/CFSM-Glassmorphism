@@ -74,8 +74,8 @@ describe('首页字节格式（Komari utils/helper.ts 规则）', () => {
   it('速度在单位后加 /s，缺失值保持占位符而不是 0', () => {
     expect(formatDisplaySpeed(1024 ** 2)).toBe('1.0 MB/s')
     expect(formatDisplaySpeed(0)).toBe('0 B/s')
-    expect(formatDisplaySpeed(null)).toBe('—')
-    expect(formatDisplayBytes(null)).toBe('—')
+    expect(formatDisplaySpeed(null)).toBe('-')
+    expect(formatDisplayBytes(null)).toBe('-')
     expect(formatDisplayMebibytes(1024)).toBe('1.0 GB')
   })
 })
@@ -85,7 +85,7 @@ describe('首页运行天数与计费周期', () => {
     const now = Date.UTC(2026, 8, 10, 6)
     expect(formatHomeUptimeDays(Date.UTC(2026, 8, 8, 6) / 1000, now)).toBe('在线 2 天')
     expect(formatHomeUptimeDays(Date.UTC(2026, 8, 10, 5) / 1000, now)).toBe('在线 0 天')
-    expect(formatHomeUptimeDays(null, now)).toBe('—')
+    expect(formatHomeUptimeDays(null, now)).toBe('-')
   })
 
   it('本地化 CFSM 官方计费周期，未知自由文本原样保留', () => {
@@ -105,7 +105,7 @@ describe('首页运行天数与计费周期', () => {
     expect(formatDisplayPrice('18', 'USD', 'year')).toBe('USD18 / 年')
     expect(formatDisplayPrice('24', 'USD', 'month')).toBe('USD24 / 月')
     expect(formatDisplayPrice('0', 'CNY', 'year')).toBe('免费')
-    expect(formatDisplayPrice(null, 'CNY', 'year')).toBe('—')
+    expect(formatDisplayPrice(null, 'CNY', 'year')).toBe('-')
     expect(formatPrice('18', 'USD', 'year')).toBe('USD18 / year')
   })
 })

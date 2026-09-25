@@ -6,7 +6,14 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { probeSeriesFor, windowAverage, type ProbeSeriesMap } from '@/domain/probe-window'
-import { daysUntilExpiry, remainingValue, trafficUsage } from '@/domain/theme-presentation'
+import {
+  daysUntilExpiry,
+  remainingValue,
+  trafficDisplay,
+  trafficDisplayPercent,
+  trafficHeadText,
+  trafficRatioText,
+} from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import {
@@ -20,6 +27,7 @@ import {
   formatLoad,
   formatPercent,
   formatProbePercent,
+  MISSING_TEXT,
   normalizeTimestampMilliseconds,
 } from '@/utils/format'
 import { trafficStatus, trafficTextTone, usageStatus } from '@/utils/progress-status'
@@ -57,9 +65,9 @@ function ratio(used: number | null, total: number | null): number | null {
 
 const memoryPercent = computed(() => ratio(props.server.memory.used, props.server.memory.total))
 const diskPercent = computed(() => ratio(props.server.disk.used, props.server.disk.total))
-// 节点关闭流量展示时不显示配额，避免呈现服务端已隐藏的数据。
-const traffic = computed(() => (props.server.showTraffic ? trafficUsage(props.server) : null))
-const trafficPercent = computed(() => (traffic.value ? traffic.value.percent : null))
+// 显示口径见 `trafficDisplay`：不限流量显示真实已用量，站点关闭流量展示时不呈现任何数值。
+const trafficView = computed(() => trafficDisplay(props.server))
+const trafficPercent = computed(() => trafficDisplayPercent(trafficView.value))
 const trafficTone = computed(() => trafficTextTone(trafficPercent.value))
 const trafficCritical = computed(() => trafficPercent.value !== null && trafficPercent.value >= 95)
 
@@ -86,9 +94,13 @@ const uptimeText = computed(() => formatHomeUptimeDays(props.server.bootTime))
 const priceText = computed(() => {
   if (!props.priceVisible || !props.server.showPrice) return ''
   const text = formatDisplayPrice(props.server.price, props.server.currency, props.server.billingCycle)
-  return text === '—' ? '' : text
+  return text === MISSING_TEXT ? '' : text
 })
 const expireVisible = computed(() => props.server.showExpire && daysUntilExpiry(props.server.expireDate) !== null)
+/*
+ * 没有可显示到期日的付费节点：上游 NodeCard 仍画两行（`-` 与剩余价值），但它把未知到期的
+ * 剩余价值算成 0，显示成「€0」。这里保留同样的两行结构，第二行如实为占位，不写成 0。
+ */
 const hasPublicPositivePrice = computed(() => {
   if (!props.priceVisible || !props.server.showPrice) return false
   const price = Number(props.server.price)
@@ -96,7 +108,7 @@ const hasPublicPositivePrice = computed(() => {
 })
 const expiryInfo = computed(() => {
   const days = daysUntilExpiry(props.server.expireDate)
-  if (days === null) return { text: '—', prefix: '', value: '', unit: '', tone: 'neutral' }
+  if (days === null) return { text: MISSING_TEXT, prefix: '', value: '', unit: '', tone: 'neutral' }
   if (days <= 0) return { text: '已过期', prefix: '', value: '', unit: '', tone: 'danger' }
   if (days > 36_500) return { text: '长期', prefix: '', value: '', unit: '', tone: 'neutral' }
   return {
@@ -369,14 +381,12 @@ function hideMissingImage(event: Event): void {
               <AppIcon name="tabler:arrows-transfer-up-down" :size="12" /><span>流量</span>
             </span>
             <span class="node-metric__value" :class="`node-metric__value--${trafficTone}`">
-              {{ traffic ? formatPercent(traffic.percent) : '∞' }}
+              {{ trafficHeadText(trafficView) }}
             </span>
           </div>
           <AppProgressThin :percentage="trafficPercent" :status="trafficStatus(trafficPercent)" />
           <div class="node-metric__hint" :class="{ 'node-metric__hint--danger': trafficCritical }">
-            {{ formatDisplayBytes(traffic ? traffic.used : null) }}
-            /
-            {{ traffic ? formatDisplayBytes(traffic.limit) : '∞' }}
+            {{ trafficRatioText(trafficView) }}
           </div>
         </div>
       </div>
@@ -431,14 +441,12 @@ function hideMissingImage(event: Event): void {
               <AppIcon name="tabler:arrows-transfer-up-down" :size="13" /><span>流量</span>
             </span>
             <span class="node-metric__value" :class="`node-metric__value--${trafficTone}`">
-              {{ traffic ? formatPercent(traffic.percent) : '∞' }}
+              {{ trafficHeadText(trafficView) }}
             </span>
           </div>
           <AppProgressThin :percentage="trafficPercent" :status="trafficStatus(trafficPercent)" />
           <div class="node-metric__hint" :class="{ 'node-metric__hint--danger': trafficCritical }">
-            {{ formatDisplayBytes(traffic ? traffic.used : null) }}
-            /
-            {{ traffic ? formatDisplayBytes(traffic.limit) : '∞' }}
+            {{ trafficRatioText(trafficView) }}
           </div>
         </div>
       </div>
@@ -496,7 +504,11 @@ function hideMissingImage(event: Event): void {
           <template v-else-if="hasPublicPositivePrice">
             <span class="node-box__row node-box__row--remaining">
               <AppIcon name="tabler:calendar-stats" :size="11" />
-              <span class="node-box__text">—</span>
+              <span class="node-box__text">{{ MISSING_TEXT }}</span>
+            </span>
+            <span class="node-box__row node-box__row--remaining">
+              <AppIcon name="tabler:coins" :size="11" />
+              <span class="node-box__text">{{ MISSING_TEXT }}</span>
             </span>
           </template>
           <template v-else>

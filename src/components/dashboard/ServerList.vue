@@ -5,7 +5,13 @@ import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { windowAverage } from '@/domain/probe-window'
-import { matchProvider, trafficUsage, type ProviderAlias } from '@/domain/theme-presentation'
+import {
+  matchProvider,
+  trafficDisplay,
+  trafficDisplayPercent,
+  trafficHeadText,
+  type ProviderAlias,
+} from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
 import { trafficStatus, usageStatus } from '@/utils/progress-status'
@@ -15,6 +21,7 @@ import {
   formatLatency,
   formatPercent,
   formatUptime,
+  MISSING_TEXT,
 } from '@/utils/format'
 
 /**
@@ -80,7 +87,7 @@ function regionCode(server: GlassServer): string | null {
 function priceText(server: GlassServer): string {
   if (!props.priceVisible || !server.showPrice) return ''
   const text = formatDisplayPrice(server.price, server.currency, server.billingCycle)
-  return text === '—' ? '' : text
+  return text === MISSING_TEXT ? '' : text
 }
 
 interface MetadataBadge {
@@ -122,14 +129,18 @@ function metadataBadges(server: GlassServer): MetadataBadge[] {
  */
 function probeText(server: GlassServer): string {
   const probe = server.latency[0]
-  if (!probe) return '—'
+  if (!probe) return MISSING_TEXT
   const average = windowAverage(server.history.latencySeries, probe.target)
   return `${probe.label} ${formatLatency(average.value ?? probe.latency)}`
 }
 
+/** 与节点卡同一口径（`trafficDisplay`）：关闭流量展示或已用量缺失时不写成「∞」。 */
 function trafficPercent(server: GlassServer): number | null {
-  if (!server.showTraffic) return null
-  return trafficUsage(server)?.percent ?? null
+  return trafficDisplayPercent(trafficDisplay(server))
+}
+
+function trafficHead(server: GlassServer): string {
+  return trafficHeadText(trafficDisplay(server))
 }
 
 function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
@@ -274,7 +285,7 @@ function hideMissingImage(event: Event): void {
 
           <div class="node-list__cell node-list__cell--metric">
             <span class="node-list__metric-value">
-              {{ trafficPercent(server) === null ? '∞' : formatPercent(trafficPercent(server)) }}
+              {{ trafficHead(server) }}
             </span>
             <AppProgressThin :percentage="trafficPercent(server)" :status="trafficStatus(trafficPercent(server))" />
           </div>

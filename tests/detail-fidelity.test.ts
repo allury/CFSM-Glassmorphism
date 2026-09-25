@@ -63,7 +63,7 @@ describe('详情页运行时间与到期文案（Komari InstanceDetail 规则）
     expect(formatDetailUptime(Date.UTC(2026, 8, 8, 12, 30) / 1000, now)).toBe('2 天')
     expect(formatDetailUptime(Date.UTC(2026, 8, 8, 9, 15) / 1000, now)).toBe('2 天 3 小时 15 分钟')
     expect(formatDetailUptime(Date.UTC(2026, 8, 10, 12, 29, 30) / 1000, now)).toBe('不足 1 分钟')
-    expect(formatDetailUptime(null, now)).toBe('—')
+    expect(formatDetailUptime(null, now)).toBe('-')
   })
 
   it('到期状态与文案对齐上游 5 / 10 / 36500 天阈值', () => {
@@ -103,7 +103,7 @@ describe('详情指标卡对齐 Komari getDetailMetricCard', () => {
     }), detailSettings('财务'))
     expect(cards.find((card) => card.key === 'trafficQuota')).toMatchObject({
       value: '-',
-      hint: '— / 1.00 TB',
+      hint: '- / 1.00 TB',
     })
   })
 
@@ -173,11 +173,11 @@ describe('详情指标卡对齐 Komari getDetailMetricCard', () => {
 
     const euro = node({ price: '60', billing_cycle: 'year', currency: '€', expire_date: '2027-01-01' })
     const pending = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: {}, sources: {}, pending: true } })
-    expect(pending.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '载入中' })
+    expect(pending.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '-', unit: '载入中' })
     const missing = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: {}, sources: {}, pending: false } })
-    expect(missing.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '汇率不可用', hint: '原币 €60\n缺少汇率，无法换算' })
+    expect(missing.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '-', unit: '汇率不可用', hint: '原币 €60\n缺少汇率，无法换算' })
     const krona = buildDetailCards(node({ price: '60', billing_cycle: 'year', currency: 'kr', expire_date: '2027-01-01' }), settings, now, testRates)
-    expect(krona.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '—', unit: '不可换算' })
+    expect(krona.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '-', unit: '不可换算' })
 
     const reference = buildDetailCards(euro, settings, now, { target: 'CNY', view: { rates: { CNY: 1, EUR: 0.125 }, sources: { EUR: 'reference' }, pending: false } })
     expect(reference.find((card) => card.key === 'remainingValue')).toMatchObject({ value: '¥480.00', unit: '参考' })
@@ -204,7 +204,7 @@ describe('详情指标卡对齐 Komari getDetailMetricCard', () => {
     expect(keys(unset)).toContain('remainingTime')
 
     const invalid = buildDetailCards(node({ price: 'abc', billing_cycle: 'month', currency: '¥', expire_date: '2027-01-01' }), settings, now, testRates)
-    expect(invalid.find((card) => card.key === 'nodePrice')?.value).toBe('—')
+    expect(invalid.find((card) => card.key === 'nodePrice')?.value).toBe('-')
     expect(keys(invalid)).not.toContain('monthlyCost')
     expect(keys(invalid)).not.toContain('remainingValue')
   })

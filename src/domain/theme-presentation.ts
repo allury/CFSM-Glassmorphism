@@ -37,6 +37,7 @@ import {
   formatLoad,
   formatPercent,
   formatPrice,
+  MISSING_TEXT,
   parseCfsmDate,
   type SplitAmount,
 } from '@/utils/format'
@@ -287,6 +288,54 @@ export function trafficUsage(server: GlassServer): { used: number, limit: number
   return { used, limit, percent: (used / limit) * 100 }
 }
 
+/**
+ * 节点卡与节点列表的流量显示口径；配额告警、排序仍用上面的 `trafficUsage`。
+ *
+ * Komari NodeCard 有上限时显示百分比与 `已用 / 上限`，没有上限时显示 `∞` 与真实的
+ * `已用 / ∞`。已用量与 CFSM 自己的计算一致：月度收发按 `traffic_calc_type` 合计；
+ * 上限按 CFSM 的 `parseFloat(traffic_limit) || 0` 语义，空、0 或无法解析都是不限流量。
+ *
+ * 只在两种上游没有的情况下如实降级：
+ * - 站点关闭流量展示（`show_tf`）：Komari 没有这个开关，CFSM 自己会整行隐藏。
+ *   这里不透露数据，也不写成「∞」冒充不限流量；
+ * - 有上限但月度计数缺失：上游把缺失按 0 计，这里保留未知，不写成 0。
+ */
+export type TrafficDisplay =
+  | { readonly kind: 'hidden' }
+  | { readonly kind: 'unlimited', readonly used: number | null }
+  | { readonly kind: 'limited', readonly used: number | null, readonly limit: number, readonly percent: number | null }
+
+export function trafficDisplay(server: GlassServer): TrafficDisplay {
+  if (!server.showTraffic) return { kind: 'hidden' }
+  const used = trafficUsageBytes(
+    server.network.monthlyReceived,
+    server.network.monthlyTransmitted,
+    server.trafficCalculationType,
+  )
+  const limit = parseTrafficLimitBytes(server.trafficLimit)
+  if (limit === null) return { kind: 'unlimited', used }
+  return { kind: 'limited', used, limit, percent: used === null ? null : (used / limit) * 100 }
+}
+
+/** 进度条与配色只认有上限且已用量已知的百分比。 */
+export function trafficDisplayPercent(view: TrafficDisplay): number | null {
+  return view.kind === 'limited' ? view.percent : null
+}
+
+/** 流量格右上角：百分比，不限流量为 `∞`，其余为占位。 */
+export function trafficHeadText(view: TrafficDisplay): string {
+  if (view.kind === 'unlimited') return '∞'
+  const percent = trafficDisplayPercent(view)
+  return percent === null ? MISSING_TEXT : formatPercent(percent)
+}
+
+/** 流量格下方的 `已用 / 上限`，不限流量时上限为 `∞`。 */
+export function trafficRatioText(view: TrafficDisplay): string {
+  if (view.kind === 'hidden') return `${MISSING_TEXT} / ${MISSING_TEXT}`
+  const limit = view.kind === 'unlimited' ? '∞' : formatDisplayBytes(view.limit)
+  return `${formatDisplayBytes(view.used)} / ${limit}`
+}
+
 export function isTrafficWarning(server: GlassServer, threshold: number): boolean {
   const usage = trafficUsage(server)
   return usage !== null && usage.percent >= threshold
@@ -435,7 +484,7 @@ function financeMarker(total: FinanceTotal, sources: readonly RateSource[]): str
 }
 
 function financeValue(total: FinanceTotal, target: DisplayCurrency): string {
-  if (total.pending || (total.counted === 0 && hasSkips(total))) return '—'
+  if (total.pending || (total.counted === 0 && hasSkips(total))) return MISSING_TEXT
   return formatFinanceAmount(total.amount, target)
 }
 
@@ -700,7 +749,7 @@ function detailRemainingValue(server: CfsmServer, now: number, finance: DetailFi
   const converted = convertAmount(result.amount, resolveSourceCurrency(server.currency), finance.target, finance.view)
   if (converted.status !== 'ok') {
     const failure = conversionFailure(converted)
-    return { value: '—', unit: failure.unit, hint: `原币 ${original}\n${failure.note}` }
+    return { value: MISSING_TEXT, unit: failure.unit, hint: `原币 ${original}\n${failure.note}` }
   }
   const split = splitMetricValue(formatFinanceAmount(converted.amount, finance.target))
   const sources = describeSources(converted.sources)
@@ -779,7 +828,7 @@ export function buildDetailCards(
       : quotaLimit === null
         ? card('trafficQuota', 'tabler:gauge', '流量配额', '∞', '', '无限流量')
         : quotaUsed === null
-          ? card('trafficQuota', 'tabler:gauge', '流量配额', '-', '', `— / ${formatDisplayBytes(quotaLimit)}`)
+          ? card('trafficQuota', 'tabler:gauge', '流量配额', MISSING_TEXT, '', `${MISSING_TEXT} / ${formatDisplayBytes(quotaLimit)}`)
           : card('trafficQuota', 'tabler:gauge', '流量配额', (quotaPercent ?? 0).toFixed(1), '%', `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}`),
   }
   return resolveDetailCardKeys(settings).flatMap((key) => model[key] ? [model[key] as PresentationCard] : [])

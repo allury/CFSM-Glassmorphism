@@ -11,6 +11,7 @@ import {
 } from '@/domain/advanced-tools'
 import type { ThemeSettings } from '@/theme/settings'
 import type { GlassServer } from '@/types/glassmorphism'
+import { MISSING_TEXT } from '@/utils/format'
 
 type ToolKey = 'health' | 'value' | 'snapshot' | 'topology'
 
@@ -54,7 +55,7 @@ function toneLabel(tone: HealthTone): string {
 }
 
 function numberLabel(value: number | null, digits = 1): string {
-  return value === null ? '—' : value.toFixed(digits)
+  return value === null ? MISSING_TEXT : value.toFixed(digits)
 }
 
 function download(filename: string, content: string, type: string): void {
@@ -119,7 +120,7 @@ function exportSnapshot(format: 'json' | 'csv'): void {
           <span class="health-list__issues">
             {{ item.issues.slice(0, 2).map((issue) => issue.message).join(' · ') || (item.tone === 'unknown' ? '没有足够指标形成判断' : '可用指标未触发阈值') }}
           </span>
-          <strong>{{ item.score === null ? '—' : item.score }}</strong>
+          <strong>{{ item.score === null ? MISSING_TEXT : item.score }}</strong>
           <small>{{ item.evaluatedSignals }} 项 · {{ item.historySamples }} 历史样本</small>
         </button>
       </div>

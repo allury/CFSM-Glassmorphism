@@ -111,9 +111,9 @@ describe('总览财务卡', () => {
     expect(cards.remainingValue?.value).toBe('$13.00')
   })
 
-  it('汇率载入中：显示「—」与「载入中」，不拿参考表凑数', () => {
+  it('汇率载入中：显示「-」与「载入中」，不拿参考表凑数', () => {
     const cards = financeCards(servers, { view: { ...EMPTY_RATE_VIEW, pending: true } })
-    expect(cards.remainingValue).toMatchObject({ value: '—', unit: '载入中' })
+    expect(cards.remainingValue).toMatchObject({ value: '-', unit: '载入中' })
     expect(cards.monthlyCost?.hint).toContain('汇率载入中')
   })
 
@@ -145,9 +145,9 @@ describe('总览财务卡', () => {
     expect(cards.remainingValue?.hint).toContain('1 台未设置到期时间，未计入')
   })
 
-  it('全部节点都算不出来时显示「—」与「不可用」，不写成 0', () => {
+  it('全部节点都算不出来时显示「-」与「不可用」，不写成 0', () => {
     const cards = financeCards([glass({ key: 'kr', price: '10', currency: 'kr', billingCycle: 'month', expireDate: '2026-10-02' })])
-    expect(cards.monthlyCost).toMatchObject({ value: '—', unit: '不可用' })
+    expect(cards.monthlyCost).toMatchObject({ value: '-', unit: '不可用' })
   })
 
   it('一个付费节点都没有时与上游一样显示 0', () => {
