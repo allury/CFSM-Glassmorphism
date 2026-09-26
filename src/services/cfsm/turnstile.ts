@@ -18,7 +18,9 @@ export interface TurnstileRenderOptions {
 }
 
 export interface TurnstileApi {
+  /** 返回组件 ID（字符串），清理时交给 `remove`。 */
   render: (container: HTMLElement, options: TurnstileRenderOptions) => unknown
+  remove?: (widgetId: string) => void
 }
 
 export function isTurnstileApi(value: unknown): value is TurnstileApi {
@@ -57,15 +59,19 @@ export function loadTurnstileScript(doc: Document = document): Promise<Turnstile
   return pending
 }
 
-/** 渲染官方组件，完成验证后得到一次性令牌；出错或令牌过期时拒绝。 */
+/**
+ * 渲染官方组件，完成验证后得到一次性令牌；出错或令牌过期时拒绝。
+ * 组件 ID 经 `onRendered` 交给调用方，移除容器前要用它调用 `removeTurnstileWidget`。
+ */
 export function requestTurnstileToken(
   api: TurnstileApi,
   container: HTMLElement,
   siteKey: string,
   theme: TurnstileTheme,
+  onRendered?: (widgetId: string) => void,
 ): Promise<string> {
   return new Promise<string>((resolve, reject) => {
-    api.render(container, {
+    const widgetId = api.render(container, {
       sitekey: siteKey,
       theme,
       callback: (token) => {
@@ -75,5 +81,18 @@ export function requestTurnstileToken(
       'error-callback': () => reject(new Error('Turnstile challenge failed')),
       'expired-callback': () => reject(new Error('Turnstile token expired')),
     })
+    if (typeof widgetId === 'string') onRendered?.(widgetId)
   })
+}
+
+/**
+ * 按 CFSM 管理端 `removeTurnstile` 的做法清理组件：直接移除容器而不调用 `remove`，
+ * Turnstile 之后会在控制台警告找不到组件。组件已失效时忽略。
+ */
+export function removeTurnstileWidget(api: TurnstileApi, widgetId: string): void {
+  try {
+    api.remove?.(widgetId)
+  } catch {
+    // 组件 ID 已失效，容器由调用方随后移除。
+  }
 }

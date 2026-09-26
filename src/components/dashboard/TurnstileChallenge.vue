@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { loadTurnstileScript, requestTurnstileToken } from '@/services/cfsm'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { loadTurnstileScript, removeTurnstileWidget, requestTurnstileToken, type TurnstileApi } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useThemeSettingsStore } from '@/stores/theme-settings'
 
@@ -23,15 +23,30 @@ const statusText = computed(() => {
   return '人机验证未通过，请重试'
 })
 
+// 当前渲染出的官方组件。重试和卸载前先 remove（与 CFSM 管理端一致），
+// 否则 Turnstile 之后找不到已移除的容器，会在控制台警告。
+let widget: { api: TurnstileApi, id: string } | null = null
+let active = true
+
+function removeWidget(): void {
+  if (widget) removeTurnstileWidget(widget.api, widget.id)
+  widget = null
+}
+
 async function start(): Promise<void> {
   const target = container.value
   if (!target) return
   status.value = 'loading'
+  removeWidget()
   target.replaceChildren()
   try {
     const api = await loadTurnstileScript()
+    // 脚本加载期间组件已卸载（不再需要验证）时，不再往移除的容器里渲染。
+    if (!active) return
     status.value = 'pending'
-    const token = await requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme)
+    const token = await requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme, (id) => {
+      widget = { api, id }
+    })
     status.value = 'verifying'
     if (!(await app.completeTurnstile(token))) status.value = 'failed'
   } catch {
@@ -41,6 +56,11 @@ async function start(): Promise<void> {
 
 onMounted(() => {
   void start()
+})
+
+onBeforeUnmount(() => {
+  active = false
+  removeWidget()
 })
 </script>
 

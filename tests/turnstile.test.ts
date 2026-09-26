@@ -5,6 +5,7 @@ import {
   fetchSiteConfig,
   isTurnstileApi,
   onTurnstileRejected,
+  removeTurnstileWidget,
   requestTurnstileToken,
   STORAGE_KEYS,
   TURNSTILE_SCRIPT_SRC,
@@ -117,6 +118,26 @@ describe('Turnstile 官方组件', () => {
     options?.['expired-callback']()
     await expect(expired).rejects.toThrow('expired')
   })
+
+  it('把组件 ID 交给调用方，清理时调用官方 remove 并忽略失效 ID', () => {
+    const removed: string[] = []
+    const api: TurnstileApi = {
+      render: () => 'cf-chl-widget-1',
+      remove: (widgetId) => {
+        removed.push(widgetId)
+        if (widgetId === 'stale') throw new Error('Nothing to remove found for stale')
+      },
+    }
+    const rendered: string[] = []
+    void requestTurnstileToken(api, {} as unknown as HTMLElement, 'site-key', 'light', (id) => rendered.push(id))
+    expect(rendered).toEqual(['cf-chl-widget-1'])
+
+    removeTurnstileWidget(api, 'cf-chl-widget-1')
+    expect(() => removeTurnstileWidget(api, 'stale')).not.toThrow()
+    expect(removed).toEqual(['cf-chl-widget-1', 'stale'])
+    // 没有 remove 的替身（或渲染失败没拿到 ID）时什么也不做。
+    expect(() => removeTurnstileWidget({ render: () => undefined }, 'any')).not.toThrow()
+  })
 })
 
 describe('凭据与 /api/config', () => {
@@ -179,7 +200,7 @@ describe('页面接线', () => {
   const appView = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
   const homeView = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8')
   const detailView = readFileSync(new URL('../src/views/ServerDetailView.vue', import.meta.url), 'utf8')
-  const challengeView = readFileSync(new URL('../src/components/dashboard/TurnstileChallenge.vue', import.meta.url), 'utf8')
+  const challengeView = readFileSync(new URL('../src/components/dashboard/TurnstileChallenge.vue', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const css = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
   const rule = (selector: string): string => {
     const start = css.indexOf(`${selector} {`)
@@ -191,7 +212,14 @@ describe('页面接线', () => {
     expect(appView).toContain('app.turnstileSiteKey === null')
     expect(appView).toContain('<LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null" :modal="!coverVisible">')
     expect(appView).toContain(':site-key="app.turnstileSiteKey"')
-    expect(challengeView).toContain('requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme)')
+    expect(challengeView).toContain('requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme, (id) => {')
+  })
+
+  it('重试和卸载前先移除官方组件，卸载后不再渲染', () => {
+    // Turnstile 找不到被直接移除的容器时会警告「consider using turnstile.remove()」。
+    expect(challengeView).toMatch(/removeWidget\(\)\n\s+target\.replaceChildren\(\)/)
+    expect(challengeView).toMatch(/onBeforeUnmount\(\(\) => \{\n\s+active = false\n\s+removeWidget\(\)/)
+    expect(challengeView).toMatch(/await loadTurnstileScript\(\)\n(?:\s+\/\/.*\n)*\s+if \(!active\) return/)
   })
 
   it('浏览中途重新验证时换用 AppDialog 的遮罩，验证内容放在弹窗面板里', () => {
