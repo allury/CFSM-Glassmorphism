@@ -352,6 +352,35 @@ a {
   color: oklch(0.86 0.012 286.067);
 }
 
+/* CFSM 全局 Turnstile 的人机验证（上游没有）：放在遮罩指示器下方，沿用指示器的文字色。 */
+.turnstile-challenge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.turnstile-challenge__text {
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.turnstile-challenge__widget:empty {
+  display: none;
+}
+
+.turnstile-challenge__retry {
+  padding: 6px 14px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
 @keyframes loading-cover-spin {
   to { transform: rotate(360deg); }
 }

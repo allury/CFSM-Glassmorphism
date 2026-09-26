@@ -107,7 +107,11 @@ describe('CFSM HTTP transport', () => {
     expect(receivedInit?.credentials).toBe('include')
     expect(headers.get('Authorization')).toBe('Bearer jwt-value')
     expect(headers.get('X-Turnstile-Verified')).toBe('verified-value')
-    expect(headers.has('X-Turnstile-Token')).toBe(false)
+    /*
+     * 与 CFSM 默认前端 `createHeaders` 一致，两者都有就都带（issue #3）：CFSM 先校验 Verified，
+     * 失效时再校验 Token。此前只带 Verified，残留的过期凭据会挡住刚拿到的新令牌。
+     */
+    expect(headers.get('X-Turnstile-Token')).toBe('one-use-value')
   })
 
   it('stores a returned verification credential and consumes the one-use token', async () => {

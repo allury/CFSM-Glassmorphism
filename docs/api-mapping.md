@@ -71,6 +71,8 @@ WebSocket 侧已确认：`latestReportUpdates[].samples[].data` 只含标量探�
 - 读取 `theme_options`、站点标题、外观/语言偏好、Turnstile 状态、WebSocket 超时、长历史点数及 latency window。
 - 旧四线路名称读取 `custom_ct_name`、`custom_cu_name`、`custom_cm_name`、`custom_bd_name`；字段缺失或空白时统一回退为“电信 / 联通 / 移动 / BGP”。新增探测点名称读取 `node_1_name` 至 `node_4_name`，缺失或空白时回退为 `Node 1` 至 `Node 4`。八个默认名集中在 `src/constants/probes.ts`，config 暂不可用时同样使用这一来源。
 - 响应体中的 `turnstile_verified` 写入同名本地键，并清除已经消费的一次性 token。
+- 本地凭据过期时，带着它请求会得到 403；`fetchSiteConfig` 此时不带验证头重取一次公开配置，与 CFSM `fetchAllTurnstileConfigs` 一致。
+- 开启全局 Turnstile（`turnstile_enabled`）且 `verified` 不为 true 时，主题在加载遮罩中渲染 Cloudflare 官方组件（`https://challenges.cloudflare.com/turnstile/v0/api.js`，CFSM CSP 已放行）。取得令牌后由 `verifyTurnstileToken` 带 `X-Turnstile-Token` 请求本端点换取凭据，再重新读取配置并让各页面重载数据。
 - 此端点不使用外部静态配置文件作为替代。
 
 ### GET /api/servers
@@ -138,7 +140,7 @@ CFSM `main` 的 `theme-develop.md` 类型定义与末尾展示约定已公开 No
 |---|---|---|
 | 400 | 参数或 theme_options 格式错误 | 展示服务端 code/message，保留用户草稿 |
 | 401 | JWT 缺失、过期或权限不足 | 清除 `jwt_token`，显示需要登录；不自动重定向 |
-| 403 | Turnstile 验证失败 | 清除 `turnstile_token` 与 `turnstile_verified`，要求重新验证 |
+| 403 | Turnstile 验证失败 | 清除 `turnstile_token` 与 `turnstile_verified` 并通知订阅方；站点开启全局 Turnstile 时，主题在遮罩中重新发起人机验证 |
 | 404 | 节点不存在 | 显示真实空/不存在状态 |
 | 409 | 数据库需要升级 | 显示 `databaseUpgradeRequired` 引导 |
 | 500–599（非 503） | 服务端请求失败 | 归类为 `server-error`，明示真实 HTTP 状态并保留最后一份真实快照，不生成替代数据 |

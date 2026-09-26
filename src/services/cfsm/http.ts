@@ -41,14 +41,32 @@ function requestHeaders(options: CfsmRequestOptions): Headers {
     if (token) headers.set('Authorization', 'Bearer ' + token)
   }
 
+  /*
+   * 与 CFSM 默认前端 `createHeaders` 一致：两者都有就都带。CFSM 先校验 Verified，失效时再校验 Token；
+   * 只带其一时，残留的过期凭据会挡住刚拿到的新令牌。
+   */
   if (options.includeTurnstile !== false) {
     const verified = readStorage(STORAGE_KEYS.turnstileVerified, options.storage)
     const token = readStorage(STORAGE_KEYS.turnstileToken, options.storage)
     if (verified) headers.set('X-Turnstile-Verified', verified)
-    else if (token) headers.set('X-Turnstile-Token', token)
+    if (token) headers.set('X-Turnstile-Token', token)
   }
 
   return headers
+}
+
+type TurnstileRejectionListener = () => void
+const turnstileRejectionListeners = new Set<TurnstileRejectionListener>()
+
+/**
+ * CFSM 开启全局 Turnstile 后，凭据缺失或过期的 API 请求返回 403。
+ * 请求层清除失效凭据后通知订阅方，由上层决定是否重新发起人机验证；返回取消订阅函数。
+ */
+export function onTurnstileRejected(listener: TurnstileRejectionListener): () => void {
+  turnstileRejectionListeners.add(listener)
+  return () => {
+    turnstileRejectionListeners.delete(listener)
+  }
 }
 
 async function responseBody(response: Response): Promise<unknown> {
@@ -124,6 +142,7 @@ export async function cfsmRequest(
   if (response.status === 403) {
     writeStorage(STORAGE_KEYS.turnstileToken, null, options.storage)
     writeStorage(STORAGE_KEYS.turnstileVerified, null, options.storage)
+    for (const listener of turnstileRejectionListeners) listener()
   }
 
   if (!response.ok) {

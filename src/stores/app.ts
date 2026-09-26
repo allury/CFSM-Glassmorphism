@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { SiteConfig } from '@/types/cfsm'
-import { adminUrl, fetchSiteConfig, getApiBases } from '@/services/cfsm'
+import { adminUrl, fetchSiteConfig, getApiBases, onTurnstileRejected, verifyTurnstileToken } from '@/services/cfsm'
+import { turnstileChallengeSiteKey } from '@/domain/turnstile'
 
 export type LoadState = 'idle' | 'loading' | 'ready' | 'partial' | 'error'
 
@@ -21,6 +22,32 @@ export const useAppStore = defineStore('app', () => {
   const administrationUrl = computed(() => (
     primaryBase.value ? adminUrl(primaryBase.value) : null
   ))
+
+  /*
+   * 全局 Turnstile：请求中途收到 403 时由请求层通知；验证成功后递增 credentialRevision，
+   * 各页面据此重新加载自己的数据（加载逻辑仍留在各页面）。
+   */
+  const turnstileRejected = ref(false)
+  const credentialRevision = ref(0)
+  const turnstileSiteKey = computed(() => turnstileChallengeSiteKey(config.value, turnstileRejected.value))
+  onTurnstileRejected(() => {
+    turnstileRejected.value = true
+  })
+
+  /**
+   * 用组件给出的一次性令牌换取凭据；CFSM 确认后通知各页面重载数据并重新读取配置。
+   * 先递增 credentialRevision：页面的重载与配置回读并行，遮罩在数据回来前不会退出。
+   */
+  async function completeTurnstile(token: string): Promise<boolean> {
+    const base = primaryBase.value
+    if (!base) return false
+    const verified = (await verifyTurnstileToken(base, token)).verified
+    if (!verified) return false
+    turnstileRejected.value = false
+    credentialRevision.value += 1
+    await initialize()
+    return config.value?.verified === true
+  }
 
   async function performInitialize(expectedRevision: number): Promise<void> {
     state.value = 'loading'
@@ -75,7 +102,10 @@ export const useAppStore = defineStore('app', () => {
     error,
     primaryBase,
     administrationUrl,
+    turnstileSiteKey,
+    credentialRevision,
     initialize,
     applyConfig,
+    completeTurnstile,
   }
 })

@@ -14,6 +14,9 @@ vi.mock('@/services/cfsm', () => ({
   getApiBases: () => ['https://monitor.example'],
   fetchSiteConfig: services.config,
   fetchAllServerSources: services.servers,
+  // app store 订阅 Turnstile 403 通知（issue #3）；本测试不涉及验证流程。
+  onTurnstileRejected: () => () => {},
+  verifyTurnstileToken: vi.fn(),
 }))
 
 describe('bootstrap request ownership', () => {

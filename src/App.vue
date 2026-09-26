@@ -3,6 +3,7 @@ import { computed, provide, readonly, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import DynamicBackground from '@/components/dashboard/DynamicBackground.vue'
 import LoadingCover from '@/components/dashboard/LoadingCover.vue'
+import TurnstileChallenge from '@/components/dashboard/TurnstileChallenge.vue'
 import AppToaster from '@/components/ui/AppToaster.vue'
 import { bootstrapKey, coldStartSettled, startBootstrapRequests, type EntryPage } from '@/domain/bootstrap'
 import { captureInjectedSiteTitle, injectedSiteTitleKey, type InjectedSiteTitle } from '@/domain/site-title'
@@ -56,8 +57,13 @@ const currentPage = computed<EntryPage | null>(() => {
   if (route.name === 'theme-settings') return 'theme-settings'
   return null
 })
-watch([currentPage, () => app.state, () => servers.state, entryDetailState], () => {
-  if (coverVisible.value && coldStartSettled(currentPage.value, app.state, servers.state, entryDetailState.value)) {
+// 需要人机验证时遮罩不退出：数据请求此时都是 403，验证通过、页面重载数据后再按原条件退出。
+watch([currentPage, () => app.state, () => servers.state, entryDetailState, () => app.turnstileSiteKey], () => {
+  if (
+    coverVisible.value
+    && app.turnstileSiteKey === null
+    && coldStartSettled(currentPage.value, app.state, servers.state, entryDetailState.value)
+  ) {
     coverVisible.value = false
   }
 }, { immediate: true, flush: 'sync' })
@@ -81,7 +87,10 @@ watch(() => app.state, (state) => {
     leave-from-class="loading-cover-leave-from"
     leave-to-class="loading-cover-leave-to"
   >
-    <LoadingCover v-if="coverVisible" />
+    <!-- 浏览中途凭据过期（403）时同样用遮罩承载人机验证。 -->
+    <LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null">
+      <TurnstileChallenge v-if="app.turnstileSiteKey !== null" :key="app.turnstileSiteKey" :site-key="app.turnstileSiteKey" />
+    </LoadingCover>
   </Transition>
   <RouterView />
   <AppToaster />

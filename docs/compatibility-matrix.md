@@ -157,7 +157,7 @@ CFSM 仍只按可靠 `region` 做地球定位，后台仍外链 `/admin#admin`�
 | 主题设置跨设备保存 | Komari 管理配置 | `POST /api/theme_options` | JWT + Turnstile，提交完整快照 | 🟢 等价实现 |
 | 本地覆盖 | localStorage 设置 | 本地层 | 与后端层分离并可清除 | ✅ 一致 |
 | JWT 鉴权 | Komari session | Authorization Bearer jwt_token | 沿用 CFSM 官方存储键和失效规则 | ✅ 一致 |
-| Turnstile | Komari 无同构流程 | config + Token/Verified headers | 按 CFSM 验证凭证复用流程实现 | 🟢 等价实现 |
+| Turnstile | Komari 无同构流程 | config + Token/Verified headers + Cloudflare 官方组件 | 按 CFSM 默认前端流程：开启全局 Turnstile 且未验证时在加载遮罩中渲染官方组件取得令牌，经 `/api/config` 换取约 1 小时的凭据；凭据过期导致 403 时重新验证。issue #3 修复前主题只复用已有凭据、从不渲染组件，访客没有凭据时所有数据请求被拒绝 | 🟢 等价实现 |
 | Komari RPC transport | `/rpc2` common/public/admin namespace | CFSM 无兼容 RPC | 完全移除，不移植 runtime | 🔴 CFSM API 暂不支持 |
 | 隐藏节点与权限过滤 | Komari 权限过滤 | `/api/servers` 服务端按身份过滤 | 信任服务端边界，不探测隐藏节点 | ✅ 一致 |
 | 缓存与延迟加载 | service cache、worker、deferred UI | 浏览器缓存与 store | 按 CFSM 请求语义重建缓存 | 🟢 等价实现 |

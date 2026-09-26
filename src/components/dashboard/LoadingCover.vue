@@ -18,6 +18,8 @@ const hasCustomBackground = computed(() => {
     <div class="loading-cover__indicator" :class="{ 'loading-cover__indicator--custom': hasCustomBackground }">
       <span class="loading-cover__spinner" :class="{ 'loading-cover__spinner--custom': hasCustomBackground }" />
       <span v-if="!hasCustomBackground" class="loading-cover__text">Loading...</span>
+      <!-- CFSM 全局 Turnstile 的人机验证（App.vue 按需放入）；上游没有这一项。 -->
+      <slot />
     </div>
   </div>
 </template>

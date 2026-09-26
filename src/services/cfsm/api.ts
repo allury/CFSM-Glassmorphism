@@ -14,7 +14,7 @@ import {
   normalizeSiteConfig,
   normalizeThemeOptionsSave,
 } from './adapters'
-import { apiSource, getApiBases } from './config'
+import { apiSource, getApiBases, STORAGE_KEYS, writeStorage } from './config'
 import { CfsmRequestError, cfsmGet, cfsmPost, type CfsmRequestOptions } from './http'
 import { normalizeServerId } from './identifiers'
 
@@ -45,7 +45,34 @@ export async function fetchSiteConfig(
   options: SharedRequestOptions = {},
 ): Promise<SiteConfig> {
   if (!base) throw new Error('No CFSM API base is configured')
-  const payload = await cfsmGet('/api/config', { ...options, base })
+  try {
+    const payload = await cfsmGet('/api/config', { ...options, base })
+    return normalizeSiteConfig(payload)
+  } catch (error) {
+    /*
+     * 与 CFSM 默认前端的 `fetchAllTurnstileConfigs` 一致：本地已存的 Turnstile 凭据过期时，
+     * 带着它请求 `/api/config` 会得到 403（请求层已清除失效凭据）。此时不带验证头再取一次公开配置，
+     * 据其中的 `turnstile_enabled` / `verified` 决定是否重新验证。
+     */
+    if (error instanceof CfsmRequestError && error.status === 403 && options.includeTurnstile !== false) {
+      const payload = await cfsmGet('/api/config', { ...options, base, includeTurnstile: false })
+      return normalizeSiteConfig(payload)
+    }
+    throw error
+  }
+}
+
+/**
+ * 用 Turnstile 组件返回的一次性令牌换取 CFSM 签发的验证凭据（有效期由 CFSM 决定，当前为 1 小时）。
+ * 请求层会把响应里的 `turnstile_verified` 存起来并清除令牌；返回的配置 `verified` 表示服务端是否确认通过。
+ */
+export async function verifyTurnstileToken(
+  base: string,
+  token: string,
+  options: SharedRequestOptions = {},
+): Promise<SiteConfig> {
+  writeStorage(STORAGE_KEYS.turnstileToken, token, options.storage)
+  const payload = await cfsmGet('/api/config', { ...options, base, includeAuth: false })
   return normalizeSiteConfig(payload)
 }
 

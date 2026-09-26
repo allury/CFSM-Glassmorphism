@@ -411,6 +411,13 @@ async function refresh(): Promise<void> {
   await detail.refresh()
 }
 
+// 通过 Turnstile 人机验证后重新拉取数据：节点若因 403 从未载入就重新打开，否则按原有刷新路径更新；
+// 顶部节点选择器依赖的列表同样被拒绝过，为空时按挂载时的规则补取。
+watch(() => app.credentialRevision, () => {
+  if (serverStore.collections.length === 0) void serverStore.load()
+  void (server.value ? refresh() : loadCurrent())
+})
+
 onMounted(async () => {
   const initialPage = bootstrap?.claimInitialPage() ?? false
   // initialize() 会在第一次 await 之前同步解析 apiBases；不要在这里等待配置响应，
