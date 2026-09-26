@@ -122,4 +122,18 @@ describe('one-shot cold-start cover', () => {
     expect(loading).toContain('loading-cover__spinner')
     expect(loading).toContain('Loading...')
   })
+
+  it('uses the dialog overlay only when a mid-session re-verification covers a loaded page', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const midSession = await renderToString(createSSRApp({
+      render: () => h(LoadingCover, { challenge: true, modal: true }),
+    }).use(pinia))
+    expect(midSession).toContain('loading-cover--modal')
+
+    const coldStart = await renderToString(createSSRApp({
+      render: () => h(LoadingCover, { challenge: true }),
+    }).use(pinia))
+    expect(coldStart).not.toContain('loading-cover--modal')
+  })
 })

@@ -101,16 +101,19 @@ describe('Turnstile 官方组件', () => {
     const api: TurnstileApi = { render: (_container, renderOptions) => { options = renderOptions } }
     const container = {} as unknown as HTMLElement
 
-    const token = requestTurnstileToken(api, container, 'site-key')
+    const token = requestTurnstileToken(api, container, 'site-key', 'dark')
     expect(options?.sitekey).toBe('site-key')
+    // 配色跟随主题解析出的明暗，站点强制深色而系统是浅色时组件也是深色。
+    expect(options?.theme).toBe('dark')
     options?.callback('token-value')
     await expect(token).resolves.toBe('token-value')
 
-    const failed = requestTurnstileToken(api, container, 'site-key')
+    const failed = requestTurnstileToken(api, container, 'site-key', 'light')
+    expect(options?.theme).toBe('light')
     options?.['error-callback']()
     await expect(failed).rejects.toThrow('challenge failed')
 
-    const expired = requestTurnstileToken(api, container, 'site-key')
+    const expired = requestTurnstileToken(api, container, 'site-key', 'light')
     options?.['expired-callback']()
     await expect(expired).rejects.toThrow('expired')
   })
@@ -176,11 +179,41 @@ describe('页面接线', () => {
   const appView = readFileSync(new URL('../src/App.vue', import.meta.url), 'utf8')
   const homeView = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8')
   const detailView = readFileSync(new URL('../src/views/ServerDetailView.vue', import.meta.url), 'utf8')
+  const challengeView = readFileSync(new URL('../src/components/dashboard/TurnstileChallenge.vue', import.meta.url), 'utf8')
+  const css = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+  const rule = (selector: string): string => {
+    const start = css.indexOf(`${selector} {`)
+    expect(start, selector).toBeGreaterThanOrEqual(0)
+    return css.slice(start, css.indexOf('}', start))
+  }
 
   it('需要验证时遮罩不退出，并在遮罩里渲染验证组件', () => {
     expect(appView).toContain('app.turnstileSiteKey === null')
-    expect(appView).toContain('<LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null">')
+    expect(appView).toContain('<LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null" :modal="!coverVisible">')
     expect(appView).toContain(':site-key="app.turnstileSiteKey"')
+    expect(challengeView).toContain('requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme)')
+  })
+
+  it('浏览中途重新验证时换用 AppDialog 的遮罩，验证内容放在弹窗面板里', () => {
+    const overlay = rule('.app-dialog__overlay')
+    const modal = rule(".loading-cover.loading-cover--modal,\n:root:not([data-theme='dark']) .loading-cover.loading-cover--modal")
+    for (const declaration of ['background: oklab(0 0 0 / 45%);', 'backdrop-filter: blur(2px);']) {
+      expect(overlay).toContain(declaration)
+      expect(modal).toContain(declaration)
+    }
+    // 同等优先级下后写的生效：必须排在自定义背景变体之后。
+    expect(css.indexOf('.loading-cover.loading-cover--modal')).toBeGreaterThan(
+      css.indexOf(":root:not([data-theme='dark']) .loading-cover.loading-cover--custom-background"),
+    )
+
+    const panel = rule('.turnstile-challenge')
+    for (const token of ['var(--dialog-surface)', 'var(--dialog-border)', 'var(--radius)', 'var(--ink)']) {
+      expect(panel).toContain(token)
+    }
+    const widget = rule('.turnstile-challenge__widget')
+    expect(widget).toContain('min-width: 300px;')
+    expect(widget).toContain('min-height: 65px;')
+    expect(css).toContain('.turnstile-challenge--failed .turnstile-challenge__widget:empty {')
   })
 
   it('验证通过后首页与详情页重新拉取数据', () => {

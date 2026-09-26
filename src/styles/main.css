@@ -309,6 +309,17 @@ a {
   background-color: rgb(15 23 42 / 10%);
 }
 
+/*
+ * CFSM 全局 Turnstile（上游没有）：浏览中途凭据过期时，验证遮罩盖在已加载的页面上，
+ * 换用与 AppDialog 相同的遮罩（上游 Dialog overlay），让背后的卡片退后。必须写在上面的变体之后才能覆盖它们。
+ */
+.loading-cover.loading-cover--modal,
+:root:not([data-theme='dark']) .loading-cover.loading-cover--modal {
+  background: oklab(0 0 0 / 45%);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
 .loading-cover__indicator {
   display: flex;
   flex-direction: column;
@@ -352,12 +363,23 @@ a {
   color: oklch(0.86 0.012 286.067);
 }
 
-/* CFSM 全局 Turnstile 的人机验证（上游没有）：验证期间替换遮罩里的转圈与 Loading 文字，沿用指示器的文字色。 */
+/*
+ * CFSM 全局 Turnstile 的人机验证（上游没有）：验证期间替换遮罩里的转圈与 Loading 文字，
+ * 放在与 AppDialog 相同的面板里，冷启动和浏览中途都不受背后内容与自定义背景影响。
+ */
 .turnstile-challenge {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  padding: 14px 12px 12px;
+  border: 1px solid var(--dialog-border);
+  border-radius: var(--radius);
+  color: var(--ink);
+  background: var(--dialog-surface);
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 25%);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 .turnstile-challenge__text {
@@ -365,7 +387,17 @@ a {
   line-height: 20px;
 }
 
-.turnstile-challenge__widget:empty {
+/*
+ * 预留官方组件（normal 尺寸 300×65）的位置，脚本加载和组件出现时面板不跳动；
+ * line-height 归零去掉行内 iframe 下方的基线空隙。只有失败且容器仍为空（脚本没加载成功）时才收起。
+ */
+.turnstile-challenge__widget {
+  min-width: 300px;
+  min-height: 65px;
+  line-height: 0;
+}
+
+.turnstile-challenge--failed .turnstile-challenge__widget:empty {
   display: none;
 }
 

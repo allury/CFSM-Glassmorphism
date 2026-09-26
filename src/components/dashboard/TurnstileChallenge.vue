@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { loadTurnstileScript, requestTurnstileToken } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
+import { useThemeSettingsStore } from '@/stores/theme-settings'
 
 /**
  * CFSM 全局 Turnstile 的人机验证，显示在全屏加载遮罩里。流程与 CFSM 默认前端
@@ -11,6 +12,7 @@ import { useAppStore } from '@/stores/app'
  */
 const props = defineProps<{ siteKey: string }>()
 const app = useAppStore()
+const theme = useThemeSettingsStore()
 const container = ref<HTMLElement | null>(null)
 const status = ref<'loading' | 'pending' | 'verifying' | 'failed'>('loading')
 
@@ -29,7 +31,7 @@ async function start(): Promise<void> {
   try {
     const api = await loadTurnstileScript()
     status.value = 'pending'
-    const token = await requestTurnstileToken(api, target, props.siteKey)
+    const token = await requestTurnstileToken(api, target, props.siteKey, theme.resolvedTheme)
     status.value = 'verifying'
     if (!(await app.completeTurnstile(token))) status.value = 'failed'
   } catch {
@@ -43,7 +45,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="turnstile-challenge" role="status" aria-live="polite">
+  <div class="turnstile-challenge" :class="`turnstile-challenge--${status}`" role="status" aria-live="polite">
     <span class="turnstile-challenge__text">{{ statusText }}</span>
     <div ref="container" class="turnstile-challenge__widget" />
     <button v-if="status === 'failed'" type="button" class="turnstile-challenge__retry" @click="start">

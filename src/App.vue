@@ -88,7 +88,7 @@ watch(() => app.state, (state) => {
     leave-to-class="loading-cover-leave-to"
   >
     <!-- 浏览中途凭据过期（403）时同样用遮罩承载人机验证。 -->
-    <LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null">
+    <LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null" :modal="!coverVisible">
       <TurnstileChallenge v-if="app.turnstileSiteKey !== null" :key="app.turnstileSiteKey" :site-key="app.turnstileSiteKey" />
     </LoadingCover>
   </Transition>

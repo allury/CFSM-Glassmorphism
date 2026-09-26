@@ -6,8 +6,12 @@
  */
 export const TURNSTILE_SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js'
 
+/** 组件配色跟随主题解析出的明暗（含 beijing 模式），不交给 Turnstile 按系统设置自行判断。 */
+export type TurnstileTheme = 'light' | 'dark'
+
 export interface TurnstileRenderOptions {
   sitekey: string
+  theme: TurnstileTheme
   callback: (token: string) => void
   'error-callback': () => void
   'expired-callback': () => void
@@ -54,10 +58,16 @@ export function loadTurnstileScript(doc: Document = document): Promise<Turnstile
 }
 
 /** 渲染官方组件，完成验证后得到一次性令牌；出错或令牌过期时拒绝。 */
-export function requestTurnstileToken(api: TurnstileApi, container: HTMLElement, siteKey: string): Promise<string> {
+export function requestTurnstileToken(
+  api: TurnstileApi,
+  container: HTMLElement,
+  siteKey: string,
+  theme: TurnstileTheme,
+): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     api.render(container, {
       sitekey: siteKey,
+      theme,
       callback: (token) => {
         if (token) resolve(token)
         else reject(new Error('Turnstile returned an empty token'))
