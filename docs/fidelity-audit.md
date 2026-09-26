@@ -77,6 +77,7 @@
 | 36 | 流量关闭或已用量缺失 | 上游没有 `show_tf` 开关；有上限但计数缺失时按 0 显示 `0.0%` 与 `0 B / 上限` | 两种情况都显示 `∞`，等于宣称不限流量，且丢掉了已知的上限 | 不一致 | **是**（第 10 条：站点隐藏的数据不呈现；未知不写成 0） | v1.1.15 关闭时显示 `-` 与 `- / -`；有上限但计数缺失时显示 `-` 与 `- / 上限`；节点卡与列表同一口径 | P2 | NECESSARY-CFSM-DIFFERENCE |
 | 37 | 无到期日付费节点的剩余信息 | 两行：`-` 与剩余价值；未知到期的剩余价值算成 0，显示「€0」 | v1.1.14 只画一行 `—` | 结构不一致 | **是**（第 10 条：未知剩余价值不写成 0） | v1.1.15 恢复两行结构：日历 `-`、硬币 `-` | P2 | NECESSARY-CFSM-DIFFERENCE |
 | 38 | Footer 样式 | `Footer.vue`：`p-4`，`text-xs`（12px / 16px）、`text-muted-foreground`，链接 `font-medium text-foreground`，悬停降低不透明度 | `.app-footer` 为 9px、`--faint` 色、`18px 2px 24px` 内边距，链接 680 字重、悬停变绿。9px 来自 2026-09-07 的早期改版，对照上游的 `3bb1501` 没有改动它 | 不一致 | 否（文字内容仍按矩阵 23 保留 CFSM 归因） | 按上游计算样式对齐：12px / 16px、`--muted`（即上游 `--muted-foreground`）、链接 500 字重的 `--ink`、`p-4` 与 `gap-4`、悬停不透明度 0.8，并删除三条移动端规则。唯一适配：CFSM 归因带版本号，比上游文字长，所以外层允许换行。手机宽度下右段整体移到下一行并左对齐，不在「Powered by」等词组中间折行；宽屏与上游完全一致。回归测试：`tests/footer-fidelity.test.ts` | P2 | PASS |
+| 39 | CFSM Turnstile 人机验证 | 上游没有人机验证流程。`LoadingCover.vue` 只显示加载动画与 Loading 文字；弹窗使用 AppDialog 的遮罩与面板 | v1.1.15 从不显示验证组件，开启全局 Turnstile 时所有数据请求被 CFSM 以 403 拒绝，页面无法加载 | 上游无对应功能 | **是**（第 6 条：CFSM JWT / Turnstile） | v1.1.16 在加载遮罩中渲染 Cloudflare 官方组件：<br>• 验证期间隐藏加载动画与文字，冷启动的遮罩保持上游样式<br>• 验证内容放在使用 AppDialog 面板 token 的面板中：`--dialog-surface`、`--dialog-border`、`--radius`、阴影与 24px 模糊<br>• 浏览中途重新验证时，遮罩改用 `.app-dialog__overlay` 的原值：`oklab(0 0 0 / 45%)` 与 `blur(2px)`<br>回归测试：`tests/turnstile.test.ts`、`tests/loading-cover.test.ts` | P2 | NECESSARY-CFSM-DIFFERENCE |
 
 ## 第 13 轮：详情页专项审计
 
@@ -224,6 +225,16 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 - 矩阵 36：CFSM 的 `show_tf` 关闭时，CFSM 默认皮肤整行隐藏流量；本主题保留上游的卡片结构但不呈现任何数值。有上限但月度计数缺失时保留上限、已用量为 `-`。两种情况都不再显示「∞」。
 - 矩阵 37：无到期日的付费节点，第三个信息盒按上游保留两行；第二行是硬币图标加 `-`，不照搬上游把未知剩余价值算成 0 的「€0」。
 
+## v1.1.16：CFSM Turnstile 人机验证
+
+矩阵 39：Turnstile 属于允许的第 6 类差异，上游没有对应界面。实现只复用已移植的上游样式，不引入新的视觉语言：
+
+- 冷启动沿用上游加载遮罩，验证组件替换其中的加载动画与文字。
+- 面板与浏览中途重新验证时的遮罩，直接使用主题中已移植的 AppDialog 样式值。
+- 验证组件由 Cloudflare 渲染。主题只传入当前解析出的明暗模式，并在移除前调用 `turnstile.remove()`。
+
+未开启 Turnstile 的站点，加载遮罩与 v1.1.15 完全相同。验证记录见 `docs/v1.1.16-verification.md`。
+
 ## 保留的 P2
 
 ## 保留的 P2
@@ -235,7 +246,7 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 ## 当前终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 3。**
-38 项审计的终态分布：PASS 29、NECESSARY-CFSM-DIFFERENCE 6、P2-ACCEPTED 3。
+39 项审计的终态分布：PASS 29、NECESSARY-CFSM-DIFFERENCE 7、P2-ACCEPTED 3。
 
 ## 数据真实性边界（不因保真而放宽）
 

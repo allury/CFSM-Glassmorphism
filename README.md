@@ -2,7 +2,7 @@
 
 面向 [CF-Server-Monitor](https://github.com/huilang-me/CF-Server-Monitor) 的第三方毛玻璃风格主题，基于 [Komari Glassmorphism](https://github.com/sanrokamlan-prog/komari-theme-Glassmorphism) 移植，使用 Vue 3 + TypeScript + Vite 构建。
 
-当前稳定版本 **v1.1.15**。
+当前稳定版本 **v1.1.16**。
 
 ## 预览
 
@@ -65,14 +65,14 @@
 在 CFSM 管理端打开 **主题商店 → 自定义主题 URL**，推荐填入稳定版的不可变标签地址，再点「应用自定义」：
 
 ```text
-https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.15
+https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.16
 ```
 
-- `theme-v1.1.15` 指向该版本已验证的构建产物，内容不随分支更新，适合稳定安装。
+- `theme-v1.1.16` 指向该版本已验证的构建产物，内容不随分支更新，适合稳定安装。
 - CFSM 根据主题地址从 GitHub 拉取 `index.html` 和 `assets/`，并按地址、引用和文件分别缓存：分支或标签引用约 **1 小时**，完整的 40 位提交 SHA 约 **1 天**。重新点击「应用自定义」**不会清除这些缓存**。
 - `theme-dist` 是滚动稳定版分支。发布后其分支地址在最长约 1 小时内可能取到新旧混用的文件，导致页面空白；等待缓存到期，或改用上方的不可变标签地址。不要依赖重新应用来刷新缓存。
 
-也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.15.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
+也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.16.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
 如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.14` 再应用；切换到不同的标签地址会使用不同的缓存键。
 
