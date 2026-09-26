@@ -352,13 +352,12 @@ a {
   color: oklch(0.86 0.012 286.067);
 }
 
-/* CFSM 全局 Turnstile 的人机验证（上游没有）：放在遮罩指示器下方，沿用指示器的文字色。 */
+/* CFSM 全局 Turnstile 的人机验证（上游没有）：验证期间替换遮罩里的转圈与 Loading 文字，沿用指示器的文字色。 */
 .turnstile-challenge {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  margin-top: 8px;
 }
 
 .turnstile-challenge__text {

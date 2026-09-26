@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { createSSRApp } from 'vue'
+import { createSSRApp, h } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -106,5 +106,20 @@ describe('one-shot cold-start cover', () => {
     const html = await renderToString(createSSRApp(LoadingCover).use(pinia))
     expect(html).not.toContain('loading-cover--custom-background')
     expect(html).toContain('Loading...')
+  })
+
+  it('shows only the Turnstile challenge, without spinner or Loading text, while it occupies the cover', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const challenge = await renderToString(createSSRApp({
+      render: () => h(LoadingCover, { challenge: true }, () => h('div', { class: 'turnstile-challenge' })),
+    }).use(pinia))
+    expect(challenge).toContain('class="turnstile-challenge"')
+    expect(challenge).not.toContain('loading-cover__spinner')
+    expect(challenge).not.toContain('Loading...')
+
+    const loading = await renderToString(createSSRApp(LoadingCover).use(pinia))
+    expect(loading).toContain('loading-cover__spinner')
+    expect(loading).toContain('Loading...')
   })
 })

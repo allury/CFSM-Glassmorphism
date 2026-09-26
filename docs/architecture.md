@@ -40,7 +40,7 @@ UI (render and user intent only)
 - 从 CFSM 兼容存储键附加 JWT 与 Turnstile header；Verified 与 Token 都有时都带，与 CFSM 默认前端一致。
 - 把非 2xx 统一转换为带 status、path、code、details 的 `CfsmRequestError`。
 - 401 清 JWT，403 清 Turnstile 并经 `onTurnstileRejected` 通知订阅方；不自动导航，不吞掉 409/503。
-- Turnstile 人机验证（issue #3）：app store 按配置判断是否需要验证。`App.vue` 在加载遮罩中渲染 `TurnstileChallenge`，冷启动与中途凭据过期共用这条路径。组件只加载官方脚本、渲染组件，令牌交给 store 换取凭据。成功后 store 递增 `credentialRevision`，首页与详情页各自按原有加载路径重取数据，不整页刷新。
+- Turnstile 人机验证（issue #3）：app store 按配置判断是否需要验证。`App.vue` 在加载遮罩中渲染 `TurnstileChallenge`，验证期间遮罩隐藏转圈与 Loading 文字、只显示验证组件，冷启动与中途凭据过期共用这条路径。组件只加载官方脚本、渲染组件，令牌交给 store 换取凭据。成功后 store 递增 `credentialRevision`，首页与详情页各自按原有加载路径重取数据，不整页刷新。
 - 不了解服务器、历史或主题设置的领域含义。
 
 ### Service

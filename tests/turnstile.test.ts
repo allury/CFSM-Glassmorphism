@@ -179,7 +179,7 @@ describe('页面接线', () => {
 
   it('需要验证时遮罩不退出，并在遮罩里渲染验证组件', () => {
     expect(appView).toContain('app.turnstileSiteKey === null')
-    expect(appView).toContain('<LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null">')
+    expect(appView).toContain('<LoadingCover v-if="coverVisible || app.turnstileSiteKey !== null" :challenge="app.turnstileSiteKey !== null">')
     expect(appView).toContain(':site-key="app.turnstileSiteKey"')
   })
 
