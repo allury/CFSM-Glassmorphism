@@ -245,7 +245,10 @@ describe('页面接线', () => {
   })
 
   it('验证通过后首页与详情页重新拉取数据', () => {
-    expect(homeView).toContain('watch(() => app.credentialRevision')
+    // 首页必须走手动刷新的同一路径（REST + realtime.sync()）：验证前列表为空，
+    // 只拉 REST 不同步的话实时连接一直不会建立。
+    expect(homeView.replace(/\r\n/g, '\n')).toMatch(/watch\(\(\) => app\.credentialRevision, \(\) => \{\n\s+void refresh\(\)\n\}\)/)
+    expect(homeView.replace(/\r\n/g, '\n')).toMatch(/async function refresh\(\): Promise<void> \{\n\s+await refreshRest\(\)\n\s+realtime\.sync\(\)/)
     expect(detailView).toContain('watch(() => app.credentialRevision')
     expect(detailView).toContain('server.value ? refresh() : loadCurrent()')
     expect(detailView).toContain('if (serverStore.collections.length === 0) void serverStore.load()')

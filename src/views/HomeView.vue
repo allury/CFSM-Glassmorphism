@@ -210,8 +210,9 @@ async function refreshRest(): Promise<void> {
 }
 
 // 通过 Turnstile 人机验证后重新拉取数据：此前的请求都因缺少凭据被 CFSM 以 403 拒绝。
+// 与手动刷新一样，拉取后让实时连接按新的节点列表同步；验证前列表为空，不同步的话 WebSocket 不会建立。
 watch(() => app.credentialRevision, () => {
-  void refreshRest()
+  void refresh()
 })
 
 async function refresh(): Promise<void> {
