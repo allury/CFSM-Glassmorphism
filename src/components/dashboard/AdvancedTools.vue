@@ -154,7 +154,7 @@ function exportSnapshot(format: 'json' | 'csv'): void {
       <div>
         <span class="snapshot-panel__icon" aria-hidden="true">↓</span>
         <h3>导出当前数据快照</h3>
-        <p>JSON 保留 normalized 字段与 Ping/Loss 三态；CSV 提供常用指标。内容来自当前 REST/WS 状态，不请求隐藏节点或管理数据。</p>
+        <p>JSON 保留全部字段，延迟与丢包区分数值、超时与未配置；CSV 提供常用指标。内容取自页面已加载的数据，不会额外读取隐藏节点或管理数据。</p>
       </div>
       <label v-if="settings.exportSecondaryPassword" class="snapshot-password">
         <span>二级确认密码</span>

@@ -265,7 +265,7 @@ function retry(): void {
       <div v-if="pingHistoryState === 'error'" class="detail-chart-error" role="alert">
         <strong>{{ errorCopy.title }}</strong>
         <p>{{ errorCopy.body }}</p>
-        <small v-if="pingHistoryIssue?.status">HTTP {{ pingHistoryIssue.status }} · {{ pingHistoryIssue.message }}</small>
+        <small v-if="pingHistoryIssue?.status">HTTP {{ pingHistoryIssue.status }}</small>
         <button type="button" @click="retry">
           重试
         </button>

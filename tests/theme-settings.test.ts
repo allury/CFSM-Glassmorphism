@@ -355,7 +355,7 @@ describe('theme settings store', () => {
     store.draft.alertTitle = 'Second'
     const second = await store.saveBackend('https://status.example', { storage, fetcher })
     expect(second.saved).toBe(false)
-    expect(store.saveError?.message).toContain('上一次保存尚未完成')
+    expect(store.saveError?.message).toContain('上一次保存还没完成')
     releaseWrite?.()
     expect((await first).saved).toBe(true)
     expect(writes).toHaveLength(1)

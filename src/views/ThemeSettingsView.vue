@@ -63,21 +63,23 @@ const backendLabel = computed(() => {
 const backendSaveCopy = computed(() => {
   const failure = theme.saveError
   if (!failure) return null
+  // 保存失败时修改一律保留在页面上，每条都说清这一点；状态码与错误码放在提示的副标题里。
+  if (failure.code === 'saveInProgress') return failure.message
   if (failure.kind === 'invalid-format') {
-    return failure.code === 'invalidThemeOptionsFormat'
-      ? 'CFSM 拒绝了 theme_options 格式。草稿已保留，请修正后重试。'
-      : `CFSM 拒绝了当前配置：${failure.message}`
+    return 'CFSM 未接受这份设置，没有保存。修改仍保留在页面上，请检查后重试。'
   }
   if (failure.kind === 'unauthorized') {
-    return 'JWT 无效或已过期。凭证已清除，请先在 CFSM 官方管理端重新登录；当前草稿未丢失。'
+    return '需要登录 CFSM 管理后台才能保存到站点。修改仍保留在页面上，登录后再试。'
   }
   if (failure.kind === 'forbidden') {
-    return 'Turnstile 验证失败。一次性与复用凭证已清除，请完成 CFSM 验证后重试；当前草稿未丢失。'
+    return '人机验证已失效，请完成验证后再保存。修改仍保留在页面上。'
   }
   if (failure.kind === 'network') {
-    return '网络请求未完成。当前草稿仍保留在页面中，可以稍后重试。'
+    return failure.code === 'timeout'
+      ? 'CFSM 长时间没有响应，设置没有保存。修改仍保留在页面上，可以稍后重试。'
+      : '网络连接失败，设置没有保存。修改仍保留在页面上，可以稍后重试。'
   }
-  return failure.message
+  return '保存没有成功。修改仍保留在页面上，可以稍后重试。'
 })
 const snapshotJson = computed(() => JSON.stringify(theme.draftSnapshot, null, 2))
 
@@ -104,8 +106,8 @@ function issueFor(key: keyof ThemeSettings): string | null {
 function fieldState(key: keyof ThemeSettings): string | null {
   if (key !== 'dataUpdateInterval') return null
   const observed = realtime.lastObservedStatus
-  if (observed === 'live') return '最近一次观察：WebSocket 正常，此项未生效。'
-  if (observed === 'fallback') return '最近一次观察：WebSocket 不可用，此项正在生效。'
+  if (observed === 'live') return '最近检测到实时连接正常，此项暂未生效。'
+  if (observed === 'fallback') return '最近检测到实时连接不可用，正在按此间隔刷新。'
   return null
 }
 
@@ -174,7 +176,7 @@ async function copySnapshot(): Promise<void> {
   try {
     if (!navigator.clipboard) throw new Error('Clipboard API is unavailable')
     await navigator.clipboard.writeText(snapshotJson.value)
-    message.info('完整规范化快照已复制。')
+    message.info('完整设置 JSON 已复制。')
   } catch {
     message.info('浏览器未允许写入剪贴板；可展开下方 JSON 手动复制。')
   } finally {
@@ -199,9 +201,6 @@ watch(backendSaveCopy, (copy) => {
   message.error(copy, detail)
 })
 
-watch(() => theme.refetchWarning, (warning) => {
-  if (warning) message.info(`配置回读错误：${warning}`)
-})
 
 onMounted(async () => {
   const initialPage = bootstrap?.claimInitialPage() ?? false
@@ -264,8 +263,8 @@ watch(siteTitle, (title) => {
         </section>
 
         <div v-if="app.state === 'error'" class="notice notice--warning" role="alert">
-          <strong>无法读取 /api/config</strong>
-          <span>{{ app.error }}。可以继续编辑并保存本地；后端保存需先恢复配置连接。</span>
+          <strong>无法读取站点配置</strong>
+          <span>可以继续编辑并保存到此浏览器；保存到站点需要先重新读取配置。</span>
           <button type="button" @click="app.initialize">
             重新读取
           </button>
@@ -368,8 +367,8 @@ watch(siteTitle, (title) => {
             <span class="eyebrow">PERSISTENCE</span>
             <h2>保存设置</h2>
             <p>
-              本地覆盖只影响当前浏览器；后端保存会提交包含 {{ THEME_SETTING_KEYS.length }} 个已知项和
-              兼容未知项的完整对象。
+              本地覆盖只影响当前浏览器；保存到后端会提交全部 {{ THEME_SETTING_KEYS.length }} 项设置，
+              并原样保留其它不认识的配置项。
             </p>
 
             <div v-if="theme.draftIssues.length" class="settings-save-alert is-error" role="alert">
@@ -389,13 +388,13 @@ watch(siteTitle, (title) => {
               :disabled="!authorized || !primaryBase || !theme.canSaveDraft"
               @click="saveBackend"
             >
-              {{ theme.saveState === 'saving' ? '正在保存并回读…' : '保存到 CFSM 后端' }}
+              {{ theme.saveState === 'saving' ? '正在保存…' : '保存到 CFSM 后端' }}
             </button>
             <p v-if="!authorized" class="settings-auth-note">
               当前未登录，后端保存已禁用。请使用 <a v-if="app.administrationUrl" :href="app.administrationUrl">CFSM 官方管理端</a><span v-else>CFSM 官方管理端</span>登录后再试。
             </p>
             <p v-else-if="app.config?.turnstileEnabled" class="settings-auth-note">
-              保存将复用当前 CFSM Turnstile Token / Verified 凭证；HTTP 403 会清除失效凭证并保留草稿。
+              站点开启了人机验证：保存时沿用当前的验证结果，验证失效时会提示重新验证，修改不会丢失。
             </p>
 
             <button class="settings-action settings-action--quiet" type="button" :disabled="copying" @click="copySnapshot">
@@ -406,7 +405,7 @@ watch(siteTitle, (title) => {
             </button>
 
             <details class="settings-json-preview">
-              <summary>查看将保存的完整快照</summary>
+              <summary>查看将保存的完整 JSON</summary>
               <pre>{{ snapshotJson }}</pre>
             </details>
           </aside>

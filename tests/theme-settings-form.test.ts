@@ -149,7 +149,7 @@ describe('设置页字段注册表与上游清单一致', () => {
    */
   it('数据更新间隔说明写明生效条件与下限，且不再声称服务端的推送批次', () => {
     const field = THEME_FORM_FIELDS.find((item) => item.key === 'dataUpdateInterval')
-    expect(field?.help).toContain('WebSocket 不可用')
+    expect(field?.help).toContain('实时连接不可用')
     expect(field?.note).toContain('5 秒')
     expect(field?.note).not.toContain('一批')
     expect(field?.note).not.toMatch(/约 ?5 ?秒/)

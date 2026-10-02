@@ -30,3 +30,17 @@ export function classifyCfsmRequestError(error: unknown): CfsmRequestIssue {
     message: error instanceof Error ? error.message : 'Unknown CFSM request error',
   }
 }
+
+/** 首页的数据源失败只保留了状态码与错误码，这里按同一规则还原分类。 */
+export function issueFromFailure(failure: {
+  status: number | null
+  code: string | null
+  message: string
+}): CfsmRequestIssue {
+  return {
+    kind: issueKind(failure.status, failure.code),
+    status: failure.status,
+    code: failure.code,
+    message: failure.message,
+  }
+}

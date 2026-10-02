@@ -348,7 +348,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     runtime.value = cloneThemeSettings(persisted.value)
     draftIssues.value = []
     previewing.value = false
-    message.value = '已放弃未保存预览。'
+    message.value = '已放弃未保存的修改。'
     saveError.value = null
   }
 
@@ -432,7 +432,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     refetchWarning.value = null
     message.value = stored
       ? '设置已保存为此浏览器的本地覆盖。'
-      : '浏览器拒绝写入存储；设置仅在当前页面会话中生效。'
+      : '浏览器不允许保存，这些设置只在当前页面有效。'
     return stored
   }
 
@@ -445,8 +445,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     saveError.value = null
     refetchWarning.value = null
     message.value = stored
-      ? '已清除本地覆盖，当前使用 CFSM 后端配置。'
-      : '当前会话已使用后端配置，但浏览器拒绝更新本地存储；重新加载后旧覆盖可能恢复。'
+      ? '已清除本地覆盖，改用 CFSM 后端配置。'
+      : '已改用后端配置，但浏览器不允许清除本地覆盖，刷新后旧设置可能恢复。'
   }
 
   async function performBackendSave(base: string, options: ThemeSaveOptions = {}): Promise<ThemeSaveOutcome> {
@@ -502,8 +502,8 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
     saveState.value = 'success'
     saveError.value = null
     message.value = localLayerStored
-      ? 'CFSM 已保存设置并返回新的 theme_options。'
-      : 'CFSM 已保存设置，但浏览器拒绝清除持久化本地覆盖；当前会话已使用后端结果。'
+      ? '设置已保存到 CFSM 后端。'
+      : '设置已保存到 CFSM 后端，但浏览器不允许清除本地覆盖，刷新后旧设置可能恢复。'
 
     try {
       const config = await fetchSiteConfig(base, {
@@ -514,15 +514,15 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
       hydrateBackend(config.themeOptions, config.preferredTheme, !draftChangedDuringSave())
       if (draftChangedDuringSave()) previewDraft()
       message.value = localLayerStored
-        ? 'CFSM 后端设置已保存并完成配置回读。'
-        : 'CFSM 后端设置已保存并完成回读，但浏览器拒绝清除持久化本地覆盖。'
+        ? '已保存到后端，所有设备与访客都会以这套设置为默认。'
+        : '已保存到后端，但浏览器不允许清除本地覆盖，刷新后此浏览器的旧设置可能恢复。'
       return { saved: true, config, refetchWarning: null }
     } catch (error) {
       const warning = error instanceof Error ? error.message : 'Unknown config re-fetch error'
       refetchWarning.value = warning
       message.value = localLayerStored
-        ? '设置已保存；但 /api/config 回读失败，当前使用保存响应中的配置。'
-        : '设置已保存；但配置回读与持久化本地覆盖清理均失败，当前会话使用保存响应。'
+        ? '设置已保存到后端，但重新读取站点配置失败，刷新页面后可以确认最新设置。'
+        : '设置已保存到后端，但重新读取配置和清除本地覆盖都没有成功，刷新页面后可以确认最新设置。'
       return { saved: true, config: null, refetchWarning: warning }
     }
   }
@@ -536,7 +536,7 @@ export const useThemeSettingsStore = defineStore('theme-settings', () => {
       previewDraft()
       saveError.value = {
         kind: 'unknown', status: null, code: 'saveInProgress',
-        message: '上一次保存尚未完成；当前草稿已保留，请等待完成后再次保存。',
+        message: '上一次保存还没完成，请稍候再保存。修改仍保留在页面上。',
       }
       return Promise.resolve({ saved: false, config: null, refetchWarning: null })
     }

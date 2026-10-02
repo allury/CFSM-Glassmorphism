@@ -191,14 +191,14 @@ function retry(): void {
       <div v-if="historyState === 'error'" class="detail-chart-error" role="alert">
         <strong>{{ errorCopy.title }}</strong>
         <p>{{ errorCopy.body }}</p>
-        <small v-if="historyIssue?.status">HTTP {{ historyIssue.status }} · {{ historyIssue.message }}</small>
+        <small v-if="historyIssue?.status">HTTP {{ historyIssue.status }}</small>
         <button type="button" @click="retry">
           重试
         </button>
       </div>
       <AppEmpty
         v-else-if="rows.length === 0 && !loading"
-        :description="liveMode ? '暂无近期样本，正在等待 WebSocket 实时数据' : '暂无负载数据'"
+        :description="liveMode ? '正在等待实时数据…' : '暂无负载数据'"
       />
 
       <div v-else class="metric-chart-grid">

@@ -498,7 +498,7 @@ onUnmounted(() => detail.close())
               <AppIcon name="lucide:octagon-x" :size="20" />
             </template>
             <template #extra>
-              <small v-if="issue?.status">HTTP {{ issue.status }} · {{ issue.message }}</small>
+              <small v-if="issue?.status">HTTP {{ issue.status }}</small>
               <div class="detail-state__actions">
                 <button type="button" class="state-panel__retry" @click="loadCurrent">
                   重新加载
@@ -599,7 +599,7 @@ onUnmounted(() => detail.close())
           </div>
 
           <div v-if="timedOut" class="notice notice--warning notice--choice" role="status">
-            <div><strong>单节点实时连接已达到站点时限</strong><span>请选择继续连接，或保留当前真实快照。</span></div>
+            <div><strong>实时连接已达到站点设定的时长</strong><span>可以继续接收实时数据，或先暂停实时更新。</span></div>
             <div class="notice__actions">
               <button type="button" @click="detail.continueAfterTimeout">
                 继续实时连接
@@ -610,16 +610,16 @@ onUnmounted(() => detail.close())
             </div>
           </div>
           <div v-else-if="paused" class="notice notice--warning notice--choice" role="status">
-            <div><strong>详情实时更新已暂停</strong><span>恢复时仍只会订阅当前节点。</span></div>
+            <div><strong>实时更新已暂停</strong><span>页面停留在暂停前的最后数据，恢复后会重新连接。</span></div>
             <div class="notice__actions">
               <button type="button" @click="detail.resume">
-                恢复
+                恢复实时连接
               </button>
             </div>
           </div>
           <div v-if="fallbackActive" class="notice notice--warning" role="status">
-            <strong>单节点 WebSocket 暂不可用</strong>
-            <span>已启用低频 /api/server REST 补偿，不会订阅其他节点。</span>
+            <strong>实时连接暂不可用</strong>
+            <span>暂时改为每 {{ theme.runtime.dataUpdateInterval }} 秒刷新一次，连接恢复后会自动切回实时更新。</span>
           </div>
           <div v-if="refreshIssue" class="notice notice--warning" role="status">
             <strong>{{ issueCopy(refreshIssue, 'detail').title }}</strong>

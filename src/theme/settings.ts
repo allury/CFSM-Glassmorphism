@@ -538,7 +538,7 @@ export function validateThemeSettingsDraft(value: ThemeSettings): ThemeDraftIssu
     issues.push({ key: 'darkBackgroundUrl', message: '暗色背景只允许 http(s)、站内 / 路径或安全的 local: 路径。' })
   }
   if (!Number.isInteger(value.dataUpdateInterval) || value.dataUpdateInterval < 5 || value.dataUpdateInterval > 60) {
-    issues.push({ key: 'dataUpdateInterval', message: 'REST 回退间隔必须是 5–60 秒的整数。' })
+    issues.push({ key: 'dataUpdateInterval', message: '数据更新间隔必须是 5–60 秒的整数。' })
   }
   if (!Number.isFinite(value.homeHighLoadThreshold) || value.homeHighLoadThreshold < 1 || value.homeHighLoadThreshold > 100) {
     issues.push({ key: 'homeHighLoadThreshold', message: '高负载阈值必须在 1–100 之间。' })

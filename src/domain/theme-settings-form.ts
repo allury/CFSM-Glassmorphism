@@ -116,8 +116,8 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         min: 5,
         max: 60,
         unit: '秒',
-        help: '只在 WebSocket 不可用时生效，是 REST 回退轮询的间隔。',
-        note: '实时数据由服务端通过 WebSocket 推送，节奏跟随站点自己的上报配置，主题改不了；本项不影响它。回退轮询每跳一次要重取站点配置与节点列表，因此下限为 5 秒。',
+        help: '只在实时连接不可用时生效：页面改为按这个间隔定时刷新数据。',
+        note: '实时数据由 CFSM 主动推送，频率取决于站点自己的上报设置，主题无法修改，本项也不影响它。每次定时刷新都要重新读取站点配置与节点列表，因此最短 5 秒。',
       },
       {
         key: 'defaultViewMode',
@@ -339,7 +339,7 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         key: 'offlineNodesLast',
         label: '离线节点置底',
         kind: 'switch',
-        help: '筛选或排序时优先显示在线节点，沿用统一的五分钟在线判定。',
+        help: '筛选或排序时把离线节点排在最后。超过 5 分钟没有上报的节点视为离线。',
       },
       {
         key: 'homeHighLoadThreshold',

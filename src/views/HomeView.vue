@@ -27,7 +27,7 @@ import {
   type QuickControlKey,
 } from '@/domain/theme-presentation'
 import { hasMultipleSources, serverDetailLocation } from '@/router/links'
-import { createGlassServerMapper } from '@/services/cfsm'
+import { createGlassServerMapper, issueFromFailure } from '@/services/cfsm'
 import { useAppStore } from '@/stores/app'
 import { useDashboardPreferencesStore } from '@/stores/dashboard-preferences'
 import { useDashboardViewStore } from '@/stores/dashboard-view'
@@ -39,6 +39,8 @@ import { parseSettingKeys } from '@/theme/settings'
 import { bootstrapKey } from '@/domain/bootstrap'
 import { injectedSiteTitleKey, injectedTitleForPrimary, resolveSiteTitle } from '@/domain/site-title'
 import { configReady } from '@/domain/config-readiness'
+import { issueReason } from '@/domain/issue-copy'
+import type { ServerSourceFailure } from '@/types/cfsm'
 import type { DashboardSort, DashboardViewMode, GlassServer } from '@/types/glassmorphism'
 
 // App.vue 的 `KeepAlive :include="['HomeView']"` 按组件名匹配，与 Komari 一致。
@@ -183,13 +185,28 @@ const hasNoMatches = computed(() => (
   glassServers.value.length > 0 && visibleServers.value.length === 0
 ))
 const allOffline = computed(() => summary.value.total > 0 && summary.value.online === 0)
+// 页脚与上游一样用英文；状态只说访客能理解的结果，不出现 REST / WebSocket 这类实现细节。
 const realtimeLabel = computed(() => {
   if (realtime.status === 'live') return 'Live updates'
-  if (realtime.status === 'fallback') return 'REST fallback'
+  if (realtime.status === 'fallback') return 'Polling updates'
   if (realtime.status === 'timed-out') return 'Live updates timed out'
   if (realtime.status === 'paused') return 'Live updates paused'
-  if (realtime.status === 'connecting') return 'Live updates connecting'
-  return 'REST snapshot'
+  if (realtime.status === 'connecting') return 'Connecting live updates'
+  return 'Snapshot'
+})
+
+/** 数据源失败的简短中文原因；不把 CFSM 返回的英文错误码直接显示给访客。 */
+function failureReason(failure: ServerSourceFailure): string {
+  return issueReason(issueFromFailure(failure))
+}
+
+// 节点一个都没加载到时的原因：单数据源直接说原因，多数据源逐个列出。
+const serverLoadReason = computed(() => {
+  const failures = serverStore.sourceFailures
+  if (failures.length === 0) return '暂时无法读取节点数据，请稍后重试。'
+  return failures
+    .map((failure) => (showSource.value ? `${failure.source.label}：${failureReason(failure)}` : failureReason(failure)))
+    .join('；')
 })
 
 watch(groups, (nextGroups) => {
@@ -342,23 +359,34 @@ onUnmounted(() => realtime.stop())
           class="notice notice--warning"
           role="status"
         >
-          <strong>站点配置读取失败</strong>
-          <span>{{ app.error }}。节点数据仍会独立尝试加载。</span>
+          <strong>无法读取站点配置</strong>
+          <span>主题设置暂用默认值，节点数据会继续加载。</span>
         </div>
 
+        <!-- 节点一个都没加载到时由下方的「无法加载节点」说明原因，这里只提示部分失败或刷新失败。 -->
         <div
-          v-if="serverStore.sourceFailures.length > 0"
+          v-if="serverStore.sourceFailures.length > 0 && serverStore.state !== 'error'"
           class="notice notice--warning"
           role="status"
         >
-          <strong>部分数据源暂不可用</strong>
-          <span
-            v-for="failure in serverStore.sourceFailures"
-            :key="failure.source.base"
-          >
-            {{ failure.source.label }}：{{ failure.message }}
-            <template v-if="failure.status">（HTTP {{ failure.status }}）</template>
-          </span>
+          <template v-if="showSource">
+            <strong>部分数据源暂不可用</strong>
+            <span
+              v-for="failure in serverStore.sourceFailures"
+              :key="failure.source.base"
+            >
+              {{ failure.source.label }}：{{ failureReason(failure) }}
+            </span>
+          </template>
+          <template v-else>
+            <strong>数据刷新失败</strong>
+            <span
+              v-for="failure in serverStore.sourceFailures"
+              :key="failure.source.base"
+            >
+              {{ failureReason(failure) }}，页面显示的是上次读取的数据。
+            </span>
+          </template>
         </div>
 
         <div
@@ -367,8 +395,8 @@ onUnmounted(() => realtime.stop())
           role="status"
         >
           <div>
-            <strong>实时连接已达到站点设置的连接时限</strong>
-            <span>请选择继续建立新的实时连接，或暂时停用实时更新。</span>
+            <strong>实时连接已达到站点设定的时长</strong>
+            <span>可以继续接收实时数据，或先暂停实时更新。</span>
           </div>
           <div class="notice__actions">
             <button type="button" @click="realtime.continueAfterTimeout">
@@ -387,7 +415,7 @@ onUnmounted(() => realtime.stop())
         >
           <div>
             <strong>实时更新已暂停</strong>
-            <span>当前页面保留最后一次真实数据快照；恢复后会重新连接各数据源。</span>
+            <span>页面停留在暂停前的最后数据，恢复后会重新连接。</span>
           </div>
           <div class="notice__actions">
             <button type="button" @click="realtime.resume">
@@ -402,7 +430,7 @@ onUnmounted(() => realtime.stop())
           role="status"
         >
           <strong>实时连接暂不可用</strong>
-          <span>已启用低频 REST 补偿刷新，WebSocket 会按退避策略继续恢复。</span>
+          <span>暂时改为每 {{ theme.runtime.dataUpdateInterval }} 秒刷新一次，连接恢复后会自动切回实时更新。</span>
         </div>
 
         <div
@@ -410,8 +438,8 @@ onUnmounted(() => realtime.stop())
           class="notice notice--offline"
           role="status"
         >
-          <strong>当前所有节点均为离线状态</strong>
-          <span>页面保留后端返回的最后指标，不把旧指标标记为实时数据。</span>
+          <strong>所有节点都已离线</strong>
+          <span>显示的是各节点离线前最后一次上报的数据。</span>
         </div>
 
         <template v-if="initialLoading">
@@ -471,7 +499,7 @@ onUnmounted(() => realtime.stop())
           >
             <span class="state-panel__icon" aria-hidden="true">!</span>
             <h2>无法加载节点</h2>
-            <p>{{ serverStore.error }}</p>
+            <p>{{ serverLoadReason }}</p>
             <button type="button" class="state-panel__retry" @click="refresh">
               重新加载
             </button>

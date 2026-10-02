@@ -98,7 +98,7 @@ describe('configuration gates are wired to the three pages', () => {
     const html = await renderPage(HomeView, '/')
     expect(html).not.toContain('aria-label="正在加载总览"')
     expect(html).toContain('overview-grid')
-    if (state === 'error') expect(html).toContain('站点配置读取失败')
+    if (state === 'error') expect(html).toContain('无法读取站点配置')
     else expect(html).toContain('真实公告')
   })
 
@@ -122,7 +122,7 @@ describe('configuration gates are wired to the three pages', () => {
     expect(html).not.toContain('aria-label="正在加载主题设置"')
     expect(html).toContain('class="settings-layout"')
     expect(html).toContain('settings-layer-stats')
-    if (state === 'error') expect(html).toContain('无法读取 /api/config')
+    if (state === 'error') expect(html).toContain('无法读取站点配置')
   })
 
   it.each(['idle', 'loading'] as const)('detail keeps metrics behind skeleton while owning config is %s', async (state) => {
