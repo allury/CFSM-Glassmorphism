@@ -117,6 +117,7 @@ describe('接线与样式', () => {
   const home = source('../src/views/HomeView.vue')
   const routerSource = source('../src/router/index.ts')
   const css = source('../src/styles/main.css')
+  const list = source('../src/components/dashboard/ServerList.vue')
 
   it('App 按上游保留首页并播放换页过渡', () => {
     expect(app).toContain('<RouterView v-slot="{ Component }">')
@@ -171,6 +172,26 @@ describe('接线与样式', () => {
     // 减少动态效果时与上游一样全部关闭。
     expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\n\s+\.node-card\.node-card-switch-enter-active,\n\s+\.node-card\.node-card-switch-leave-active,\n\s+\.node-card\.node-card-switch-move \{\n\s+transition: none;\n\s+transition-delay: 0ms;/)
     expect(css).toMatch(/\.node-card\.node-card-switch-enter-from,\n\s+\.node-card\.node-card-switch-leave-to \{\n\s+opacity: 1;\n\s+transform: none;\n\s+filter: none;/)
+  })
+
+  it('列表行切换照搬上游 NodeList 的 node-row-switch', () => {
+    // 分组：列表随分组 key 整个重新挂载（上游在各分组的 TabsContent 里），行按 appear 依次进场。
+    expect(home).toMatch(/<ServerList\n\s+v-else\n\s+:key="selectedGroup"/)
+    expect(home).toContain(':transition-key="selectedGroup"')
+    expect(home).toContain(':motion="!theme.runtime.disablePageAnimation"')
+    // 行 key 只含分组（Komari getRowTransitionKey）：快捷筛选、实时数据与排序不换 key。
+    expect(list).toContain('return `${props.transitionKey}-${server.key}`')
+    expect(list).toMatch(/<TransitionGroup\n\s+:appear="rowTransition"\n\s+:css="rowTransition"\n\s+name="node-row-switch"\n\s+>/)
+    // 超过 30 行上游改用虚拟列表、不做行过渡；关闭页面动画时同样不做。
+    expect(list).toContain('const rowTransition = computed(() => props.motion && props.servers.length <= 30)')
+    expect(list).toContain("'--node-row-delay': `${index * 35}ms`")
+    expect(list).toContain('return ROW_DELAY_STYLES[Math.min(index, 12)]')
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-enter-active,\n\.node-list__row\.node-row-switch-leave-active \{\n\s+transition:\n\s+opacity 170ms ease,\n\s+transform 210ms cubic-bezier\(0\.22, 1, 0\.36, 1\),\n\s+filter 170ms ease;\n\}/)
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-enter-active \{\n\s+transition-delay: var\(--node-row-delay, 0ms\);/)
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-move \{\n\s+transition: transform 210ms cubic-bezier\(0\.22, 1, 0\.36, 1\);\n\}/)
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(8px\);\n\s+filter: blur\(3px\);/)
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-leave-to \{\n\s+opacity: 0;\n\s+transform: translateY\(-5px\);\n\s+filter: blur\(2px\);/)
+    expect(css).toMatch(/\.node-list__row\.node-row-switch-enter-from,\n\s+\.node-list__row\.node-row-switch-leave-to \{\n\s+opacity: 1;\n\s+transform: none;\n\s+filter: none;/)
   })
 
   it('换页过渡作用于页面主体与页脚，顶栏不动，数值与上游一致', () => {

@@ -2368,6 +2368,54 @@ a {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--red) 10%, transparent);
 }
 
+/*
+ * 列表行切换：Komari NodeList 的 node-row-switch（TransitionGroup）逐项移植。上游写在组件的
+ * scoped 样式里；这里加 `.node-list__row` 提高优先级，盖过行自身的悬停过渡。
+ */
+.node-list__row.node-row-switch-enter-active,
+.node-list__row.node-row-switch-leave-active {
+  transition:
+    opacity 170ms ease,
+    transform 210ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 170ms ease;
+}
+
+.node-list__row.node-row-switch-enter-active {
+  transition-delay: var(--node-row-delay, 0ms);
+}
+
+.node-list__row.node-row-switch-move {
+  transition: transform 210ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.node-list__row.node-row-switch-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+  filter: blur(3px);
+}
+
+.node-list__row.node-row-switch-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+  filter: blur(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .node-list__row.node-row-switch-enter-active,
+  .node-list__row.node-row-switch-leave-active,
+  .node-list__row.node-row-switch-move {
+    transition: none;
+    transition-delay: 0ms;
+  }
+
+  .node-list__row.node-row-switch-enter-from,
+  .node-list__row.node-row-switch-leave-to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
 .node-list__cells {
   display: grid;
   align-items: center;

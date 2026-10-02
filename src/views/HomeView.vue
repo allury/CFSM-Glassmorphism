@@ -549,8 +549,10 @@ onUnmounted(() => realtime.stop())
                 @toggle-favorite="preferences.toggleFavorite(server.key)"
               />
             </TransitionGroup>
+            <!-- 与卡片网格同理：上游列表也在各分组的 TabsContent 里，切换分组时整个重新挂载。 -->
             <ServerList
               v-else
+              :key="selectedGroup"
               :servers="visibleServers"
               :show-source="showSource"
               :favorite-keys="preferences.favorites"
@@ -559,6 +561,8 @@ onUnmounted(() => realtime.stop())
               :provider-aliases="providerAliases"
               :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
               :price-visible="priceVisible"
+              :transition-key="selectedGroup"
+              :motion="!theme.runtime.disablePageAnimation"
               @open="openServer"
               @toggle-favorite="preferences.toggleFavorite"
             />

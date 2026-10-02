@@ -41,6 +41,10 @@ const props = defineProps<{
   customTagsVisible: boolean
   providerAliases: ProviderAlias[]
   priceVisible: boolean
+  /** 当前分组：与 Komari NodeList 的 `transitionKey` 一样并入行 key。 */
+  transitionKey: string
+  /** 页面动画开关（主题设置「禁用页面动画」的反面）。 */
+  motion: boolean
 }>()
 
 const emit = defineEmits<{
@@ -143,6 +147,24 @@ function trafficHead(server: GlassServer): string {
   return trafficHeadText(trafficDisplay(server))
 }
 
+/*
+ * 行切换动画，对应 Komari NodeList 的 node-row-switch：key 含分组，快捷筛选、实时数据与
+ * 排序不改变 key——留下的行保持原元素，离开的行淡出、新增的行依次进场，换位时滑到新位置。
+ * 上游超过 30 行改用虚拟列表、不做行过渡；关闭页面动画时同样不做。
+ */
+const ROW_DELAY_STYLES = Array.from({ length: 13 }, (_, index) => ({
+  '--node-row-delay': `${index * 35}ms`,
+}))
+const rowTransition = computed(() => props.motion && props.servers.length <= 30)
+
+function rowTransitionKey(server: GlassServer): string {
+  return `${props.transitionKey}-${server.key}`
+}
+
+function rowStyle(index: number): Record<string, string> {
+  return ROW_DELAY_STYLES[Math.min(index, 12)] ?? ROW_DELAY_STYLES[0] ?? {}
+}
+
 function handleRowKeydown(event: KeyboardEvent, server: GlassServer): void {
   if (event.key !== 'Enter' && event.key !== ' ') return
   event.preventDefault()
@@ -170,132 +192,140 @@ function hideMissingImage(event: Event): void {
         </span>
       </div>
 
-      <div
-        v-for="server in servers"
-        :key="server.key"
-        v-memo="[
-          server,
-          favoriteKeys.has(server.key),
-          showSource,
-          metadataEnabled,
-          metadataFields,
-          customTagsVisible,
-          providerAliases,
-          priceVisible,
-        ]"
-        class="node-list__row"
-        :class="{ 'node-list__row--offline': !server.online }"
-        role="button"
-        tabindex="0"
-        :aria-label="`查看节点 ${server.name} 详情`"
-        @click="emit('open', server)"
-        @keydown="handleRowKeydown($event, server)"
+      <TransitionGroup
+        :appear="rowTransition"
+        :css="rowTransition"
+        name="node-row-switch"
       >
-        <div class="node-list__cells" :style="gridStyle">
-          <div class="node-list__cell node-list__cell--center">
-            <span class="node-status-wrap" aria-hidden="true">
-              <span
-                class="node-status"
-                :class="server.online ? 'node-status--online' : 'node-status--offline'"
-              />
-              <span
-                class="node-status-pulse"
-                :class="server.online ? 'node-status-pulse--online' : 'node-status-pulse--offline'"
-              />
-            </span>
-          </div>
-
-          <div class="node-list__cell node-list__cell--center">
-            <img
-              class="node-list__os"
-              :src="osIconUrl(server.operatingSystem)"
-              :alt="osDisplayName(server.operatingSystem)"
-              :title="server.operatingSystem ?? osDisplayName(server.operatingSystem)"
-              @error="hideMissingImage"
-            >
-          </div>
-
-          <div class="node-list__cell node-list__cell--name">
-            <div class="node-list__identity">
-              <img
-                v-if="regionCode(server)"
-                class="node-list__flag"
-                :src="flagUrl(regionCode(server) as string)"
-                :alt="server.region ?? ''"
-                @error="hideMissingFlag"
-              >
-              <span class="node-list__name" :title="server.name">{{ server.name }}</span>
-              <button
-                type="button"
-                class="favorite-button"
-                :class="{ 'is-favorite': favoriteKeys.has(server.key) }"
-                :aria-label="favoriteKeys.has(server.key) ? `取消收藏 ${server.name}` : `收藏 ${server.name}`"
-                :title="favoriteKeys.has(server.key) ? '取消收藏' : '收藏节点'"
-                @click.stop="emit('toggleFavorite', server.key)"
-                @keydown.stop
-              >
-                <AppIcon :name="favoriteKeys.has(server.key) ? 'tabler:star-filled' : 'tabler:star'" :size="13" />
-              </button>
+        <div
+          v-for="(server, index) in servers"
+          :key="rowTransitionKey(server)"
+          v-memo="[
+            server,
+            index,
+            favoriteKeys.has(server.key),
+            showSource,
+            metadataEnabled,
+            metadataFields,
+            customTagsVisible,
+            providerAliases,
+            priceVisible,
+          ]"
+          class="node-list__row"
+          :class="{ 'node-list__row--offline': !server.online }"
+          :style="rowStyle(index)"
+          role="button"
+          tabindex="0"
+          :aria-label="`查看节点 ${server.name} 详情`"
+          @click="emit('open', server)"
+          @keydown="handleRowKeydown($event, server)"
+        >
+          <div class="node-list__cells" :style="gridStyle">
+            <div class="node-list__cell node-list__cell--center">
+              <span class="node-status-wrap" aria-hidden="true">
+                <span
+                  class="node-status"
+                  :class="server.online ? 'node-status--online' : 'node-status--offline'"
+                />
+                <span
+                  class="node-status-pulse"
+                  :class="server.online ? 'node-status-pulse--online' : 'node-status-pulse--offline'"
+                />
+              </span>
             </div>
-            <span v-if="priceText(server)" class="node-list__sub">{{ priceText(server) }}</span>
-          </div>
 
-          <div v-if="metadataEnabled" class="node-list__cell node-list__cell--metadata">
-            <span
-              v-for="badge in metadataBadges(server)"
-              :key="badge.key"
-              class="node-list__badge"
-              :title="badge.value"
-            >
-              <img v-if="badge.flag" :src="badge.flag" alt="" @error="hideMissingFlag">
-              <span>{{ badge.value }}</span>
-            </span>
-          </div>
+            <div class="node-list__cell node-list__cell--center">
+              <img
+                class="node-list__os"
+                :src="osIconUrl(server.operatingSystem)"
+                :alt="osDisplayName(server.operatingSystem)"
+                :title="server.operatingSystem ?? osDisplayName(server.operatingSystem)"
+                @error="hideMissingImage"
+              >
+            </div>
 
-          <div class="node-list__cell">
-            <span class="node-list__sub">{{ formatUptime(server.bootTime) }}</span>
-            <span class="node-list__sub">{{ probeText(server) }}</span>
-          </div>
+            <div class="node-list__cell node-list__cell--name">
+              <div class="node-list__identity">
+                <img
+                  v-if="regionCode(server)"
+                  class="node-list__flag"
+                  :src="flagUrl(regionCode(server) as string)"
+                  :alt="server.region ?? ''"
+                  @error="hideMissingFlag"
+                >
+                <span class="node-list__name" :title="server.name">{{ server.name }}</span>
+                <button
+                  type="button"
+                  class="favorite-button"
+                  :class="{ 'is-favorite': favoriteKeys.has(server.key) }"
+                  :aria-label="favoriteKeys.has(server.key) ? `取消收藏 ${server.name}` : `收藏 ${server.name}`"
+                  :title="favoriteKeys.has(server.key) ? '取消收藏' : '收藏节点'"
+                  @click.stop="emit('toggleFavorite', server.key)"
+                  @keydown.stop
+                >
+                  <AppIcon :name="favoriteKeys.has(server.key) ? 'tabler:star-filled' : 'tabler:star'" :size="13" />
+                </button>
+              </div>
+              <span v-if="priceText(server)" class="node-list__sub">{{ priceText(server) }}</span>
+            </div>
 
-          <div class="node-list__cell node-list__cell--metric">
-            <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
-            <!-- 上游 NodeList 的进度条同样按 `getStatus` 着色。 -->
-            <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
-          </div>
+            <div v-if="metadataEnabled" class="node-list__cell node-list__cell--metadata">
+              <span
+                v-for="badge in metadataBadges(server)"
+                :key="badge.key"
+                class="node-list__badge"
+                :title="badge.value"
+              >
+                <img v-if="badge.flag" :src="badge.flag" alt="" @error="hideMissingFlag">
+                <span>{{ badge.value }}</span>
+              </span>
+            </div>
 
-          <div class="node-list__cell node-list__cell--metric">
-            <span class="node-list__metric-value">
-              {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
-            </span>
-            <AppProgressThin
-              :percentage="ratio(server.memory.used, server.memory.total)"
-              :status="usageStatus(ratio(server.memory.used, server.memory.total))"
-            />
-          </div>
+            <div class="node-list__cell">
+              <span class="node-list__sub">{{ formatUptime(server.bootTime) }}</span>
+              <span class="node-list__sub">{{ probeText(server) }}</span>
+            </div>
 
-          <div class="node-list__cell node-list__cell--metric">
-            <span class="node-list__metric-value">
-              {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
-            </span>
-            <AppProgressThin
-              :percentage="ratio(server.disk.used, server.disk.total)"
-              :status="usageStatus(ratio(server.disk.used, server.disk.total))"
-            />
-          </div>
+            <div class="node-list__cell node-list__cell--metric">
+              <span class="node-list__metric-value">{{ formatPercent(server.cpu) }}</span>
+              <!-- 上游 NodeList 的进度条同样按 `getStatus` 着色。 -->
+              <AppProgressThin :percentage="server.cpu" :status="usageStatus(server.cpu)" />
+            </div>
 
-          <div class="node-list__cell node-list__cell--metric">
-            <span class="node-list__metric-value">
-              {{ trafficHead(server) }}
-            </span>
-            <AppProgressThin :percentage="trafficPercent(server)" :status="trafficStatus(trafficPercent(server))" />
-          </div>
+            <div class="node-list__cell node-list__cell--metric">
+              <span class="node-list__metric-value">
+                {{ formatPercent(ratio(server.memory.used, server.memory.total)) }}
+              </span>
+              <AppProgressThin
+                :percentage="ratio(server.memory.used, server.memory.total)"
+                :status="usageStatus(ratio(server.memory.used, server.memory.total))"
+              />
+            </div>
 
-          <div class="node-list__cell">
-            <span class="node-list__sub node-list__sub--up">↑ {{ formatDisplaySpeed(server.network.outSpeed) }}</span>
-            <span class="node-list__sub node-list__sub--down">↓ {{ formatDisplaySpeed(server.network.inSpeed) }}</span>
+            <div class="node-list__cell node-list__cell--metric">
+              <span class="node-list__metric-value">
+                {{ formatPercent(ratio(server.disk.used, server.disk.total)) }}
+              </span>
+              <AppProgressThin
+                :percentage="ratio(server.disk.used, server.disk.total)"
+                :status="usageStatus(ratio(server.disk.used, server.disk.total))"
+              />
+            </div>
+
+            <div class="node-list__cell node-list__cell--metric">
+              <span class="node-list__metric-value">
+                {{ trafficHead(server) }}
+              </span>
+              <AppProgressThin :percentage="trafficPercent(server)" :status="trafficStatus(trafficPercent(server))" />
+            </div>
+
+            <div class="node-list__cell">
+              <span class="node-list__sub node-list__sub--up">↑ {{ formatDisplaySpeed(server.network.outSpeed) }}</span>
+              <span class="node-list__sub node-list__sub--down">↓ {{ formatDisplaySpeed(server.network.inSpeed) }}</span>
+            </div>
           </div>
         </div>
-      </div>
+      </TransitionGroup>
     </div>
   </div>
 </template>
