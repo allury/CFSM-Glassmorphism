@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import {
+  formatBytes,
   formatCfsmDate,
   formatCurrencyValue,
+  formatDisplayBytesSplit,
+  formatDisplaySpeed,
   formatLatency,
   formatPrice,
   formatProbePercent,
+  formatSpeed,
   formatTimestamp,
   formatUptime,
   parseCfsmDate,
@@ -52,5 +56,15 @@ describe('time formatting', () => {
     expect(formatPrice(null, null, null)).toBe('-')
     expect(formatCurrencyValue(12.345, '€')).toBe('€12.35')
     expect(formatCurrencyValue(null, '€')).toBe('-')
+  })
+})
+
+describe('byte formatting', () => {
+  it('keeps sub-byte values in bytes instead of indexing past the unit table', () => {
+    // 对数为负时若不钳到 0，展示层会落到 PB 兜底，把 0.5 B 显示成 512.00 PB。
+    expect(formatBytes(0.5)).toBe('0.50 B')
+    expect(formatSpeed(0.5)).toBe('0.50 B/s')
+    expect(formatDisplayBytesSplit(0.4)).toEqual({ value: '0', unit: 'B' })
+    expect(formatDisplaySpeed(0.75)).toBe('1 B/s')
   })
 })

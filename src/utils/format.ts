@@ -18,8 +18,9 @@ export function formatBytes(value: number | null, suffix = ''): string {
   if (bytes === null) return MISSING_TEXT
   if (bytes === 0) return '0 B' + suffix
 
+  // 不足 1 字节时对数为负，下标钳到 0（与 formatChartBytes 一致），否则单位会越界。
   const unitIndex = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
+    Math.max(Math.floor(Math.log(bytes) / Math.log(1024)), 0),
     BYTE_UNITS.length - 1,
   )
   const scaled = bytes / (1024 ** unitIndex)
@@ -223,8 +224,9 @@ export function formatDisplayBytesSplit(value: number | null): SplitAmount {
   if (bytes === null) return { value: MISSING_TEXT, unit: '' }
   if (bytes === 0) return { value: '0', unit: 'B' }
 
+  // 不足 1 字节时对数为负；不钳到 0 的话会落到下面的 'PB' 兜底，把 0.5 B 显示成 512.00 PB。
   const unitIndex = Math.min(
-    Math.floor(Math.log(bytes) / Math.log(1024)),
+    Math.max(Math.floor(Math.log(bytes) / Math.log(1024)), 0),
     DISPLAY_BYTE_UNITS.length - 1,
   )
   const unit = DISPLAY_BYTE_UNITS[unitIndex] ?? 'PB'
