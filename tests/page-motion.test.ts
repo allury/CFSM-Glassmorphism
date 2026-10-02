@@ -145,22 +145,32 @@ describe('接线与样式', () => {
   })
 
   it('卡片进场改为 TransitionGroup，数值与上游一致', () => {
-    expect(home).toMatch(/<TransitionGroup\n\s+v-else-if="viewMode === 'card'"\n\s+:appear="cardTransition"\n\s+:css="cardTransition"\n\s+name="node-card-switch"/)
+    expect(home).toMatch(/<TransitionGroup\n\s+v-else-if="viewMode === 'card'"\n\s+:key="selectedGroup"\n\s+:appear="cardTransition"\n\s+:css="cardTransition"\n\s+name="node-card-switch"/)
     expect(home).toContain('const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)')
     expect(home).toContain("'--node-item-delay': `${index * 35}ms`")
     expect(css).not.toContain('node-enter')
-    expect(css).toMatch(/\.node-card\.node-card-switch-enter-active \{\n\s+transition:\n\s+opacity 180ms ease,\n\s+transform 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\),\n\s+filter 180ms ease;\n\s+transition-delay: var\(--node-item-delay, 0ms\);/)
+    expect(css).toMatch(/\.node-card\.node-card-switch-enter-active \{\n\s+transition-delay: var\(--node-item-delay, 0ms\);/)
     expect(css).toMatch(/\.node-card\.node-card-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(10px\) scale\(0\.985\);\n\s+filter: blur\(3px\);/)
   })
 
-  it('切换分组或快捷筛选时整组卡片重新进场（Komari getNodeItemTransitionKey）', () => {
-    // key 含分组与快捷筛选：切换时整组换新 key，旧卡片立即移除、新卡片按进场过渡依次出现；
+  it('切换分组或快捷筛选时整组卡片重新进场（Komari TabsContent + getNodeItemTransitionKey）', () => {
+    // 分组：上游每个分组一个 TabsContent，切换时网格整个卸载重挂，旧卡片当帧消失、新卡片按 appear 依次进场。
+    // 只换卡片 key 的话，Vue 要等下一帧才移走离场卡片，切换瞬间会多出一帧新旧卡片共存。
+    expect(home).toMatch(/<TransitionGroup\n\s+v-else-if="viewMode === 'card'"\n\s+:key="selectedGroup"/)
+    // 快捷筛选：key 含快捷筛选，切换时旧卡片按离场过渡淡出、新卡片依次进场；
     // 实时数据、搜索与排序不改变 key，卡片保持原组件。
     expect(home).toContain("return `${selectedGroup.value}-${activeQuickFilter.value ?? 'all'}-${server.key}`")
     expect(home).toContain(':key="cardTransitionKey(server)"')
     expect(home).not.toContain(':key="server.key"\n                :server="server"')
-    // 离场与位移不做动画：旧卡片立即移除，与上游实际看到的效果一致。
-    expect(css).toMatch(/\.node-card\.node-card-switch-leave-active,\n\.node-card\.node-card-switch-move \{\n\s+transition: none;/)
+  })
+
+  it('离场淡出与换位滑动照搬上游 node-card-switch', () => {
+    expect(css).toMatch(/\.node-card\.node-card-switch-enter-active,\n\.node-card\.node-card-switch-leave-active \{\n\s+transition:\n\s+opacity 180ms ease,\n\s+transform 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\),\n\s+filter 180ms ease;\n\}/)
+    expect(css).toMatch(/\.node-card\.node-card-switch-move \{\n\s+transition: transform 220ms cubic-bezier\(0\.22, 1, 0\.36, 1\);\n\}/)
+    expect(css).toMatch(/\.node-card\.node-card-switch-leave-to \{\n\s+opacity: 0;\n\s+transform: translateY\(-6px\) scale\(0\.99\);\n\s+filter: blur\(2px\);/)
+    // 减少动态效果时与上游一样全部关闭。
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\n\s+\.node-card\.node-card-switch-enter-active,\n\s+\.node-card\.node-card-switch-leave-active,\n\s+\.node-card\.node-card-switch-move \{\n\s+transition: none;\n\s+transition-delay: 0ms;/)
+    expect(css).toMatch(/\.node-card\.node-card-switch-enter-from,\n\s+\.node-card\.node-card-switch-leave-to \{\n\s+opacity: 1;\n\s+transform: none;\n\s+filter: none;/)
   })
 
   it('换页过渡作用于页面主体与页脚，顶栏不动，数值与上游一致', () => {

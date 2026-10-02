@@ -1498,17 +1498,25 @@ a {
 }
 
 /*
- * 卡片进场：Komari HomeView 的 node-card-switch（TransitionGroup）enter 逐项移植。
+ * 卡片切换：Komari HomeView 的 node-card-switch（TransitionGroup）逐项移植，进场、离场、换位都照搬。
  * 上游把过渡放在包裹卡片的 div 上；这里作用在卡片根元素，所以加 `.node-card` 提高优先级，
- * 盖过卡片自身的悬停过渡。上游切换分组时整体重新进场（key 含分组），本主题的 key 不含分组，
- * 离场与位移不做动画，切换筛选时保持即时替换。
+ * 盖过卡片自身的悬停过渡。离场的卡片与上游一样在淡出期间仍然占位，淡出结束后其余卡片
+ * 按 move 过渡滑到新位置；按实时指标排序换位时同样滑动。
  */
-.node-card.node-card-switch-enter-active {
+.node-card.node-card-switch-enter-active,
+.node-card.node-card-switch-leave-active {
   transition:
     opacity 180ms ease,
     transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
     filter 180ms ease;
+}
+
+.node-card.node-card-switch-enter-active {
   transition-delay: var(--node-item-delay, 0ms);
+}
+
+.node-card.node-card-switch-move {
+  transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .node-card.node-card-switch-enter-from {
@@ -1517,18 +1525,22 @@ a {
   filter: blur(3px);
 }
 
-.node-card.node-card-switch-leave-active,
-.node-card.node-card-switch-move {
-  transition: none;
+.node-card.node-card-switch-leave-to {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.99);
+  filter: blur(2px);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .node-card.node-card-switch-enter-active {
+  .node-card.node-card-switch-enter-active,
+  .node-card.node-card-switch-leave-active,
+  .node-card.node-card-switch-move {
     transition: none;
     transition-delay: 0ms;
   }
 
-  .node-card.node-card-switch-enter-from {
+  .node-card.node-card-switch-enter-from,
+  .node-card.node-card-switch-leave-to {
     opacity: 1;
     transform: none;
     filter: none;

@@ -260,8 +260,9 @@ function cardStyle(index: number): Record<string, string> {
 }
 
 /**
- * Komari getNodeItemTransitionKey：key 含当前分组与快捷筛选。切换时整组卡片按进场过渡
- * 重新依次出现，旧卡片立即移除；实时数据更新、搜索与排序不改变 key，卡片保持原组件。
+ * Komari getNodeItemTransitionKey：key 含当前分组与快捷筛选。切换快捷筛选时整组卡片换新 key，
+ * 旧卡片按离场过渡淡出、新卡片依次进场；切换分组时整个网格随外层 key 重新挂载（见模板）。
+ * 实时数据更新、搜索与排序不改变 key，卡片保持原组件，换位时按 move 过渡滑到新位置。
  */
 function cardTransitionKey(server: GlassServer): string {
   return `${selectedGroup.value}-${activeQuickFilter.value ?? 'all'}-${server.key}`
@@ -519,9 +520,12 @@ onUnmounted(() => realtime.stop())
             <!--
               与 Komari 一致：卡片进场用 TransitionGroup 的过渡，只在首次渲染与卡片加入列表时播放；
               KeepAlive 重新插回页面时不会重播（CSS animation 会）。
+              按分组加 key：上游每个分组各有一个 TabsContent，切换分组时旧分组的网格整个卸载、
+              新分组的网格重新挂载并按 appear 依次进场，旧卡片当帧消失，不走离场过渡。
             -->
             <TransitionGroup
               v-else-if="viewMode === 'card'"
+              :key="selectedGroup"
               :appear="cardTransition"
               :css="cardTransition"
               name="node-card-switch"
