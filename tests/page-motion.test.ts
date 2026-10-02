@@ -133,9 +133,15 @@ describe('接线与样式', () => {
 
   it('首页可被 KeepAlive 匹配，返回时不重连、不重拉，只恢复标题', () => {
     expect(home).toContain("defineOptions({ name: 'HomeView' })")
-    expect(home).toMatch(/onActivated\(\(\) => \{\n\s+if \(siteTitle\.value\) document\.title = siteTitle\.value\n\}\)/)
-    expect(home).not.toContain('onDeactivated')
+    expect(home).toMatch(/onActivated\(\(\) => \{\n\s+viewActive = true\n\s+if \(siteTitle\.value\) document\.title = siteTitle\.value\n\}\)/)
+    // 离开首页只记录不在前台，不停止实时连接；实时连接只在真正卸载时释放。
+    expect(home).toMatch(/onDeactivated\(\(\) => \{\n\s+viewActive = false\n\}\)/)
     expect(home).toContain('onUnmounted(() => realtime.stop())')
+  })
+
+  it('首页在后台时不改网页标题', () => {
+    // KeepAlive 保留的首页侦听仍在运行：停留详情页期间配置重读、站点名变化，不能把详情页的标题改掉。
+    expect(home).toMatch(/watch\(siteTitle, \(title\) => \{\n\s+if \(title && viewActive\) document\.title = title\n\}, \{ immediate: true \}\)/)
   })
 
   it('卡片进场改为 TransitionGroup，数值与上游一致', () => {

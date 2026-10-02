@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onActivated, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, inject, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/dashboard/AppHeader.vue'
@@ -198,13 +198,22 @@ watch(groups, (nextGroups) => {
   }
 })
 
+// 首页由 KeepAlive 保留，离开后侦听仍在运行（与 Komari 的 isViewActive 一样区分前台）：
+// 只有首页在前台时才改网页标题，否则停留详情页期间配置重读、站点名变化会把详情页的标题改掉。
+let viewActive = true
+
 watch(siteTitle, (title) => {
-  if (title) document.title = title
+  if (title && viewActive) document.title = title
 }, { immediate: true })
 
 // KeepAlive 回到首页时组件不重建，上面的 watch 不会再执行，这里恢复被详情页改写的标题。
 onActivated(() => {
+  viewActive = true
   if (siteTitle.value) document.title = siteTitle.value
+})
+
+onDeactivated(() => {
+  viewActive = false
 })
 
 async function refreshRest(): Promise<void> {
