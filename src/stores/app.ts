@@ -35,18 +35,21 @@ export const useAppStore = defineStore('app', () => {
   })
 
   /**
-   * 用组件给出的一次性令牌换取凭据；CFSM 确认后通知各页面重载数据并重新读取配置。
-   * 先递增 credentialRevision：页面的重载与配置回读并行，遮罩在数据回来前不会退出。
+   * 用组件给出的一次性令牌换取凭据；CFSM 确认后通知各页面重载数据。
+   *
+   * 换取凭据的 `/api/config` 响应本身就是最新的完整配置，直接采用，不再调用 initialize()：
+   * initialize() 会复用验证前发出、可能仍未返回的配置请求，那份结果仍是未验证状态，
+   * 会把刚通过的验证误判为失败。applyConfig 同时作废那份旧请求的结果。
    */
   async function completeTurnstile(token: string): Promise<boolean> {
     const base = primaryBase.value
     if (!base) return false
-    const verified = (await verifyTurnstileToken(base, token)).verified
-    if (!verified) return false
+    const verifiedConfig = await verifyTurnstileToken(base, token)
+    if (!verifiedConfig.verified) return false
+    applyConfig(verifiedConfig)
     turnstileRejected.value = false
     credentialRevision.value += 1
-    await initialize()
-    return config.value?.verified === true
+    return true
   }
 
   async function performInitialize(expectedRevision: number): Promise<void> {
