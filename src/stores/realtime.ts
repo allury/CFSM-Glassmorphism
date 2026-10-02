@@ -43,9 +43,10 @@ export const useRealtimeStore = defineStore('realtime', () => {
   const timedOut = ref(false)
   const paused = ref(false)
   /*
-   * 离开首页时 stop() 会把上面这些清空，设置页因此读不到实时状态。
-   * 这一对快照不参与连接逻辑，只记录「最近一次观察到的结果」，
-   * 供设置页如实说明「数据更新间隔」当下有没有在用——没有观察过就什么都不说。
+   * 首页由 KeepAlive 保留，离开首页后连接照常运行，上面这些状态仍是当前值；
+   * 只有首页真正卸载时 stop() 才会清空它们。这一对快照不参与连接逻辑，只记录
+   * 「最近一次观察到的结果」，供设置页如实说明「数据更新间隔」当下有没有在用——
+   * 没有观察过（例如直接打开设置页、首页从未挂载）就什么都不说。
    */
   const lastObservedStatus = ref<DashboardRealtimeStatus | null>(null)
   const lastObservedAt = ref<number | null>(null)

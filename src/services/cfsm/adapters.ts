@@ -126,6 +126,11 @@ function latencyWindow(value: unknown): LatencyWindowSample[] {
     .sort((left, right) => left.timestamp - right.timestamp)
 }
 
+/*
+ * 与 CFSM 服务端 `hasDiskMetricsPayload` 一致：六项全为 0 或缺失视为没有磁盘 IO 数据。
+ * 服务端把这种采样以 null 写入历史、输出时去掉 `disk` 对象；这里同样返回 undefined，
+ * 实时与历史因此表现一致（图上是缺口，而不是一条 0 线）。
+ */
 function diskIoValue(value: unknown): DiskIoMetrics | undefined {
   if (!isRecord(value)) return undefined
   const disk = {
