@@ -250,6 +250,14 @@ function cardStyle(index: number): Record<string, string> {
   return NODE_ITEM_DELAY_STYLES[Math.min(index, 12)] ?? NODE_ITEM_DELAY_STYLES[0] ?? {}
 }
 
+/**
+ * Komari getNodeItemTransitionKey：key 含当前分组与快捷筛选。切换时整组卡片按进场过渡
+ * 重新依次出现，旧卡片立即移除；实时数据更新、搜索与排序不改变 key，卡片保持原组件。
+ */
+function cardTransitionKey(server: GlassServer): string {
+  return `${selectedGroup.value}-${activeQuickFilter.value ?? 'all'}-${server.key}`
+}
+
 function quickAction(key: QuickControlKey): void {
   if (activeQuickFilter.value === key) {
     activeQuickFilter.value = null
@@ -517,7 +525,7 @@ onUnmounted(() => realtime.stop())
             >
               <ServerCard
                 v-for="(server, index) in visibleServers"
-                :key="server.key"
+                :key="cardTransitionKey(server)"
                 :server="server"
                 :show-source="showSource"
                 :density="theme.runtime.nodeCardSize"

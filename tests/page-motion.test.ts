@@ -147,6 +147,16 @@ describe('接线与样式', () => {
     expect(css).toMatch(/\.node-card\.node-card-switch-enter-from \{\n\s+opacity: 0;\n\s+transform: translateY\(10px\) scale\(0\.985\);\n\s+filter: blur\(3px\);/)
   })
 
+  it('切换分组或快捷筛选时整组卡片重新进场（Komari getNodeItemTransitionKey）', () => {
+    // key 含分组与快捷筛选：切换时整组换新 key，旧卡片立即移除、新卡片按进场过渡依次出现；
+    // 实时数据、搜索与排序不改变 key，卡片保持原组件。
+    expect(home).toContain("return `${selectedGroup.value}-${activeQuickFilter.value ?? 'all'}-${server.key}`")
+    expect(home).toContain(':key="cardTransitionKey(server)"')
+    expect(home).not.toContain(':key="server.key"\n                :server="server"')
+    // 离场与位移不做动画：旧卡片立即移除，与上游实际看到的效果一致。
+    expect(css).toMatch(/\.node-card\.node-card-switch-leave-active,\n\.node-card\.node-card-switch-move \{\n\s+transition: none;/)
+  })
+
   it('换页过渡作用于页面主体与页脚，顶栏不动，数值与上游一致', () => {
     // 页脚紧跟在内容之后：只让主体过渡时，内容透明期间页脚会单独露出来（「先看到页脚」）。
     const both = (state: string) => `\\.page-${state} \\.app-shell > main,\\n\\.page-${state} \\.app-shell > footer \\{`
