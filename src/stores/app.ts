@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { SiteConfig } from '@/types/cfsm'
 import { adminUrl, fetchSiteConfig, getApiBases, onTurnstileRejected, verifyTurnstileToken } from '@/services/cfsm'
@@ -40,15 +40,20 @@ export const useAppStore = defineStore('app', () => {
    * 换取凭据的 `/api/config` 响应本身就是最新的完整配置，直接采用，不再调用 initialize()：
    * initialize() 会复用验证前发出、可能仍未返回的配置请求，那份结果仍是未验证状态，
    * 会把刚通过的验证误判为失败。applyConfig 同时作废那份旧请求的结果。
+   *
+   * 顺序：先通知各页面重载，等它们在下一轮更新里把自己的加载状态置为「加载中」，
+   * 再撤下验证。冷启动遮罩按页面数据是否就绪退出；若先撤下验证，节点列表仍是验证前的
+   * 403 错误状态，遮罩会提前退出、先露出没有数据的页面。
    */
   async function completeTurnstile(token: string): Promise<boolean> {
     const base = primaryBase.value
     if (!base) return false
     const verifiedConfig = await verifyTurnstileToken(base, token)
     if (!verifiedConfig.verified) return false
+    credentialRevision.value += 1
+    await nextTick()
     applyConfig(verifiedConfig)
     turnstileRejected.value = false
-    credentialRevision.value += 1
     return true
   }
 

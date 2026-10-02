@@ -1,4 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
+import { watch } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/stores/app'
 
@@ -50,6 +51,23 @@ describe('completeTurnstile', () => {
     // 旧请求随后带着未验证的结果返回，也不能覆盖已经采用的最新配置。
     resolveStale(siteConfig(false))
     await stale
+    expect(app.config?.verified).toBe(true)
+  })
+
+  it('先通知页面重载，等页面进入加载中后才撤下验证', async () => {
+    // 冷启动遮罩按页面数据是否就绪退出：若先撤下验证，节点列表仍是验证前的 403 错误状态，
+    // 遮罩会提前退出、先露出没有数据的页面。
+    setActivePinia(createPinia())
+    const app = useAppStore()
+    services.config.mockResolvedValueOnce(siteConfig(false))
+    await app.initialize()
+    const seenWhenNotified: Array<boolean | undefined> = []
+    watch(() => app.credentialRevision, () => {
+      seenWhenNotified.push(app.config?.verified)
+    })
+    services.verify.mockResolvedValueOnce(siteConfig(true))
+    await expect(app.completeTurnstile('token')).resolves.toBe(true)
+    expect(seenWhenNotified).toEqual([false])
     expect(app.config?.verified).toBe(true)
   })
 
