@@ -150,16 +150,24 @@ const visibleServers = computed(() => sortServers(
   sort.value,
   theme.runtime.offlineNodesLast,
 ))
-const favoriteCount = computed(() => glassServers.value.reduce(
-  (count, server) => count + (preferences.isFavorite(server.key) ? 1 : 0),
-  0,
-))
-const quickCounts = computed<Partial<Record<QuickControlKey, number>>>(() => ({
-  favorite: favoriteCount.value,
-  offline: glassServers.value.filter((server) => !server.online).length,
-  highLoad: glassServers.value.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold)).length,
-  expiring: glassServers.value.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
-}))
+/*
+ * 与上游 `quickControlCounts` / `getQuickControlCount` 一致：在当前分组与搜索范围内计数，
+ * 不受正在使用的快捷筛选影响；排序类控制（总流量、上行、下行、峰值）显示范围内的节点数。
+ */
+const quickCountBase = computed(() => filterServers(glassServers.value, query.value, selectedGroup.value))
+const quickCounts = computed<Record<QuickControlKey, number>>(() => {
+  const base = quickCountBase.value
+  return {
+    favorite: base.filter((server) => preferences.isFavorite(server.key)).length,
+    offline: base.filter((server) => !server.online).length,
+    highLoad: base.filter((server) => isHighLoad(server, theme.runtime.homeHighLoadThreshold)).length,
+    expiring: base.filter((server) => isExpiring(server, theme.runtime.homeExpiringDays)).length,
+    totalTraffic: base.length,
+    upload: base.length,
+    download: base.length,
+    peak: base.length,
+  }
+})
 const isDenseCollection = computed(() => visibleServers.value.length >= 30)
 // Komari enableNodeCardTransition：关闭页面动画或卡片超过 30 张（denseNodeAppearThreshold）时不播进场过渡。
 const cardTransition = computed(() => !theme.runtime.disablePageAnimation && visibleServers.value.length <= 30)

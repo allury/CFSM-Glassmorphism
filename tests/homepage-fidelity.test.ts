@@ -290,6 +290,13 @@ describe('快捷控制预设对齐 Komari HOME_QUICK_CONTROL_PRESETS', () => {
     settings.homeQuickControlKeys = 'upload\ndownload\nfavorite\nmonthlyCost'
     expect(resolveQuickControlKeys(settings)).toEqual(['upload', 'download', 'favorite'])
   })
+
+  it('计数在当前分组与搜索范围内统计，排序类控制显示范围内的节点数（上游 getQuickControlCount）', () => {
+    const home = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8').replace(/\r\n/g, '\n')
+    expect(home).toContain('const quickCountBase = computed(() => filterServers(glassServers.value, query.value, selectedGroup.value))')
+    for (const key of ['totalTraffic', 'upload', 'download', 'peak']) expect(home).toContain(`    ${key}: base.length,`)
+    expect(home).toContain('favorite: base.filter((server) => preferences.isFavorite(server.key)).length')
+  })
 })
 
 describe('默认背景使用 Komari 正式资产', () => {
