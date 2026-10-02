@@ -214,4 +214,39 @@ describe('总览卡片对齐 Komari NodeGeneralCards 的统计口径与 tooltip'
       .find((item) => item.key === 'remainingValue')
     expect(remaining?.hint).toContain('未标明币种，无法换算')
   })
+
+  it('峰值节点只在在线节点里取：第一台先入选，之后严格更大才替换', () => {
+    const a = glass({ key: 'a', name: 'A', tcpConnections: 30, udpConnections: 5, network: { ...network, inSpeed: 100, outSpeed: 900 } })
+    const b = glass({ key: 'b', name: 'B', tcpConnections: 30, udpConnections: 5, network: { ...network, inSpeed: 700, outSpeed: 100 } })
+    const gone = glass({ key: 'c', name: 'Gone', online: false, tcpConnections: 999, network: { ...network, inSpeed: 9999, outSpeed: 9999 } })
+    expect(card('uploadPeakNode', [a, b, gone])).toMatchObject({ value: '900', unit: 'B/s', hint: 'A\n↑ 900 B/s\n↓ 100 B/s' })
+    expect(card('downloadPeakNode', [a, b, gone])).toMatchObject({ value: '700', unit: 'B/s', hint: 'B\n↑ 100 B/s\n↓ 700 B/s' })
+    // 两台连接数相同，保留第一台（上游 updateTopMetric 只在严格更大时替换）。
+    expect(card('connectionPeakNode', [a, b, gone])).toMatchObject({ value: '35', hint: 'A\nTCP 30\nUDP 5' })
+    expect(card('connectionPeakNode', [glass()])).toMatchObject({ value: '-', hint: '暂无数据' })
+  })
+
+  it('GPU 峰值取利用率最高的在线 GPU 节点', () => {
+    const low = glass({ key: 'a', name: 'Low', gpus: [{ id: '0', name: 'T4', utilization: 20 }] })
+    const high = glass({ key: 'b', name: 'High', gpus: [{ id: '0', name: 'A100', utilization: 80 }] })
+    expect(card('gpuPeakNode', [low, high])).toMatchObject({ value: '80.0', unit: '%', hint: 'High\nA100\nGPU 80.0%' })
+    expect(card('gpuPeakNode', [glass()])).toMatchObject({ value: '-' })
+  })
+
+  it('流量配额合计设了上限的节点，缺月度数据的不当作 0', () => {
+    const GiB = 1024 ** 3
+    const monthly = (received: number | null, transmitted: number | null) => ({ ...network, monthlyReceived: received, monthlyTransmitted: transmitted })
+    const a = glass({ key: 'a', trafficLimit: '100', trafficCalculationType: 'total', network: monthly(30 * GiB, 10 * GiB) })
+    const b = glass({ key: 'b', trafficLimit: '300', trafficCalculationType: 'dl', network: monthly(60 * GiB, 5 * GiB) })
+    const unlimited = glass({ key: 'c', trafficLimit: null, network: monthly(500 * GiB, 500 * GiB) })
+    const missing = glass({ key: 'd', trafficLimit: '100', trafficCalculationType: 'total', network: monthly(null, 5 * GiB) })
+    const hidden = glass({ key: 'e', trafficLimit: '100', showTraffic: false, network: monthly(90 * GiB, 0) })
+    // (40 + 60) / (100 + 300) = 25%；不限流量与站点隐藏流量的节点不参与，缺数据的节点单独说明。
+    expect(card('trafficQuota', [a, b, unlimited, missing, hidden])).toMatchObject({
+      value: '25.0',
+      unit: '%',
+      hint: '100.0 GB / 400.0 GB\n部分 · 1 台缺少流量数据，未计入',
+    })
+    expect(card('trafficQuota', [unlimited])).toMatchObject({ value: '-', hint: '无限流量' })
+  })
 })

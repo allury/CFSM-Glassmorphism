@@ -78,7 +78,8 @@ describe('总览财务上下文', () => {
     const hidden = servers.map((server) => ({ ...server, showPrice: false }))
     expect(generalFinanceContext(hidden, financeSettings(), input())).toEqual({ state: 'hidden' })
     const cards = buildGeneralCards(hidden, financeSettings(), NOW, { state: 'hidden' })
-    expect(cards.map((card) => card.key)).toEqual(['expiringNodes'])
+    // 三张金额卡整张不出现；即将到期与流量配额和价格无关，照常显示。
+    expect(cards.map((card) => card.key)).toEqual(['expiringNodes', 'trafficQuota'])
   })
 
   it('未登录隐藏价格：显示 ***，不能点开明细，tooltip 也不泄露金额', () => {

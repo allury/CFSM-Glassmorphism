@@ -74,7 +74,7 @@
 | 15 | `colorVisionMode` | select / `标准` | 保留标准/色觉友好及非颜色编码 | ✅ 一致 |
 | 16 | `glassCustomColors` | richtext / 10 个颜色键 JSON | 校验颜色 schema 后映射 CSS 变量 | ✅ 一致 |
 | 17 | `generalCardPreset` | select / `基础` | 指标注册表改为 CFSM 领域字段，保留预设交互 | 🟢 等价 |
-| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列。v1.1.7 起 remainingValue / monthlyCost / yearlyCost 恢复，按财务显示币种合计，剩余价值卡可打开明细，显示币种与汇率在明细里设置（浏览器本地偏好，不新增后台键）；trafficQuota / 各类 PeakNode / 虚拟化分布因 CFSM 未提供字段而隐藏，不以估算值补位 | 🟡 降级 |
+| 18 | `generalCardKeys` | richtext / memory、disk、remainingValue、totalTraffic、uploadSpeed、downloadSpeed | 第 11 轮起 key 集合与顺序按上游 `ALL_GENERAL_CARD_KEYS` 排列。v1.1.7 起 remainingValue / monthlyCost / yearlyCost 恢复，按财务显示币种合计，剩余价值卡可打开明细，显示币种与汇率在明细里设置（浏览器本地偏好，不新增后台键）；峰值节点（上行 / 下行 / 连接 / GPU）与流量配额由 CFSM 的实时网速、连接数、GPU 利用率、流量上限与月度流量真实计算；只有虚拟化分布因 CFSM 没有虚拟化类型而隐藏，不以估算值补位 | 🟡 降级 |
 | 19 | `homeToolsEnabled` | switch / `true` | 登录态显示真实健康、分币种价值、快照与分类拓扑；Audit Log 隐藏 | 🟡 降级 |
 | 20 | `hideAdminEntryWhenLoggedOut` | switch / `false` | 根据 authorization 控制 `/admin#admin` 链接 | ✅ 一致 |
 | 21 | `hidePriceWhenLoggedOut` | switch / `false` | 根据 authorization 隐藏财务字段：首页卡片与列表的价格、剩余价值，以及详情页的节点价格 / 月均支出 / 剩余价值；v1.1.7 起首页顶部的剩余价值 / 月费用 / 年费用卡显示 `***`，不能打开明细，也不请求汇率 | ✅ 一致 |

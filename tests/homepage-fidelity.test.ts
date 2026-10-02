@@ -224,10 +224,11 @@ describe('总览卡片对齐 Komari NodeGeneralCards', () => {
     ])
   })
 
-  // v1.1.7 接入汇率换算后，剩余价值 / 月费用 / 年费用成为真实可算的卡；流量配额仍需站点级配额，照旧忽略。
-  it('剩余价值 / 月费用 / 年费用可以选用，流量配额仍不以估算值补位', () => {
-    const settings = customGeneral('remainingValue\nmonthlyCost\nyearlyCost\ntrafficQuota\nonlineNodes')
-    expect(resolveGeneralCardKeys(settings)).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'onlineNodes'])
+  // 剩余价值 / 月费用 / 年费用按显示币种换算；流量配额由各节点的流量上限与月度流量真实合计。
+  // 只有虚拟化分布没有数据来源（CFSM 不提供虚拟化类型），写进模板也会被忽略。
+  it('财务三卡与流量配额都可以选用，虚拟化分布不以估算值补位', () => {
+    const settings = customGeneral('remainingValue\nmonthlyCost\nyearlyCost\ntrafficQuota\nvirtualizationDistribution\nonlineNodes')
+    expect(resolveGeneralCardKeys(settings)).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'trafficQuota', 'onlineNodes'])
   })
 
   it('模板渲染 unit，并把 hint 交给 tooltip', () => {
@@ -244,16 +245,16 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
     return resolveGeneralCardKeys(settings)
   }
 
-  it('保持上游顺序，只删掉 CFSM 无法真实计算的条目', () => {
+  it('保持上游顺序与张数，只删掉 CFSM 没有数据的虚拟化分布', () => {
     expect(keysFor('官方')).toEqual(['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
     // 「基础」与上游一样是 6 张，第三张是剩余价值（v1.1.7 起可换算）。
     expect(keysFor('基础')).toEqual(['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'])
     expect(keysFor('运维')).toEqual(['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'])
     expect(keysFor('资源')).toEqual(['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'])
-    // 上游「财务」的第 6 张 trafficQuota 需要站点级配额，CFSM 没有。
-    expect(keysFor('财务')).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'])
-    expect(keysFor('流量')).toEqual(['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'])
-    expect(keysFor('GPU')).toEqual(['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'])
+    expect(keysFor('财务')).toEqual(['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic', 'trafficQuota'])
+    expect(keysFor('流量')).toEqual(['totalTraffic', 'trafficQuota', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'])
+    expect(keysFor('GPU')).toEqual(['gpuNodes', 'avgGpu', 'gpuPeakNode', 'avgCpu', 'memory', 'trafficPeak'])
+    // 上游「资产」的第 4 张是虚拟化分布，CFSM 没有虚拟化类型，因此是 5 张。
     expect(keysFor('资产')).toEqual(['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'])
   })
 
@@ -262,8 +263,8 @@ describe('General Card 预设顺序对齐 Komari GENERAL_CARD_PRESETS', () => {
       'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
       'totalTraffic', 'uploadSpeed', 'downloadSpeed',
       'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
-      'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
-      'highLoadNodes', 'expiringNodes', 'trafficWarnings',
+      'processes', 'connections', 'cpuCores', 'gpuNodes', 'gpuPeakNode', 'trafficQuota', 'trafficPeak',
+      'uploadPeakNode', 'downloadPeakNode', 'highLoadNodes', 'expiringNodes', 'trafficWarnings', 'connectionPeakNode',
       'regionDistribution', 'systemDistribution', 'yearlyCost',
     ])
   })

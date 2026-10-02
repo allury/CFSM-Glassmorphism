@@ -46,17 +46,18 @@ import {
 } from '@/utils/format'
 
 /*
- * 总览卡片的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_GENERAL_CARD_KEYS`，
- * 只保留 CFSM 能够真实计算的项目。剩余价值、月费用与年费用在 v1.1.7 接入了汇率换算
- * （`domain/finance.ts`）；trafficQuota 需要站点级配额，*PeakNode 与
- * virtualizationDistribution 需要 CFSM 未提供的字段——它们仍不出现，不用估算值凑满六张卡。
+ * 总览卡片的 key 与顺序取自 Komari `stores/app.ts` 的 `ALL_GENERAL_CARD_KEYS`。
+ * 剩余价值、月费用与年费用按财务显示币种换算（`domain/finance.ts`）；峰值节点与流量配额
+ * 由 CFSM 的实时网速、连接数、GPU 利用率、流量上限与月度流量真实计算。
+ * 只有 `virtualizationDistribution` 不出现：CFSM 不提供虚拟化类型，不用估算值补位。
  */
 export type GeneralCardKey =
   | 'currentTime' | 'memory' | 'disk' | 'remainingValue' | 'monthlyCost'
   | 'totalTraffic' | 'uploadSpeed' | 'downloadSpeed'
   | 'onlineNodes' | 'offlineNodes' | 'avgCpu' | 'avgGpu' | 'avgLoad'
   | 'swap' | 'processes' | 'connections' | 'cpuCores' | 'gpuNodes'
-  | 'trafficPeak' | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings'
+  | 'gpuPeakNode' | 'trafficQuota' | 'trafficPeak' | 'uploadPeakNode' | 'downloadPeakNode'
+  | 'highLoadNodes' | 'expiringNodes' | 'trafficWarnings' | 'connectionPeakNode'
   | 'regionDistribution' | 'systemDistribution' | 'yearlyCost'
 
 export type QuickControlKey = 'favorite' | 'totalTraffic' | 'upload' | 'download' | 'peak' | 'offline' | 'highLoad' | 'expiring'
@@ -79,30 +80,29 @@ export type ChartFamily =
   | 'cpu' | 'memory' | 'disk' | 'network' | 'traffic' | 'gpu'
   | 'connections' | 'process' | 'diskIo' | 'ping' | 'pingLoss'
 
-/** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，去掉 CFSM 无法真实计算的项目。 */
+/** Komari `ALL_GENERAL_CARD_KEYS` 的顺序，只去掉 CFSM 没有数据的虚拟化分布。 */
 const ALL_GENERAL_CARD_KEYS: readonly GeneralCardKey[] = [
   'currentTime', 'memory', 'disk', 'remainingValue', 'monthlyCost',
   'totalTraffic', 'uploadSpeed', 'downloadSpeed',
   'onlineNodes', 'offlineNodes', 'avgCpu', 'avgGpu', 'avgLoad', 'swap',
-  'processes', 'connections', 'cpuCores', 'gpuNodes', 'trafficPeak',
-  'highLoadNodes', 'expiringNodes', 'trafficWarnings',
+  'processes', 'connections', 'cpuCores', 'gpuNodes', 'gpuPeakNode', 'trafficQuota', 'trafficPeak',
+  'uploadPeakNode', 'downloadPeakNode', 'highLoadNodes', 'expiringNodes', 'trafficWarnings', 'connectionPeakNode',
   'regionDistribution', 'systemDistribution', 'yearlyCost',
 ]
 
 /*
  * 逐项对应 Komari `GENERAL_CARD_PRESETS`（official / basic / ops / resource /
- * finance / traffic / gpu / asset / full / custom），保持同一顺序，
- * 只删去 CFSM 无法真实计算的条目：「财务」里的 trafficQuota 需要站点级配额，
- * 因此是 5 张；其余预设与上游张数相同。
+ * finance / traffic / gpu / asset / full / custom），保持同一顺序与张数；
+ * 唯一删去的是「资产」里的虚拟化分布（CFSM 没有这项数据），因此「资产」是 5 张。
  */
 const GENERAL_PRESETS: Record<ThemeSettings['generalCardPreset'], readonly GeneralCardKey[]> = {
   官方: ['currentTime', 'onlineNodes', 'regionDistribution', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
   基础: ['memory', 'disk', 'remainingValue', 'totalTraffic', 'uploadSpeed', 'downloadSpeed'],
   运维: ['onlineNodes', 'offlineNodes', 'highLoadNodes', 'trafficWarnings', 'avgCpu', 'avgLoad'],
   资源: ['avgCpu', 'avgLoad', 'memory', 'disk', 'swap', 'cpuCores'],
-  财务: ['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic'],
-  流量: ['totalTraffic', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'],
-  GPU: ['gpuNodes', 'avgGpu', 'avgCpu', 'memory', 'trafficPeak'],
+  财务: ['remainingValue', 'monthlyCost', 'yearlyCost', 'expiringNodes', 'totalTraffic', 'trafficQuota'],
+  流量: ['totalTraffic', 'trafficQuota', 'uploadSpeed', 'downloadSpeed', 'trafficPeak', 'trafficWarnings'],
+  GPU: ['gpuNodes', 'avgGpu', 'gpuPeakNode', 'avgCpu', 'memory', 'trafficPeak'],
   资产: ['onlineNodes', 'regionDistribution', 'systemDistribution', 'cpuCores', 'gpuNodes'],
   完整: ALL_GENERAL_CARD_KEYS,
   自定义: [],
@@ -546,19 +546,41 @@ function financeCards(context: GeneralFinanceContext | undefined): Pick<Record<G
   }
 }
 
+interface TopNode {
+  server: GlassServer
+  value: number
+}
+
 /**
- * 对应 Komari 的 `trafficPeak`（`getRealtimeTotalSpeed`）：实时上下行合计最高的一台在线节点。
- * 两向都缺失的节点不参与；只缺一向时按另一向计，与上游的 `|| 0` 口径相同。
+ * 对应 Komari `updateTopMetric`：在候选节点里取指标最高的一台，第一台先入选、之后严格大于才替换。
+ * 指标缺失（null）的节点不参与，不当作 0。
  */
-function peakSpeedNode(servers: GlassServer[]): { server: GlassServer, value: number } | null {
-  let best: { server: GlassServer, value: number } | null = null
+function topNode(servers: readonly GlassServer[], metric: (server: GlassServer) => number | null): TopNode | null {
+  let best: TopNode | null = null
   for (const server of servers) {
-    const { inSpeed, outSpeed } = server.network
-    if (inSpeed === null && outSpeed === null) continue
-    const total = (inSpeed ?? 0) + (outSpeed ?? 0)
-    if (best === null || total > best.value) best = { server, value: total }
+    const value = metric(server)
+    if (value === null || !Number.isFinite(value)) continue
+    if (best === null || value > best.value) best = { server, value: Math.max(0, value) }
   }
   return best
+}
+
+/** Komari `getRealtimeTotalSpeed`：上下行合计；只缺一向时按另一向计（上游 `|| 0`），两向都缺时不参与。 */
+function totalSpeed(server: GlassServer): number | null {
+  const { inSpeed, outSpeed } = server.network
+  return inSpeed === null && outSpeed === null ? null : (inSpeed ?? 0) + (outSpeed ?? 0)
+}
+
+/** Komari `getConnectionCount`：TCP + UDP；两项都缺时不参与。 */
+function nodeConnections(server: GlassServer): number | null {
+  return server.tcpConnections === null && server.udpConnections === null
+    ? null
+    : (server.tcpConnections ?? 0) + (server.udpConnections ?? 0)
+}
+
+/** GPU 型号，多卡同型号只写一次（上游的 `gpu_name` 是一个字符串）。 */
+function gpuModels(server: GlassServer): string {
+  return [...new Set(server.gpus.map((gpu) => gpu.name.trim()).filter(Boolean))].join(' / ')
 }
 
 /** 对应 Komari `formatNodeNames`：最多列 8 台，超出写「… 还有 N 台」，没有节点时写「暂无节点」。 */
@@ -659,12 +681,26 @@ export function buildGeneralCards(
   const totalTraffic = trafficUp !== null && trafficDown !== null ? trafficUp + trafficDown : null
   const upload = sum(online.map((server) => server.network.outSpeed))
   const download = sum(online.map((server) => server.network.inSpeed))
-  const peak = peakSpeedNode(online)
   const avgCpu = average(online.map((server) => server.cpu))
   // 与上游一样按节点平均：多卡节点先取自身平均，不按卡数加权。
   const gpuNodes = servers.filter((server) => server.gpus.length > 0)
   const onlineGpuNodes = gpuNodes.filter((server) => server.online)
   const avgGpu = average(onlineGpuNodes.map(gpuUtilization))
+  // 峰值节点与上游 `onlineStats` 一样只在在线节点里取。
+  const trafficTop = topNode(online, totalSpeed)
+  const uploadTop = topNode(online, (server) => server.network.outSpeed)
+  const downloadTop = topNode(online, (server) => server.network.inSpeed)
+  const connectionTop = topNode(online, nodeConnections)
+  const gpuTop = topNode(onlineGpuNodes, gpuUtilization)
+  // 流量配额：上游只合计设了上限的节点。站点关闭流量展示的节点不透露；已用量缺失的不当作 0，单独说明。
+  const quotaNodes = servers.filter((server) => server.showTraffic && parseTrafficLimitBytes(server.trafficLimit) !== null)
+  const quotaUsage = quotaNodes.flatMap((server) => {
+    const usage = trafficUsage(server)
+    return usage === null ? [] : [usage]
+  })
+  const quotaMissing = quotaNodes.length - quotaUsage.length
+  const quotaUsed = sum(quotaUsage.map((usage) => usage.used))
+  const quotaLimit = sum(quotaUsage.map((usage) => usage.limit))
   const avgLoad = average(online.map((server) => server.load.one))
   const avgLoad5 = average(online.map((server) => server.load.five))
   const avgLoad15 = average(online.map((server) => server.load.fifteen))
@@ -688,9 +724,7 @@ export function buildGeneralCards(
     const value = gpuUtilization(server)
     return `${server.name}: ${value === null ? MISSING_TEXT : `${value.toFixed(1)}%`}`
   }
-  const gpuNameText = (server: GlassServer) => (
-    `${server.name}: ${[...new Set(server.gpus.map((gpu) => gpu.name.trim()).filter(Boolean))].join(' / ') || 'GPU'}`
-  )
+  const gpuNameText = (server: GlassServer) => `${server.name}: ${gpuModels(server) || 'GPU'}`
   const highLoadText = (server: GlassServer) => (
     `${server.name}: ${highLoadMetrics(server, settings.homeHighLoadThreshold)
       .map((metric) => `${metric.label} ${metric.percentage.toFixed(1)}%`)
@@ -708,7 +742,38 @@ export function buildGeneralCards(
   const totalTrafficSplit = formatDisplayBytesSplit(totalTraffic)
   const uploadSplit = formatDisplaySpeedSplit(upload)
   const downloadSplit = formatDisplaySpeedSplit(download)
-  const peakSplit = formatDisplaySpeedSplit(peak?.value ?? null)
+  /** 上游 `formatTopNodeSpeed`：没有候选或速度为 0 时只显示 `-`；否则给出这台节点的上下行。 */
+  const speedCard = (
+    key: 'trafficPeak' | 'uploadPeakNode' | 'downloadPeakNode',
+    icon: IconName,
+    label: string,
+    top: TopNode | null,
+  ): PresentationCard => {
+    if (top === null || top.value <= 0) return { key, icon, label, value: MISSING_TEXT, hint: '' }
+    const split = formatDisplaySpeedSplit(top.value)
+    return {
+      key,
+      icon,
+      label,
+      value: split.value,
+      unit: split.unit,
+      hint: `${top.server.name}\n↑ ${formatDisplaySpeed(top.server.network.outSpeed)}\n↓ ${formatDisplaySpeed(top.server.network.inSpeed)}`,
+    }
+  }
+  /** 上游 `trafficQuota`：已用合计 ÷ 上限合计；没有任何节点设上限时显示 `-` 与「无限流量」。 */
+  const quotaCard = (): PresentationCard => {
+    const card: Pick<PresentationCard, 'key' | 'icon' | 'label'> = { key: 'trafficQuota', icon: 'tabler:gauge', label: '流量配额' }
+    if (quotaUsed === null || quotaLimit === null || quotaLimit <= 0) {
+      return { ...card, value: MISSING_TEXT, hint: quotaNodes.length === 0 ? '无限流量' : `${quotaMissing} 台缺少流量数据，未计入` }
+    }
+    const missing = quotaMissing > 0 ? `\n部分 · ${quotaMissing} 台缺少流量数据，未计入` : ''
+    return {
+      ...card,
+      value: (quotaUsed / quotaLimit * 100).toFixed(1),
+      unit: '%',
+      hint: `${formatDisplayBytes(quotaUsed)} / ${formatDisplayBytes(quotaLimit)}${missing}`,
+    }
+  }
 
   const values: Record<GeneralCardKey, PresentationCard | null> = {
     ...financeCards(finance),
@@ -729,10 +794,18 @@ export function buildGeneralCards(
     // 上游用 `tabler:chip`，该名称已不在 Iconify Tabler 集内，改用同族的 `tabler:cpu`。
     cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), unit: 'Core', hint: '' },
     gpuNodes: { key: 'gpuNodes', icon: 'tabler:device-imac', label: 'GPU 节点', value: formatCount(gpuNodes.length), unit: `/ ${formatCount(servers.length)}`, hint: formatNodeNames(gpuNodes, gpuNameText) },
-    // 上游 `formatTopNodeSpeed`：合计为 0 时只显示 `-`；否则给出这台节点的上下行。
-    trafficPeak: peak === null ? null : peak.value <= 0
-      ? { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: MISSING_TEXT, hint: '' }
-      : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.server.name}\n↑ ${formatDisplaySpeed(peak.server.network.outSpeed)}\n↓ ${formatDisplaySpeed(peak.server.network.inSpeed)}` },
+    // 上游 `formatTopNodePercentage`：没有 GPU 节点时只显示 `-`。
+    gpuPeakNode: gpuTop === null
+      ? { key: 'gpuPeakNode', icon: 'tabler:chart-histogram', label: 'GPU 峰值', value: MISSING_TEXT, hint: '' }
+      : { key: 'gpuPeakNode', icon: 'tabler:chart-histogram', label: 'GPU 峰值', value: gpuTop.value.toFixed(1), unit: '%', hint: [gpuTop.server.name, gpuModels(gpuTop.server), `GPU ${gpuTop.value.toFixed(1)}%`].filter(Boolean).join('\n') },
+    trafficQuota: quotaCard(),
+    trafficPeak: speedCard('trafficPeak', 'tabler:activity', '实时峰值', trafficTop),
+    uploadPeakNode: speedCard('uploadPeakNode', 'tabler:arrow-big-up-lines', '上行最高', uploadTop),
+    downloadPeakNode: speedCard('downloadPeakNode', 'tabler:arrow-big-down-lines', '下行最高', downloadTop),
+    // 上游 `connectionPeakTooltip`：节点名与 TCP / UDP；没有候选时写「暂无数据」。
+    connectionPeakNode: connectionTop === null
+      ? { key: 'connectionPeakNode', icon: 'tabler:plug-connected', label: '连接峰值', value: MISSING_TEXT, hint: '暂无数据' }
+      : { key: 'connectionPeakNode', icon: 'tabler:plug-connected', label: '连接峰值', value: formatCount(connectionTop.value), hint: `${connectionTop.server.name}\nTCP ${formatCount(connectionTop.server.tcpConnections)}\nUDP ${formatCount(connectionTop.server.udpConnections)}` },
     highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadNodes.length), unit: `/ ${formatCount(online.length)}`, hint: formatNodeNames(highLoadNodes, highLoadText) },
     expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringNodes.length), unit: '台', hint: formatNodeNames(expiringNodes, expiryText) },
     trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningNodes.length), unit: '台', hint: formatNodeNames(trafficWarningNodes, trafficWarningText) },
