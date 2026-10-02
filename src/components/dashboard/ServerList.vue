@@ -3,14 +3,14 @@ import { computed } from 'vue'
 import type { GlassServer } from '@/types/glassmorphism'
 import AppIcon from '@/components/ui/AppIcon.vue'
 import AppProgressThin from '@/components/ui/AppProgressThin.vue'
+import type { IconName } from '@/constants/icons'
 import { resolveRegionCoordinates } from '@/domain/advanced-tools'
 import { windowAverage } from '@/domain/probe-window'
+import { resolveNodeProvider } from '@/domain/provider'
 import {
-  matchProvider,
   trafficDisplay,
   trafficDisplayPercent,
   trafficHeadText,
-  type ProviderAlias,
 } from '@/domain/theme-presentation'
 import { flagUrl, hideMissingFlag } from '@/utils/flags'
 import { osDisplayName, osIconUrl } from '@/utils/os-icon'
@@ -39,7 +39,8 @@ const props = defineProps<{
   metadataEnabled: boolean
   metadataFields: string[]
   customTagsVisible: boolean
-  providerAliases: ProviderAlias[]
+  /** 主题设置里的厂商别名原文，与详情页走同一套识别（`domain/provider.ts`）。 */
+  providerAliases: string
   priceVisible: boolean
   /** 当前分组：与 Komari NodeList 的 `transitionKey` 一样并入行 key。 */
   transitionKey: string
@@ -98,16 +99,29 @@ interface MetadataBadge {
   key: string
   value: string
   flag?: string
+  icon?: IconName
+  title?: string
 }
 
-/** 只展示 CFSM 真实存在的元数据；provider 仅按用户声明的别名做文本匹配。 */
+/**
+ * 只展示 CFSM 真实存在的元数据。厂商与上游 NodeList 一样取 `displayName`、图标与识别依据，
+ * 和详情页同一个识别函数：节点名称 / 分组 / 地区 / 标签、自定义别名，以及约定的 asn / org 标签。
+ * 上游的 city / asn 两项来自 IP 地理查询，CFSM 不公开 IP，因此不提供。
+ */
 function metadataBadges(server: GlassServer): MetadataBadge[] {
   const fields = new Set(props.metadataFields)
   const badges: MetadataBadge[] = []
 
   if (fields.has('provider')) {
-    const provider = matchProvider(server, props.providerAliases)
-    if (provider) badges.push({ key: 'provider', value: provider })
+    const provider = resolveNodeProvider(server, props.providerAliases).provider
+    if (provider?.displayName) {
+      badges.push({
+        key: 'provider',
+        value: provider.displayName,
+        icon: provider.primary.icon,
+        title: provider.tooltipLines.length > 0 ? provider.tooltipLines.join('\n') : provider.displayName,
+      })
+    }
   }
   if (fields.has('region') && server.region) {
     const code = regionCode(server)
@@ -274,9 +288,10 @@ function hideMissingImage(event: Event): void {
                 v-for="badge in metadataBadges(server)"
                 :key="badge.key"
                 class="node-list__badge"
-                :title="badge.value"
+                :title="badge.title ?? badge.value"
               >
                 <img v-if="badge.flag" :src="badge.flag" alt="" @error="hideMissingFlag">
+                <AppIcon v-else-if="badge.icon" :name="badge.icon" :size="12" />
                 <span>{{ badge.value }}</span>
               </span>
             </div>

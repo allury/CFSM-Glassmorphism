@@ -29,7 +29,7 @@ const MiB = 1024
 function glass(overrides: Partial<GlassServer> = {}): GlassServer {
   return {
     key: 'source:node', id: 'node', sourceBase: 'https://status.example', sourceLabel: 'status.example',
-    name: 'Acme Hong Kong Edge', group: 'Production', tags: [], region: 'HK',
+    name: 'Acme Hong Kong Edge', group: 'Production', tags: [], providerTags: { asn: null, org: null }, region: 'HK',
     price: null, billingCycle: null, currency: null, expireDate: null, trafficLimit: null,
     trafficCalculationType: null, showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: null, cpu: null, load: { one: null, five: null, fifteen: null },

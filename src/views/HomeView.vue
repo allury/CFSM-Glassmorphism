@@ -22,7 +22,6 @@ import {
   generalFinanceContext,
   isExpiring,
   isHighLoad,
-  parseProviderAliases,
   resolveQuickControlKeys,
   type QuickControlKey,
 } from '@/domain/theme-presentation'
@@ -105,7 +104,6 @@ const generalStageClass = computed(() => {
   return isTiledEarth.value ? 'general-stage--tiled' : 'general-stage--globe'
 })
 const metadataFields = computed(() => parseSettingKeys(theme.runtime.nodeListMetadataFields))
-const providerAliases = computed(() => parseProviderAliases(theme.runtime.providerAliases))
 const quickControlKeys = computed(() => resolveQuickControlKeys(theme.runtime))
 const glassServers = computed(() => (
   glassServerMapper.map(serverStore.servers, app.config)
@@ -586,7 +584,7 @@ onUnmounted(() => realtime.stop())
               :favorite-keys="preferences.favorites"
               :metadata-enabled="theme.runtime.nodeListMetadataEnabled"
               :metadata-fields="metadataFields"
-              :provider-aliases="providerAliases"
+              :provider-aliases="theme.runtime.providerAliases"
               :custom-tags-visible="theme.runtime.nodeListCustomTagsVisible"
               :price-visible="priceVisible"
               :transition-key="selectedGroup"

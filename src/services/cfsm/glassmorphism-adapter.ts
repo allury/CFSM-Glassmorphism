@@ -75,6 +75,7 @@ export function toGlassServer(server: CfsmServer, config: SiteConfig | null): Gl
     name: server.name,
     group: server.group,
     tags: server.tags,
+    providerTags: server.providerTags,
     region: server.region,
     price: server.price,
     billingCycle: server.billingCycle,

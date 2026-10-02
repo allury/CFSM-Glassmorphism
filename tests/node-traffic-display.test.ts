@@ -21,7 +21,7 @@ const GiB = 1024 ** 3
 function server(overrides: Partial<GlassServer> = {}): GlassServer {
   return {
     key: 'example:node', id: 'node', sourceBase: 'https://example.invalid', sourceLabel: 'Example',
-    name: 'Example Node', group: '', tags: [], region: 'HK',
+    name: 'Example Node', group: '', tags: [], providerTags: { asn: null, org: null }, region: 'HK',
     price: null, billingCycle: null, currency: null, expireDate: null, trafficLimit: null,
     trafficCalculationType: 'total', showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: null, cpu: 5, load: { one: 1.11, five: 2.22, fifteen: 3.33 },
@@ -112,7 +112,8 @@ async function cardTraffic(overrides: Partial<GlassServer>, density: 'comfortabl
 async function listTraffic(overrides: Partial<GlassServer>): Promise<string> {
   const html = await renderToString(createSSRApp(ServerList, {
     servers: [server(overrides)], showSource: false, favoriteKeys: new Set<string>(),
-    metadataEnabled: false, metadataFields: [], customTagsVisible: false, providerAliases: [], priceVisible: true,
+    metadataEnabled: false, metadataFields: [], customTagsVisible: false, providerAliases: '', priceVisible: true,
+    transitionKey: '__all__', motion: false,
   }))
   const values = [...html.matchAll(/<span class="node-list__metric-value">([^<]*)<\/span>/g)].map((item) => item[1]?.trim() ?? '')
   // CPU / 内存 / 硬盘 / 流量

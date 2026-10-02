@@ -179,8 +179,22 @@ function normalizeText(value: string): NormalizedText {
   return { spaced, compact: spaced.replace(SPACE_REGEX, '') }
 }
 
+/*
+ * 列表视图每一行、每次实时推送都会做一次厂商识别，内置厂商库的关键词是固定的，
+ * 规范化结果缓存起来，不必每次重算上百个关键词。自定义别名同样进缓存，数量有限。
+ */
+const normalizedKeywordCache = new Map<string, NormalizedText>()
+
+function keywordText(keyword: string): NormalizedText {
+  const cached = normalizedKeywordCache.get(keyword)
+  if (cached) return cached
+  const normalized = normalizeText(keyword)
+  normalizedKeywordCache.set(keyword, normalized)
+  return normalized
+}
+
 function matchesKeyword(text: NormalizedText, keyword: string): boolean {
-  const normalizedKeyword = normalizeText(keyword)
+  const normalizedKeyword = keywordText(keyword)
   return Boolean(
     (normalizedKeyword.spaced && text.spaced.includes(normalizedKeyword.spaced))
     || (normalizedKeyword.compact && text.compact.includes(normalizedKeyword.compact)),

@@ -19,6 +19,7 @@ function makeServer(id: string, overrides: Partial<GlassServer> = {}): GlassServ
     name: 'Node ' + id,
     group: '',
     tags: [],
+    providerTags: { asn: null, org: null },
     region: null,
     price: null,
     billingCycle: null,

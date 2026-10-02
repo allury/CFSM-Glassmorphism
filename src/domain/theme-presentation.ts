@@ -6,9 +6,11 @@ import {
   EMPTY_RATE_VIEW,
   formatFinanceAmount,
   monthlyCost as monthlyCostOf,
+  parseBillingPrice,
   remainingValueOf,
   resolveSourceCurrency,
   SKIP_REASONS,
+  skipReasonLabel,
   summarizeFinance,
   type BillableNode,
   type Conversion,
@@ -18,6 +20,7 @@ import {
   type RateSource,
   type RateView,
 } from '@/domain/finance'
+import { summarizeResource } from '@/domain/dashboard'
 import { parseSettingKeys, type ThemeSettings } from '@/theme/settings'
 import type { CfsmServer } from '@/types/cfsm'
 import type { GlassServer } from '@/types/glassmorphism'
@@ -217,9 +220,31 @@ export function resolveChartFamilies(settings: ThemeSettings): ChartFamily[] {
   return [...new Set(selectedKeys(CHART_PRESETS[settings.chartDashboardPreset], template, CHART_KEYS))]
 }
 
+export interface HighLoadMetric {
+  label: 'CPU' | '内存' | '硬盘'
+  percentage: number
+}
+
+/**
+ * 对应 Komari `getHighLoadMetrics`：离线节点一律不算（最后一次上报不代表当前负载），
+ * 在线节点按 CPU / 内存 / 硬盘逐项与阈值比较。缺失的指标不参与，不当作 0。
+ * 总览卡片与快捷筛选都经由这里判断，因此都只统计在线节点，与上游一致。
+ */
+export function highLoadMetrics(server: GlassServer, threshold: number): HighLoadMetric[] {
+  if (!server.online) return []
+  const metrics: HighLoadMetric[] = []
+  if (server.cpu !== null && server.cpu >= threshold) metrics.push({ label: 'CPU', percentage: server.cpu })
+  if (server.memory.percentage !== null && server.memory.percentage >= threshold) {
+    metrics.push({ label: '内存', percentage: server.memory.percentage })
+  }
+  if (server.disk.percentage !== null && server.disk.percentage >= threshold) {
+    metrics.push({ label: '硬盘', percentage: server.disk.percentage })
+  }
+  return metrics
+}
+
 export function isHighLoad(server: GlassServer, threshold: number): boolean {
-  return [server.cpu, server.memory.percentage, server.disk.percentage]
-    .some((value) => value !== null && value >= threshold)
+  return highLoadMetrics(server, threshold).length > 0
 }
 
 export function daysUntilExpiry(value: string | null, now = Date.now()): number | null {
@@ -247,10 +272,15 @@ export function remainingValue(server: BillableServer, now = Date.now()): number
   return result.status === 'ok' ? result.amount : null
 }
 
+/**
+ * 对应 Komari `isExpiringNode`：免费节点不算；已经过期的节点也算在内（上游名单里写「已过期」）；
+ * 阈值至少 1 天。站点关闭到期展示（`show_expire`）时不透露。
+ */
 export function isExpiring(server: GlassServer, days: number, now = Date.now()): boolean {
   if (!server.showExpire) return false
+  if (parseBillingPrice(server.price).status === 'free') return false
   const remaining = daysUntilExpiry(server.expireDate, now)
-  return remaining !== null && remaining >= 0 && remaining <= days
+  return remaining !== null && remaining <= Math.max(1, days)
 }
 
 export function parseTrafficLimitBytes(value: string | null): number | null {
@@ -339,25 +369,6 @@ export function trafficRatioText(view: TrafficDisplay): string {
 export function isTrafficWarning(server: GlassServer, threshold: number): boolean {
   const usage = trafficUsage(server)
   return usage !== null && usage.percent >= threshold
-}
-
-export interface ProviderAlias { provider: string, aliases: string[] }
-
-export function parseProviderAliases(value: string): ProviderAlias[] {
-  return value.split(';').flatMap((entry) => {
-    const separator = entry.indexOf(':')
-    if (separator < 1) return []
-    const provider = entry.slice(0, separator).trim()
-    const aliases = entry.slice(separator + 1).split(',').map((item) => item.trim().toLocaleLowerCase()).filter(Boolean)
-    return provider && aliases.length > 0 ? [{ provider, aliases }] : []
-  })
-}
-
-export function matchProvider(server: GlassServer, aliases: readonly ProviderAlias[]): string | null {
-  const values = [server.name, server.group, server.region, ...server.tags]
-    .filter((value): value is string => Boolean(value))
-    .map((value) => value.normalize('NFKC').toLocaleLowerCase())
-  return aliases.find((entry) => entry.aliases.some((alias) => values.some((value) => value.includes(alias))))?.provider ?? null
 }
 
 function average(values: Array<number | null>): number | null {
@@ -535,17 +546,41 @@ function financeCards(context: GeneralFinanceContext | undefined): Pick<Record<G
   }
 }
 
-/** 取用量最高的一台节点，用于「实时峰值」卡片的 tooltip 说明。 */
-function peakSpeedNode(servers: GlassServer[]): { name: string, value: number } | null {
-  let best: { name: string, value: number } | null = null
+/**
+ * 对应 Komari 的 `trafficPeak`（`getRealtimeTotalSpeed`）：实时上下行合计最高的一台在线节点。
+ * 两向都缺失的节点不参与；只缺一向时按另一向计，与上游的 `|| 0` 口径相同。
+ */
+function peakSpeedNode(servers: GlassServer[]): { server: GlassServer, value: number } | null {
+  let best: { server: GlassServer, value: number } | null = null
   for (const server of servers) {
-    for (const speed of [server.network.inSpeed, server.network.outSpeed]) {
-      if (speed === null) continue
-      if (best === null || speed > best.value) best = { name: server.name, value: speed }
-    }
+    const { inSpeed, outSpeed } = server.network
+    if (inSpeed === null && outSpeed === null) continue
+    const total = (inSpeed ?? 0) + (outSpeed ?? 0)
+    if (best === null || total > best.value) best = { server, value: total }
   }
   return best
 }
+
+/** 对应 Komari `formatNodeNames`：最多列 8 台，超出写「… 还有 N 台」，没有节点时写「暂无节点」。 */
+function formatNodeNames(
+  servers: readonly GlassServer[],
+  formatter: (server: GlassServer) => string = (server) => server.name,
+  max = 8,
+): string {
+  if (servers.length === 0) return '暂无节点'
+  const lines = servers.slice(0, max).map(formatter)
+  if (servers.length > max) lines.push(`… 还有 ${servers.length - max} 台`)
+  return lines.join('\n')
+}
+
+/** 节点 GPU 利用率：多卡取平均；全部缺失时为 null，不当作 0。 */
+function gpuUtilization(server: GlassServer): number | null {
+  return average(server.gpus.map((gpu) => gpu.utilization))
+}
+
+// 「当前时间」卡片每次重算都会用到，格式器只建一次。
+const CLOCK_TIME_FORMAT = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+const CLOCK_DATE_FORMAT = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })
 
 /** 按出现次数降序的取值分布，对应 Komari `getDistribution`。 */
 function distribution(values: Array<string | null>): Array<{ label: string, count: number }> {
@@ -581,12 +616,7 @@ export function buildGeneralCards(
   finance?: GeneralFinanceContext,
 ): PresentationCard[] {
   const online = servers.filter((server) => server.online)
-  const offlineCount = servers.length - online.length
-  const resources = (selector: (server: GlassServer) => { used: number | null, total: number | null }) => {
-    const used = sum(servers.map((server) => selector(server).used))
-    const total = sum(servers.map((server) => selector(server).total))
-    return { used, total, percentage: used !== null && total !== null && total > 0 ? used / total * 100 : null }
-  }
+  const offlineNodes = servers.filter((server) => !server.online)
   /** 内存 / 硬盘 / 交换内存：`已用值` + `已用单位 / 总量 单位`。 */
   const usageCard = (
     key: 'memory' | 'disk' | 'swap',
@@ -615,9 +645,10 @@ export function buildGeneralCards(
     }
   }
 
-  const memory = resources((server) => server.memory)
-  const disk = resources((server) => server.disk)
-  const swap = resources((server) => server.swap)
+  // 只累计已用与总量都有值的节点，与首页其它汇总同一口径；缺的一侧不当作 0 混进合计。
+  const memory = summarizeResource(servers, (server) => server.memory)
+  const disk = summarizeResource(servers, (server) => server.disk)
+  const swap = summarizeResource(servers, (server) => server.swap)
   // 单节点仍须双向完整；缺失的一向绝不能被当作 0 加进全站总量。
   const trafficReady = servers.filter((server) => (
     server.network.transmitted !== null && server.network.received !== null
@@ -630,7 +661,10 @@ export function buildGeneralCards(
   const download = sum(online.map((server) => server.network.inSpeed))
   const peak = peakSpeedNode(online)
   const avgCpu = average(online.map((server) => server.cpu))
-  const avgGpu = average(online.flatMap((server) => server.gpus.map((gpu) => gpu.utilization)))
+  // 与上游一样按节点平均：多卡节点先取自身平均，不按卡数加权。
+  const gpuNodes = servers.filter((server) => server.gpus.length > 0)
+  const onlineGpuNodes = gpuNodes.filter((server) => server.online)
+  const avgGpu = average(onlineGpuNodes.map(gpuUtilization))
   const avgLoad = average(online.map((server) => server.load.one))
   const avgLoad5 = average(online.map((server) => server.load.five))
   const avgLoad15 = average(online.map((server) => server.load.fifteen))
@@ -639,14 +673,38 @@ export function buildGeneralCards(
   const udpCount = sum(online.map((server) => server.udpConnections))
   const connectionCount = tcpCount === null && udpCount === null ? null : (tcpCount ?? 0) + (udpCount ?? 0)
   const coreCount = sum(servers.map((server) => server.cpuCores))
-  const gpuNodeCount = servers.filter((server) => server.gpus.length > 0).length
   const regionEntries = distribution(servers.map((server) => server.region ?? null))
   const regions = regionEntries.length
   const systemEntries = distribution(servers.map((server) => server.operatingSystem))
   const topSystem = systemEntries[0] ?? null
-  const highLoadCount = servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold)).length
-  const expiringCount = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now)).length
-  const trafficWarningCount = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold)).length
+  const highLoadNodes = servers.filter((server) => isHighLoad(server, settings.homeHighLoadThreshold))
+  const expiringNodes = servers.filter((server) => isExpiring(server, settings.homeExpiringDays, now))
+  const trafficWarningNodes = servers.filter((server) => isTrafficWarning(server, settings.homeTrafficWarningThreshold))
+  /*
+   * 以下几张卡的 tooltip 逐条对应 Komari `NodeGeneralCards` 的 `formatNodeNames(...)`：
+   * 列出具体节点与指标。上游没有 tooltip 的卡（实时上下行、在线节点、平均 CPU、进程、核心）这里也不放。
+   */
+  const gpuText = (server: GlassServer) => {
+    const value = gpuUtilization(server)
+    return `${server.name}: ${value === null ? MISSING_TEXT : `${value.toFixed(1)}%`}`
+  }
+  const gpuNameText = (server: GlassServer) => (
+    `${server.name}: ${[...new Set(server.gpus.map((gpu) => gpu.name.trim()).filter(Boolean))].join(' / ') || 'GPU'}`
+  )
+  const highLoadText = (server: GlassServer) => (
+    `${server.name}: ${highLoadMetrics(server, settings.homeHighLoadThreshold)
+      .map((metric) => `${metric.label} ${metric.percentage.toFixed(1)}%`)
+      .join(' / ')}`
+  )
+  const expiryText = (server: GlassServer) => {
+    const days = daysUntilExpiry(server.expireDate, now)
+    if (days === null) return `${server.name}: 未知`
+    return days <= 0 ? `${server.name}: 已过期` : `${server.name}: ${days} 天`
+  }
+  const trafficWarningText = (server: GlassServer) => {
+    const usage = trafficUsage(server)
+    return `${server.name}: ${usage === null ? MISSING_TEXT : `${Math.min(100, usage.percent).toFixed(1)}%`}`
+  }
   const totalTrafficSplit = formatDisplayBytesSplit(totalTraffic)
   const uploadSplit = formatDisplaySpeedSplit(upload)
   const downloadSplit = formatDisplaySpeedSplit(download)
@@ -654,27 +712,30 @@ export function buildGeneralCards(
 
   const values: Record<GeneralCardKey, PresentationCard | null> = {
     ...financeCards(finance),
-    currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).format(now), hint: new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' }).format(now) },
+    currentTime: { key: 'currentTime', icon: 'tabler:clock', label: '当前时间', value: CLOCK_TIME_FORMAT.format(now), hint: CLOCK_DATE_FORMAT.format(now) },
     memory: usageCard('memory', 'icon-park-outline:memory', '内存用量', memory),
     disk: usageCard('disk', 'tabler:server-2', '硬盘用量', disk),
     totalTraffic: totalTraffic === null ? null : { key: 'totalTraffic', icon: 'tabler:download', label: '累计流量', value: totalTrafficSplit.value, unit: totalTrafficSplit.unit, hint: `↑ ${formatDisplayBytes(trafficUp)}\n↓ ${formatDisplayBytes(trafficDown)}${missingTrafficCount > 0 ? `\n部分 · ${missingTrafficCount} 台缺少流量数据，未计入` : ''}` },
-    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '在线节点合计' },
-    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '在线节点合计' },
-    onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: `${offlineCount} 台离线` },
-    offlineNodes: { key: 'offlineNodes', icon: 'tabler:plug-connected-x', label: '离线节点', value: formatCount(offlineCount), unit: `/ ${formatCount(servers.length)}`, hint: '5 分钟未上报即离线' },
-    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: 'tabler:cpu', label: '平均 CPU', value: avgCpu.toFixed(1), unit: '%', hint: '有采样的在线节点' },
-    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: 'tabler:device-desktop-analytics', label: '平均 GPU', value: avgGpu.toFixed(1), unit: '%', hint: '有 GPU 采样的在线节点' },
+    uploadSpeed: upload === null ? null : { key: 'uploadSpeed', icon: 'tabler:chevrons-up', label: '实时上行', value: uploadSplit.value, unit: uploadSplit.unit, hint: '' },
+    downloadSpeed: download === null ? null : { key: 'downloadSpeed', icon: 'tabler:chevrons-down', label: '实时下行', value: downloadSplit.value, unit: downloadSplit.unit, hint: '' },
+    onlineNodes: { key: 'onlineNodes', icon: 'tabler:activity-heartbeat', label: '在线节点', value: formatCount(online.length), unit: `/ ${formatCount(servers.length)}`, hint: '' },
+    offlineNodes: { key: 'offlineNodes', icon: 'tabler:plug-connected-x', label: '离线节点', value: formatCount(offlineNodes.length), unit: `/ ${formatCount(servers.length)}`, hint: formatNodeNames(offlineNodes) },
+    avgCpu: avgCpu === null ? null : { key: 'avgCpu', icon: 'tabler:cpu', label: '平均 CPU', value: avgCpu.toFixed(1), unit: '%', hint: '' },
+    avgGpu: avgGpu === null ? null : { key: 'avgGpu', icon: 'tabler:device-desktop-analytics', label: '平均 GPU', value: avgGpu.toFixed(1), unit: '%', hint: formatNodeNames(onlineGpuNodes, gpuText) },
     avgLoad: avgLoad === null ? null : { key: 'avgLoad', icon: 'tabler:chart-line', label: '平均负载', value: formatLoad(avgLoad), hint: `1m ${formatLoad(avgLoad)}\n5m ${formatLoad(avgLoad5)}\n15m ${formatLoad(avgLoad15)}` },
     swap: usageCard('swap', 'icon-park-outline:switch', '交换内存', swap),
-    processes: processCount === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程总数', value: formatCount(processCount), hint: '在线节点合计' },
+    processes: processCount === null ? null : { key: 'processes', icon: 'tabler:list-numbers', label: '进程总数', value: formatCount(processCount), hint: '' },
     connections: connectionCount === null ? null : { key: 'connections', icon: 'tabler:plug-connected', label: '连接数', value: formatCount(connectionCount), hint: `TCP ${formatCount(tcpCount)}\nUDP ${formatCount(udpCount)}` },
     // 上游用 `tabler:chip`，该名称已不在 Iconify Tabler 集内，改用同族的 `tabler:cpu`。
-    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), unit: 'Core', hint: '有数据节点合计' },
-    gpuNodes: { key: 'gpuNodes', icon: 'tabler:device-imac', label: 'GPU 节点', value: formatCount(gpuNodeCount), unit: `/ ${formatCount(servers.length)}`, hint: '包含真实 gpu_info' },
-    trafficPeak: peak === null ? null : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.name}\n${formatDisplaySpeed(peak.value)}` },
-    highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadCount), unit: `/ ${formatCount(online.length)}`, hint: `CPU / RAM / Disk ≥ ${settings.homeHighLoadThreshold}%` },
-    expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringCount), unit: '台', hint: `${settings.homeExpiringDays} 天内` },
-    trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningCount), unit: '台', hint: `可靠配额 ≥ ${settings.homeTrafficWarningThreshold}%` },
+    cpuCores: coreCount === null ? null : { key: 'cpuCores', icon: 'tabler:cpu', label: 'CPU 核心', value: formatCount(coreCount), unit: 'Core', hint: '' },
+    gpuNodes: { key: 'gpuNodes', icon: 'tabler:device-imac', label: 'GPU 节点', value: formatCount(gpuNodes.length), unit: `/ ${formatCount(servers.length)}`, hint: formatNodeNames(gpuNodes, gpuNameText) },
+    // 上游 `formatTopNodeSpeed`：合计为 0 时只显示 `-`；否则给出这台节点的上下行。
+    trafficPeak: peak === null ? null : peak.value <= 0
+      ? { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: MISSING_TEXT, hint: '' }
+      : { key: 'trafficPeak', icon: 'tabler:activity', label: '实时峰值', value: peakSplit.value, unit: peakSplit.unit, hint: `${peak.server.name}\n↑ ${formatDisplaySpeed(peak.server.network.outSpeed)}\n↓ ${formatDisplaySpeed(peak.server.network.inSpeed)}` },
+    highLoadNodes: { key: 'highLoadNodes', icon: 'tabler:alert-triangle', label: '高负载节点', value: formatCount(highLoadNodes.length), unit: `/ ${formatCount(online.length)}`, hint: formatNodeNames(highLoadNodes, highLoadText) },
+    expiringNodes: { key: 'expiringNodes', icon: 'tabler:calendar-exclamation', label: '即将到期', value: formatCount(expiringNodes.length), unit: '台', hint: formatNodeNames(expiringNodes, expiryText) },
+    trafficWarnings: { key: 'trafficWarnings', icon: 'tabler:traffic-cone', label: '流量预警', value: formatCount(trafficWarningNodes.length), unit: '台', hint: formatNodeNames(trafficWarningNodes, trafficWarningText) },
     regionDistribution: { key: 'regionDistribution', icon: 'tabler:map-pin', label: '地区分布', value: formatCount(regions), unit: '个', hint: distributionTooltip(regionEntries) },
     // 上游这张卡的 tooltip 是 `formatDistributionTooltip`，会列出完整的系统名与台数；
     // 此前这里放的是一句说明文字，长系统名（`Ubuntu 24.04.4 LTS`）被截断后就读不回来了。
@@ -733,7 +794,7 @@ const DEFAULT_DETAIL_FINANCE: DetailFinanceContext = { target: 'CNY', view: EMPT
 function conversionFailure(converted: Exclude<Conversion, { status: 'ok' }>): { unit: string, note: string } {
   if (converted.status === 'pending') return { unit: '载入中', note: '汇率载入中' }
   if (converted.reason === 'rate-missing') return { unit: '汇率不可用', note: '缺少汇率，无法换算' }
-  return { unit: '不可换算', note: '币种无法识别，无法换算' }
+  return { unit: '不可换算', note: `${skipReasonLabel(converted.reason)}，无法换算` }
 }
 
 /**

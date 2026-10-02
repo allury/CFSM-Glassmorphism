@@ -30,7 +30,7 @@ const NETWORK: RateView = { rates: { CNY: 1, EUR: 0.125, USD: 0.1 }, sources: { 
 function glass(overrides: Partial<GlassServer>): GlassServer {
   return {
     key: overrides.key ?? 'n', id: 'n', sourceBase: 'https://status.example', sourceLabel: 'status.example',
-    name: overrides.name ?? 'Node', group: '', tags: [], region: null,
+    name: overrides.name ?? 'Node', group: '', tags: [], providerTags: { asn: null, org: null }, region: null,
     price: null, billingCycle: null, currency: null, expireDate: null, trafficLimit: null,
     trafficCalculationType: null, showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: null, cpu: null, load: { one: null, five: null, fifteen: null },

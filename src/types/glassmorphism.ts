@@ -1,4 +1,4 @@
-import type { ProbeTarget, ProbeValue, Reachability } from './cfsm'
+import type { ProbeTarget, ProbeValue, ProviderTags, Reachability } from './cfsm'
 
 export interface GlassResourceMetric {
   used: number | null
@@ -45,6 +45,8 @@ export interface GlassServer {
   name: string
   group: string
   tags: string[]
+  /** 运营者在标签里约定的 ASN / 组织名（见 `services/cfsm/provider-tags.ts`），只用于厂商识别。 */
+  providerTags: ProviderTags
   region: string | null
   price: string | null
   billingCycle: string | null

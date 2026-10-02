@@ -9,7 +9,7 @@ import { MISSING_TEXT } from '@/utils/format'
 function server(overrides: Partial<GlassServer> = {}): GlassServer {
   return {
     key: 'example:node', id: 'node', sourceBase: 'https://example.invalid', sourceLabel: 'Example',
-    name: 'Example Node', group: '', tags: [], region: 'HK',
+    name: 'Example Node', group: '', tags: [], providerTags: { asn: null, org: null }, region: 'HK',
     price: '12', billingCycle: 'year', currency: 'USD', expireDate: null, trafficLimit: null,
     trafficCalculationType: null, showPrice: true, showExpire: true, showTraffic: true,
     online: true, sortOrder: null, cpu: 5, load: { one: 1.11, five: 2.22, fifteen: 3.33 },

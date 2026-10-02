@@ -147,7 +147,8 @@ export function groupServers(servers: GlassServer[]): GlassServerGroup[] {
   return [...groups].map(([name, group]) => ({ name, servers: group }))
 }
 
-function summarizeResource(
+/** 只累计已用与总量都有值、且总量为正的节点：缺的一侧不能当 0 混进合计。 */
+export function summarizeResource(
   servers: GlassServer[],
   selector: (server: GlassServer) => GlassResourceMetric,
 ): GlassResourceMetric {
