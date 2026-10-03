@@ -88,6 +88,7 @@
 | 47 | 列表视图「信息」栏的厂商 | `NodeList` 取 `resolveProvider` 的 `displayName`、图标与识别依据，与详情页同一个识别函数；另有 city / asn 两项来自 IP 地理查询 | v1.1.17 列表只认自定义别名、只按分号分组，同一台节点在列表与详情页可能显示不同的厂商 | 不一致 | 部分（city / asn 依赖 IP 地理查询，CFSM 不公开 IP） | 下一版列表改用与详情页相同的 `resolveNodeProvider`，带图标与识别依据；city / asn 不提供。回归测试：`tests/list-provider.test.ts` | P2 | PASS |
 | 48 | 总览卡片集合 | `ALL_GENERAL_CARD_KEYS` 31 张，含上行 / 下行 / 连接数 / GPU 峰值节点、流量配额、虚拟化分布；财务与流量预设含流量配额，GPU 预设含 GPU 峰值节点 | v1.1.17 只有 25 张，缺这 6 张；`docs/theme-settings.md` 记为「CFSM 未提供字段」 | 不一致 | 部分（虚拟化分布：CFSM 没有虚拟化类型字段） | 下一版照上游补上 5 张（用户决定）：上行最高、下行最高、连接峰值、GPU 峰值与流量配额，由实时网速、连接数、GPU 利用率、流量上限与月度流量真实计算，并补回财务、流量、GPU、完整预设里的位置。峰值节点只在在线节点里取，第一台先入选、之后严格更大才替换；流量配额只合计设了上限的节点，缺月度数据的节点单独说明、不当作 0。虚拟化分布不提供。回归测试：`tests/theme-presentation.test.ts`、`tests/homepage-fidelity.test.ts` | P2 | PASS |
 | 49 | 快捷控制按钮上的计数 | `quickControlCounts` / `getQuickControlCount`：在当前分组与搜索范围内计数，不受正在使用的快捷筛选影响；排序类控制（总流量、上行、下行、峰值）显示范围内的节点数 | v1.1.17 在全部节点范围内计数，排序类控制一律显示 0 | 不一致 | 否 | 下一版照上游修正。回归测试：`tests/homepage-fidelity.test.ts` | P2 | PASS |
+| 50 | 首页公告外框 | `HomeView` 的 `.alert.px-4` + shadcn `Alert`（`border-none bg-background/60 backdrop-blur-xs rounded-md`）：只有正文非空才出现，标题可选、没有默认标题与图标，`role="alert"`；实测内边距 12px 16px、圆角 8px、4px 模糊、14px/20px、标题字重 500、行距 2px、下方无外边距 | 自绘毛玻璃面板：左侧圆形信息图标、默认标题「站点公告」、只有标题也显示、`role="status"`；内边距 15px 17px、圆角 10px、正文 12px、标题粗体、下方 18px 外边距 | 不一致 | 否 | 结构与取值照上游重做。2026-10-03 与 Komari 本地预览并排实测（浅色 / 深色 1440、浅色 390，含不填标题），外框、标题、正文、链接与代码块的计算值和几何全部一致；唯一差异是上游把 `<`、`&` 显示成实体导致字数变长，属第 20 项记录的不复制缺陷。回归测试：`tests/announcement-markdown.test.ts` | P1 | PASS |
 
 ## 第 13 轮：详情页专项审计
 
@@ -271,7 +272,7 @@ P2-ACCEPTED 2、NECESSARY-CFSM-DIFFERENCE 6）。矩阵 16 的结论相应更新
 ## 当前终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 4。**
-49 项审计的终态分布：PASS 38、NECESSARY-CFSM-DIFFERENCE 7、P2-ACCEPTED 4、FAIL 0。
+50 项审计的终态分布：PASS 39、NECESSARY-CFSM-DIFFERENCE 7、P2-ACCEPTED 4、FAIL 0。
 
 ## 数据真实性边界（不因保真而放宽）
 

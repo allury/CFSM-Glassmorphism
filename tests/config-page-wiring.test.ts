@@ -23,7 +23,8 @@ function config(title: string, themeMode: 'light' | 'dark' = 'light'): SiteConfi
     isPublic: true, authorization: false, turnstileEnabled: false,
     turnstileLoginEnabled: false, turnstileSiteKey: null,
     probeLabels: { ...DEFAULT_PROBE_LABELS }, siteTitle: title, preferredTheme: 'auto', defaultLanguage: 'auto',
-    themeOptions: { themeMode, alertEnabled: true, alertTitle: '真实公告' },
+    // 与上游一致，公告只在正文非空时出现，所以样例同时给出标题与正文。
+    themeOptions: { themeMode, alertEnabled: true, alertTitle: '真实公告', alertContent: '公告正文' },
     verified: false, turnstileVerified: null, frontendWebsocketTimeoutMinutes: 5,
     longHistoryPoints: 180, latencyWindow: { points: 20, hours: 2 },
   }
@@ -63,6 +64,7 @@ describe('configuration gates are wired to the three pages', () => {
     servers.state = 'ready'
     theme.runtime.alertEnabled = true
     theme.runtime.alertTitle = '真实公告'
+    theme.runtime.alertContent = '公告正文'
     servers.collections = [{
       source: { base: primary, label: '主站' },
       servers: [normalizeServer({ id: 'node', name: '节点' }, { base: primary, label: '主站' })],

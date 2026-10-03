@@ -111,4 +111,31 @@ describe('首页公告接线', () => {
     expect(css).not.toMatch(/\.theme-announcement strong\b/)
     expect(css).toContain('.theme-announcement__title {')
   })
+
+  /*
+   * 外框对齐上游 `.alert.px-4` 里的 shadcn Alert（2026-10-03 与 Komari 本地预览并排实测，
+   * 浅色 / 深色 / 390 全部计算值一致）：只有正文非空才出现，标题可选，没有默认标题与图标。
+   */
+  it('结构与上游 Alert 一致：正文为空不出现，没有默认标题与图标', () => {
+    const home = readFileSync(new URL('../src/views/HomeView.vue', import.meta.url), 'utf8')
+    const start = home.indexOf('class="theme-announcement"')
+    const block = home.slice(start, home.indexOf('<MarkdownRenderer', start) + 80)
+    expect(start).toBeGreaterThan(0)
+    expect(home).toContain('v-if="siteConfigReady && theme.runtime.alertEnabled && theme.runtime.alertContent"')
+    expect(block).toContain('data-slot="alert" class="theme-announcement__box" role="alert"')
+    expect(block).toContain('v-if="theme.runtime.alertTitle" data-slot="alert-title"')
+    expect(block).toContain('data-slot="alert-description"')
+    expect(home).not.toContain('站点公告')
+    expect(block).not.toContain('AppIcon')
+  })
+
+  it('外框取值与上游运行时一致', () => {
+    const css = readFileSync(new URL('../src/styles/main.css', import.meta.url), 'utf8')
+    const rule = css.slice(css.indexOf('.theme-announcement__box {'), css.indexOf('}', css.indexOf('.theme-announcement__box {')))
+    expect(rule).toContain('padding: 12px 16px;')
+    expect(rule).toContain('border-radius: 8px;')
+    expect(rule).toContain('background-color: color-mix(in oklab, var(--background) 60%, transparent);')
+    expect(rule).toContain('backdrop-filter: blur(4px);')
+    expect(rule).toContain('font-size: 14px;')
+  })
 })

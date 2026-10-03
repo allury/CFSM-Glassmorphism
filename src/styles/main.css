@@ -4267,37 +4267,47 @@ a {
   }
 }
 
+/*
+ * 首页公告，对应 Komari `HomeView` 的 `.alert.px-4` 与 shadcn `Alert`
+ * （`grid gap-0.5 px-4 py-3 text-sm` + `border-none bg-background/60 backdrop-blur-xs rounded-md`）。
+ * 数值取自上游运行时实测：内边距 12px 16px、圆角 8px、4px 模糊、14px/20px 文字。
+ * 下方不留外边距，与上游一样由下一个区块自身的 16px 内边距隔开。
+ */
 .theme-announcement {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding: 15px 17px;
-  border-radius: var(--radius);
+  padding-inline: 16px;
 }
 
-.theme-announcement__mark {
+.theme-announcement__box {
   display: grid;
-  width: 25px;
-  height: 25px;
-  flex: none;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--emerald);
-  background: var(--emerald-soft);
-  font-weight: 850;
+  position: relative;
+  width: 100%;
+  gap: 2px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: color-mix(in oklab, var(--background) 60%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
 }
 
 .theme-announcement__title {
-  display: block;
-  margin: 2px 0 4px;
+  font-weight: 500;
 }
 
-.theme-announcement p {
-  margin: 0;
+.theme-announcement__description {
   color: var(--muted);
-  font-size: 12px;
-  line-height: 1.65;
+  font-size: 14px;
+  line-height: 20px;
+  text-wrap: balance;
+}
+
+@media (min-width: 768px) {
+  .theme-announcement__description {
+    text-wrap: pretty;
+  }
 }
 
 /*

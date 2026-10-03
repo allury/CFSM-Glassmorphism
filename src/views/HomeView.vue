@@ -10,7 +10,6 @@ import MarkdownRenderer from '@/components/dashboard/MarkdownRenderer.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
-import AppIcon from '@/components/ui/AppIcon.vue'
 import {
   ALL_GROUPS,
   availableGroups,
@@ -344,23 +343,24 @@ onUnmounted(() => realtime.stop())
       />
 
       <main v-if="!coldStartCover" class="dashboard">
-        <!-- 与 Komari 一致：公告位于总览与节点区之前，是首页第一块内容。 -->
-        <section
-          v-if="siteConfigReady && theme.runtime.alertEnabled && (theme.runtime.alertTitle || theme.runtime.alertContent)"
-          class="theme-announcement glass-panel"
-          role="status"
+        <!--
+          与 Komari 一致：公告位于总览与节点区之前，是首页第一块内容。结构对应上游
+          `.alert.px-4` 里的 shadcn Alert：只有正文非空才出现，标题可选、没有默认标题与图标，
+          正文按受限 Markdown 渲染（不执行 HTML）。
+        -->
+        <div
+          v-if="siteConfigReady && theme.runtime.alertEnabled && theme.runtime.alertContent"
+          class="theme-announcement"
         >
-          <span class="theme-announcement__mark" aria-hidden="true">
-            <AppIcon name="lucide:info" :size="16" />
-          </span>
-          <div>
-            <strong class="theme-announcement__title">{{ theme.runtime.alertTitle || '站点公告' }}</strong>
-            <!-- 与 Komari 一致：公告正文按受限 Markdown 渲染（不执行 HTML）。 -->
-            <p v-if="theme.runtime.alertContent">
+          <div data-slot="alert" class="theme-announcement__box" role="alert">
+            <div v-if="theme.runtime.alertTitle" data-slot="alert-title" class="theme-announcement__title">
+              {{ theme.runtime.alertTitle }}
+            </div>
+            <div data-slot="alert-description" class="theme-announcement__description">
               <MarkdownRenderer :content="theme.runtime.alertContent" />
-            </p>
+            </div>
           </div>
-        </section>
+        </div>
 
         <div
           v-if="app.state === 'error'"
