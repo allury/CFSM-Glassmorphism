@@ -324,6 +324,15 @@ describe('详情页 DOM 与分区结构', () => {
     expect(loadChart).toContain('hours: loadChartHours(liveMode.value, historyHours.value)')
   })
 
+  /*
+   * 2026-10-03 线上实测：匿名访客先选「2 天」（CFSM 返回 401），再切到「实时」，负载图仍停在 401 提示，
+   * 实时数据被挡住。上游进入实时会先清空 error；这里历史失败只在历史档位显示。
+   */
+  it('历史档位的请求失败不会挡住「实时」档位', () => {
+    expect(loadChart).toContain(`v-if="!liveMode && historyState === 'error'"`)
+    expect(loadChart).not.toContain(`v-if="historyState === 'error'"`)
+  })
+
   it('CFSM 没有的字段不出现在详情页的可见文案里；厂商只取运营者文本', () => {
     // 只断言渲染出来的标签，避免误伤解释这些缺口的注释文字。
     const labels = [...detailView.matchAll(/label: '([^']+)'/g)].map((match) => match[1])

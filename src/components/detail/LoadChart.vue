@@ -189,7 +189,11 @@ function retry(): void {
     <AppTabs v-model="rangeModel" class="detail-range-tabs" list-label="负载图时间范围" :items="rangeItems" />
 
     <div class="chart-spinner" :class="{ 'is-loading': loading }">
-      <div v-if="historyState === 'error'" class="detail-chart-error" role="alert">
+      <!--
+        历史请求的失败只属于历史档位。与上游一样，切到「实时」时不再显示它（上游进入实时会先清空
+        error）：实时档位画的是推送数据，不能被另一个时段的 401 / 503 挡住。
+      -->
+      <div v-if="!liveMode && historyState === 'error'" class="detail-chart-error" role="alert">
         <strong>{{ errorCopy.title }}</strong>
         <p>{{ errorCopy.body }}</p>
         <small v-if="historyIssue?.status">HTTP {{ historyIssue.status }}</small>
