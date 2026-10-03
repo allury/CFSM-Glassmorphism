@@ -14,7 +14,7 @@ import type { ThemeSettings } from '@/theme/settings'
  *
  * CFSM 公开接口确实不提供的两项（`rpcTransportMode`、`visitorInfoEnabled`）不在这张表里：
  * 设置页不渲染它们，避免出现点了没反应的控件。两项仍留在 `theme/settings.ts` 的 48 项
- * schema 与保存快照中（保存协议要求发送完整对象），正式版待办见 `docs/todo.md` TODO-02。
+ * schema 与保存快照中（保存协议要求发送完整对象）；最终稳定版决定保留，见 `docs/todo.md` TODO-02。
  */
 
 export type ThemeFieldKind = 'select' | 'switch' | 'text' | 'password' | 'number' | 'textarea'
@@ -158,7 +158,8 @@ export const THEME_SETTINGS_FORM: readonly ThemeFieldGroup[] = [
         kind: 'textarea',
         rows: 4,
         wide: true,
-        help: '公告的详细内容，按安全纯文本渲染，不执行 HTML。',
+        help: '公告的详细内容，支持受限 Markdown：粗体、斜体、行内代码、链接、图片与换行；不执行 HTML。',
+        note: '链接只允许 http(s)、mailto、tel 与站内地址，图片只允许 http(s)、data 与站内地址，其它地址不会生成链接或图片。外站图片还要站点的内容安全策略放行才能显示。',
         enabled: (settings) => settings.alertEnabled,
       },
       {

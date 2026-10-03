@@ -82,6 +82,12 @@ describe('首页与详情页的提示模板', () => {
       '../src/views/ServerDetailView.vue',
       '../src/components/detail/LoadChart.vue',
       '../src/components/detail/PingChart.vue',
+      // 顶栏的提示与读屏标签同样面向访客。
+      '../src/components/dashboard/AppHeader.vue',
+      '../src/components/dashboard/DashboardControls.vue',
+      '../src/components/dashboard/ServerCard.vue',
+      '../src/components/dashboard/ServerList.vue',
+      '../src/components/dashboard/OverviewCards.vue',
     ]) {
       const markup = template(path)
       expect(markup).not.toMatch(/REST|WebSocket|\/api\/|快照|模拟数据/)

@@ -58,7 +58,7 @@
 | 17 | 图标体系 | `@iconify/vue` 图标 | 文本 / emoji 占位 | 不一致 | 否 | 第 9.9 轮：以同名 Tabler / IconPark 图标替换全部字符占位；图标路径在构建期内联，运行时不访问图标 CDN（自托管与严格 CSP 环境的必要交付方式差异） | P1 | PASS（交付方式为 NECESSARY-CFSM-DIFFERENCE） |
 | 18 | UI 基元与弹层 | `reka-ui` 基元、`vue-sonner` 提示、Dialog/Drawer/Tooltip 组件族 | 自写弹层与提示 | 部分一致 | 否 | 第 9.95 轮：Tooltip / Tabs / Badge 改用上游同源的 `reka-ui` 基元（Portal、碰撞翻转、roving focus、`data-state` 与 aria 均由基元提供），瞬时提示改用 `vue-sonner`。Dialog / Drawer / Popover / Select / Switch / Slider 在上游仅服务于 CFSM 不具备的功能（汇率换算财务弹窗、Ping 监控弹窗）与已按规范移除的 QuickView，因此本主题没有对应弹层面，不制造空壳组件。v1.1.7 移植财务明细弹窗时接入了 reka Dialog（`AppDialog`） | P1 | PASS（其余弹层无对应面，为 NECESSARY-CFSM-DIFFERENCE） |
 | 19 | 样式体系 | Tailwind 4 + `tw-animate-css` | 4700+ 行手写 CSS | 部分一致 | 否（属实现方式差异） | 第 9.9 轮已按 Komari 尺度校准主要 token：卡片 `rounded-xl`(12px)、列表行与指标盒 `rounded-lg`(8px)、指标网格 16/10px、芯片 11px、行高 64px。余下细粒度差异（逐处 shadow / blur 强度）接受为 P2 | P2 | P2-ACCEPTED |
-| 20 | 公告 | `MarkdownRenderer` 受限 Markdown | 已实现受限 Markdown 渲染 | 一致 | 否 | — | — | PASS |
+| 20 | 公告 | `MarkdownRenderer` 受限 Markdown | 按纯文本渲染（此前误记为已实现，2026-10-03 复核时发现从未实现） | 不一致 | 否 | 移植 `MarkdownRenderer`：解析与地址白名单放在 `domain/announcement-markdown.ts`，组件按记号渲染、不用 `v-html`；上游文字先转义再插值会把 `<`、`&` 显示成实体，这一运行时缺陷不复制 | P1 | PASS |
 | 21 | 分组 / 搜索 / 排序 / Quick Controls | 按真实字段过滤与排序 | 已实现且行为等价 | 一致 | 否 | — | — | PASS |
 | 22 | Ping / Loss 三态 | `number \| null \| false` 三态 | 已在 adapter 边界统一，旧四线路 + Node 1–4 全覆盖 | 一致 | 否 | — | — | PASS |
 | 23 | Footer | Komari 品牌页脚 | `Powered by CF-Server-Monitor vX.Y.Z` + Glassmorphism Theme | 不一致 | **是**（§82 要求指向 CFSM） | 保持 CFSM 页脚 | — | NECESSARY-CFSM-DIFFERENCE |

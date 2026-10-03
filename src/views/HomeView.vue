@@ -6,6 +6,7 @@ import AppHeader from '@/components/dashboard/AppHeader.vue'
 import AdvancedTools from '@/components/dashboard/AdvancedTools.vue'
 import DashboardControls from '@/components/dashboard/DashboardControls.vue'
 import EarthMap from '@/components/dashboard/EarthMap.vue'
+import MarkdownRenderer from '@/components/dashboard/MarkdownRenderer.vue'
 import OverviewCards from '@/components/dashboard/OverviewCards.vue'
 import ServerCard from '@/components/dashboard/ServerCard.vue'
 import ServerList from '@/components/dashboard/ServerList.vue'
@@ -353,9 +354,10 @@ onUnmounted(() => realtime.stop())
             <AppIcon name="lucide:info" :size="16" />
           </span>
           <div>
-            <strong>{{ theme.runtime.alertTitle || '站点公告' }}</strong>
+            <strong class="theme-announcement__title">{{ theme.runtime.alertTitle || '站点公告' }}</strong>
+            <!-- 与 Komari 一致：公告正文按受限 Markdown 渲染（不执行 HTML）。 -->
             <p v-if="theme.runtime.alertContent">
-              {{ theme.runtime.alertContent }}
+              <MarkdownRenderer :content="theme.runtime.alertContent" />
             </p>
           </div>
         </section>

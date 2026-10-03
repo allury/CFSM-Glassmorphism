@@ -4288,7 +4288,7 @@ a {
   font-weight: 850;
 }
 
-.theme-announcement strong {
+.theme-announcement__title {
   display: block;
   margin: 2px 0 4px;
 }
@@ -4298,7 +4298,53 @@ a {
   color: var(--muted);
   font-size: 12px;
   line-height: 1.65;
-  white-space: pre-wrap;
+}
+
+/*
+ * 公告正文的受限 Markdown（Komari `MarkdownRenderer`）。取值都是上游运行时实际生效的值：
+ * 三个颜色逐字取自上游 `:root` / `.dark` 的 --primary、--muted、--foreground（本主题同名变量
+ * 含义不同，因此用带前缀的局部变量），链接样式取公告描述区覆盖后的结果
+ * （始终带下划线、偏移 3px、悬停转 --foreground）。
+ */
+.markdown-content {
+  --markdown-primary: oklch(0.21 0.006 285.885);
+  --markdown-muted: oklch(0.967 0.001 286.375);
+  --markdown-foreground: oklch(0.11 0.01 285.823);
+  line-height: 1.6;
+}
+
+:root[data-theme='dark'] .markdown-content {
+  --markdown-primary: oklch(0.92 0.004 286.32);
+  --markdown-muted: oklch(0.274 0.006 286.033);
+  --markdown-foreground: oklch(0.985 0 0);
+}
+
+.markdown-content__link {
+  color: var(--markdown-primary);
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
+}
+
+.markdown-content__link:hover {
+  color: var(--markdown-foreground);
+}
+
+.markdown-content__code {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  color: var(--markdown-foreground);
+  background-color: var(--markdown-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+}
+
+.markdown-content__image {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  max-height: 200px;
+  border-radius: 0.25rem;
+  vertical-align: middle;
 }
 
 .settings-page {

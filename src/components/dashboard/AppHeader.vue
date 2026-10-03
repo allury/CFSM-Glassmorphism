@@ -119,7 +119,7 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
         </div>
       </div>
 
-      <div v-if="showStatus" class="header-status" aria-label="REST 数据状态">
+      <div v-if="showStatus" class="header-status" aria-label="节点在线状态">
         <span
           class="status-dot"
           :class="loading ? 'status-dot--pending' : 'status-dot--online'"
@@ -140,13 +140,13 @@ onUnmounted(() => window.removeEventListener('scroll', updateScrolled))
             <AppIcon :name="resolvedTheme === 'dark' ? 'tabler:moon' : 'tabler:sun'" :size="18" />
           </button>
         </AppTooltip>
-        <AppTooltip content="刷新 REST 数据">
+        <AppTooltip content="刷新数据">
           <button
             class="icon-button"
             :class="{ 'is-spinning': loading }"
             type="button"
             :disabled="loading"
-            aria-label="刷新 REST 数据"
+            aria-label="刷新数据"
             @click="$emit('refresh')"
           >
             <AppIcon name="tabler:refresh" :size="18" />

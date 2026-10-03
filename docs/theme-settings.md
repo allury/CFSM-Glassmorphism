@@ -64,7 +64,7 @@
 | 5 | `nodeCardSize` | select / `compact` | 保留 mini/compact/comfortable/large | ✅ 一致 |
 | 6 | `alertEnabled` | switch / `false` | 存于 theme_options，控制首页公告 | ✅ 一致 |
 | 7 | `alertTitle` | string / 空 | 存于 theme_options | ✅ 一致 |
-| 8 | `alertContent` | richtext / 空 | 支持受限 Markdown 渲染并做 XSS 清理 | ✅ 一致 |
+| 8 | `alertContent` | richtext / 空 | 受限 Markdown（粗体、斜体、行内代码、链接、图片、换行），移植自上游 `MarkdownRenderer`；不生成 HTML 字符串、不用 `v-html`，链接只放行 http(s) / mailto / tel / 站内地址，图片只放行 http(s) / data / 站内地址 | ✅ 一致 |
 | 9 | `stopEarth` | switch / `false` | 控制 realistic/cobe 动画；tiled 本身不旋转 | ✅ 一致 |
 | 10 | `earthRenderer` | select / `realistic` | 已实现 realistic/cobe/tiled 三种可区分渲染 | ✅ 一致 |
 | 11 | `hideEarth` | switch / `false` | 控制首页 Earth/Map 视觉区 | ✅ 一致 |
