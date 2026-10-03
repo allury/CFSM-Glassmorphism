@@ -6,6 +6,7 @@ import {
   diskChartOption,
   diskIoChartOption,
   gpuChartOption,
+  loadChartHours,
   memoryChartOption,
   metricSeriesChartOption,
   networkChartOption,
@@ -393,5 +394,23 @@ describe('图表提示框统一转义系列名', () => {
     expect(html).toContain('&lt;b&gt;A100&lt;/b&gt;')
     expect(html).not.toContain('<b>A100')
     expect(html).not.toContain('&amp;lt;')
+  })
+})
+
+describe('负载图「实时」档位的时间格式', () => {
+  const tooltipOf = (hours: number) => cpuChartOption({ ...context(), hours }).tooltip
+    .formatter([{ dataIndex: 0, seriesName: 'CPU', value: 10, color: '#000000' }])
+
+  it('实时档位照上游：坐标轴只显示时刻，tooltip 精确到秒', () => {
+    const hours = loadChartHours(true, 168)
+    expect(cpuChartOption({ ...context(), hours }).xAxis.data.some((label) => label.includes('/'))).toBe(false)
+    expect(tooltipOf(hours)).toMatch(/\d{2}:\d{2}:\d{2}/)
+  })
+
+  it('历史档位照旧：1 天及以上带日期', () => {
+    const hours = loadChartHours(false, 168)
+    expect(hours).toBe(168)
+    expect(cpuChartOption({ ...context(), hours }).xAxis.data.every((label) => label.includes('/'))).toBe(true)
+    expect(tooltipOf(hours)).not.toMatch(/\d{2}:\d{2}:\d{2}/)
   })
 })

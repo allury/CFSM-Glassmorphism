@@ -320,6 +320,10 @@ describe('详情页 DOM 与分区结构', () => {
     expect(pingChart).toContain('activeProbeTargets(current, pingHistoryPoints.value)')
   })
 
+  it('「实时」档位的时间格式不沿用上一次选中的历史窗口', () => {
+    expect(loadChart).toContain('hours: loadChartHours(liveMode.value, historyHours.value)')
+  })
+
   it('CFSM 没有的字段不出现在详情页的可见文案里；厂商只取运营者文本', () => {
     // 只断言渲染出来的标签，避免误伤解释这些缺口的注释文字。
     const labels = [...detailView.matchAll(/label: '([^']+)'/g)].map((match) => match[1])

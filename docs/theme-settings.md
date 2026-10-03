@@ -92,7 +92,7 @@
 | 33 | `homeTrafficWarningThreshold` | number / `80` | 只在 traffic_limit 可可靠解析时生效，限制 1–100 | ✅ 一致 |
 | 34 | `homeExpiringDays` | number / `30` | 使用 expire_date，限制 1–3650 | ✅ 一致 |
 | 35 | `diskPredictionEnabled` | switch / `false` | 第 12 轮落地：对详情页已取回的 `disk_used` / `disk_total` 序列做最小二乘回归，显示在负载图磁盘卡副标题；不为预测追加请求，因此需要把时间范围选到 2 天以上（未登录最多 24 小时）。上游另有首页健康面板的磁盘风险榜，那需要逐节点历史，CFSM 不做 | 🟢 等价 |
-| 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测 | ✅ 一致 |
+| 36 | `diskPredictionThresholdDays` | number / `30` | 预计天数小于等于该值时，详情页负载图磁盘卡副标题转预警色；样本不足两天或未增长时不显示预测；限制 1–3650 的整数，越界在设置页提示，不随保存悄悄回退 | ✅ 一致 |
 | 37 | `nodeDetailSectionTabsEnabled` | switch / `false` | 保留连续布局/分区标签页切换；第 12 轮补上设置页开关（此前功能已实现但页面上没有入口） | ✅ 一致 |
 | 38 | `detailMetricCardPreset` | select / `财务` | 预设映射到 CFSM 详情领域模型，保持响应式卡片数量 | 🟢 等价 |
 | 39 | `detailMetricCardKeys` | richtext / nodePrice、monthlyCost、remainingTime、remainingValue、totalTraffic、trafficQuota、uptime、connections | 支持有真实字段的 keys；节点价格与月均支出保留原币，剩余价值按财务显示币种换算（v1.1.7）；系统温度、精确配额等按可用性隐藏 | 🟡 降级 |

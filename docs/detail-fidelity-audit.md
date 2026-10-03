@@ -81,12 +81,13 @@
 | D33 | 375 指标卡实测 80px | 82px | 2px，来自单位行基线对齐的行盒差 | P2 | 接受 | P2-ACCEPTED |
 | D34 | probe 的 `false` / `null` / 数值三态 | 已在 adapter 与详情全链路保持 | — | — | 回归验证：`sparse=1` 时面板隐藏而不是显示 0 | PASS |
 | D35 | History 九档时间范围与 401 / 409 / 503 / 空态 | 已有 | — | — | 回归验证 409 与 503 真实文案，不用 mock 顶替 | PASS |
+| D36 | 负载图「实时」档位没有时段（`selectedHours ?? 4`）：坐标轴 `HH:mm`，tooltip 到秒 | 沿用上一次选中的历史窗口；先选 1 天及以上再切到实时，10 分钟窗口带日期、tooltip 不到秒 | 时间格式随上一档位变化 | P2 | `loadChartHours` 让实时档位固定按 10 分钟窗口（`LIVE_SEED_HOURS`）格式化，历史档位不变 | PASS |
 
 ## 终态
 
 **P0 = 0 ｜ P1 = 0 ｜ FAIL = 0 ｜ P2-ACCEPTED = 2 ｜ KNOWN-BUG = 0**
 
-35 项分布：PASS 27、NECESSARY-CFSM-DIFFERENCE 6、P2-ACCEPTED 2、KNOWN-BUG 0。
+36 项分布：PASS 28、NECESSARY-CFSM-DIFFERENCE 6、P2-ACCEPTED 2、KNOWN-BUG 0。
 
 本轮没有发现需要记录为 KNOWN-BUG 的新问题；`docs/known-bugs.md` 中已有的两条与详情页
 无关（BUG-001 是首页 Ping 窗口来源，BUG-002 是首页丢包面板的三态表达）。

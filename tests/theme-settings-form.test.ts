@@ -4,7 +4,13 @@ import {
   THEME_FORM_FIELDS,
   THEME_SETTINGS_FORM,
 } from '@/domain/theme-settings-form'
-import { cloneThemeSettings, DEFAULT_THEME_SETTINGS, resolveThemeMode, THEME_SETTING_KEYS } from '@/theme/settings'
+import {
+  cloneThemeSettings,
+  DEFAULT_THEME_SETTINGS,
+  resolveThemeMode,
+  THEME_SETTING_KEYS,
+  validateThemeSettingsDraft,
+} from '@/theme/settings'
 
 /*
  * 基线是 Komari Glassmorphism v3.3.7 的 `komari-theme.json`：它的
@@ -159,6 +165,25 @@ describe('设置页字段注册表与上游清单一致', () => {
     const field = THEME_FORM_FIELDS.find((item) => item.key === 'dataUpdateInterval')
     expect(field?.min).toBe(5)
     expect(field?.max).toBe(60)
+  })
+
+  /*
+   * 读取时的规范化会把越界值悄悄换回原值，所以越界必须在草稿校验里拦下并提示；
+   * 否则设置页提示已保存，实际写回的却是旧值。
+   */
+  it('每个数值字段越界都会被草稿校验拦下', () => {
+    for (const field of THEME_FORM_FIELDS.filter((item) => item.kind === 'number')) {
+      if (field.min === undefined || field.max === undefined) throw new Error(`missing range for ${field.key}`)
+      for (const value of [field.max + 1, field.min - 1]) {
+        const draft = cloneThemeSettings(DEFAULT_THEME_SETTINGS)
+        Object.assign(draft, { [field.key]: value })
+        expect(validateThemeSettingsDraft(draft).map((issue) => issue.key), `${field.key} = ${value}`).toContain(field.key)
+      }
+    }
+    const fractional = cloneThemeSettings(DEFAULT_THEME_SETTINGS)
+    fractional.diskPredictionThresholdDays = 7.5
+    expect(validateThemeSettingsDraft(fractional).map((issue) => issue.key)).toContain('diskPredictionThresholdDays')
+    expect(validateThemeSettingsDraft(cloneThemeSettings(DEFAULT_THEME_SETTINGS))).toEqual([])
   })
 })
 

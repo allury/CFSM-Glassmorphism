@@ -17,6 +17,7 @@ import {
   gpuAverage,
   gpuChartOption,
   latestPoint,
+  loadChartHours,
   memoryChartOption,
   networkChartOption,
   probeSeries,
@@ -65,7 +66,7 @@ const accessible = computed(() => theme.runtime.colorVisionMode === '色觉友�
 const rows = computed(() => (liveMode.value ? liveRows.value : buildChartRows(historyPoints.value)))
 const context = computed<LoadChartContext>(() => ({
   rows: rows.value,
-  hours: historyHours.value,
+  hours: loadChartHours(liveMode.value, historyHours.value),
   load: getLoadChartPalette(accessible.value),
   series: getChartSeriesPalette(accessible.value),
   theme: getChartThemeColors(theme.resolvedTheme === 'dark'),

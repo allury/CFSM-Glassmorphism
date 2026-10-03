@@ -1,4 +1,4 @@
-import type { ChartRow } from '@/domain/server-detail'
+import { LIVE_SEED_HOURS, type ChartRow } from '@/domain/server-detail'
 import { countMasked, detectSpikes } from '@/domain/spike-mask'
 import type { ChartFamily } from '@/domain/theme-presentation'
 import type { HistoryHours } from '@/services/cfsm'
@@ -40,6 +40,14 @@ export const HISTORY_RANGE_LABELS: Record<HistoryHours, string> = {
   48: '2 天',
   96: '4 天',
   168: '7 天',
+}
+
+/**
+ * 负载图时间格式所用的时段。上游「实时」档位没有时段（`selectedHours ?? 4`），坐标轴只显示
+ * 时刻、tooltip 精确到秒；这里的实时档位同样不沿用上一次选中的历史窗口。
+ */
+export function loadChartHours(liveMode: boolean, historyHours: number): number {
+  return liveMode ? LIVE_SEED_HOURS : historyHours
 }
 
 export interface LoadChartContext {
