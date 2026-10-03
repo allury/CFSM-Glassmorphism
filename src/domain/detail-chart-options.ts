@@ -180,8 +180,9 @@ function dot(color: string, radius = '50%'): string {
   return `<span style="display:inline-block;width:8px;height:8px;border-radius:${radius};background:${color};margin-right:8px;flex-shrink:0"></span>`
 }
 
+/** 标签在这里统一转义：系列名可能来自运营者填写的文本（探测目标、GPU 型号），调用方不必各自处理。 */
 function tooltipLine(color: string, label: string, value: string, radius?: string): string {
-  return `<div style="display:flex;align-items:center">${dot(color, radius)}<span>${label}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${value}</span></div>`
+  return `<div style="display:flex;align-items:center">${dot(color, radius)}<span>${escapeHtml(label)}</span><span style="margin-left:auto;font-weight:600;margin-left:16px">${value}</span></div>`
 }
 
 function tooltipFrame(theme: ChartThemeColors, time: string, body: string): string {
@@ -595,7 +596,7 @@ export function gpuChartOption(context: LoadChartContext) {
     tooltip: {
       ...baseTooltip(theme),
       formatter: axisTooltip(context, (items, point) => {
-        const lines = items.map((item) => tooltipLine(item.color, escapeHtml(item.seriesName), fixed(item.value, 1, '%'))).join('')
+        const lines = items.map((item) => tooltipLine(item.color, item.seriesName, fixed(item.value, 1, '%'))).join('')
         if (point.gpus.length === 0) return lines
         const details = point.gpus.map((gpu) => (
           `<div style="display:flex;align-items:center;gap:8px;color:${theme.textSecondary}"><span>${escapeHtml(gpu.name.trim() || `GPU ${gpu.id}`)}</span><span style="margin-left:auto">${fixed(gpu.utilization, 1, '%')}</span></div>`

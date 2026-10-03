@@ -1,3 +1,4 @@
+import { monthlyCost, resolveSourceCurrency } from '@/domain/finance'
 import { cloneHistorySummary, numericWindowSamples } from '@/domain/probe-window'
 import { daysUntilExpiry, parseTrafficLimitBytes, trafficUsage } from '@/domain/theme-presentation'
 import type { ThemeSettings } from '@/theme/settings'
@@ -124,18 +125,25 @@ export function evaluateServerHealth(server: GlassServer, settings: Pick<ThemeSe
   let evaluatedSignals = 1
   if (!server.online) issues.push({ metric: '在线状态', message: '节点离线', tone: 'critical' })
 
-  evaluatedSignals += addThresholdIssue(issues, 'CPU', server.cpu, settings.homeHighLoadThreshold, 95)
-  evaluatedSignals += addThresholdIssue(issues, 'RAM', server.memory.percentage, settings.homeHighLoadThreshold, 95)
-  evaluatedSignals += addThresholdIssue(issues, 'Swap', server.swap.percentage, 80, 95)
-  evaluatedSignals += addThresholdIssue(issues, 'Disk', server.disk.percentage, settings.homeHighLoadThreshold, 95)
+  /*
+   * 离线节点的最后一次上报不代表当前状态（与首页高负载判定同一口径）：只报离线，
+   * 不再拿旧的 CPU / 内存 / 交换 / 硬盘 / 负载 / GPU / 实时探测评级。
+   * 流量配额、到期与历史平均不是瞬时值，离线时照常评估。
+   */
+  if (server.online) {
+    evaluatedSignals += addThresholdIssue(issues, 'CPU', server.cpu, settings.homeHighLoadThreshold, 95)
+    evaluatedSignals += addThresholdIssue(issues, 'RAM', server.memory.percentage, settings.homeHighLoadThreshold, 95)
+    evaluatedSignals += addThresholdIssue(issues, 'Swap', server.swap.percentage, 80, 95)
+    evaluatedSignals += addThresholdIssue(issues, 'Disk', server.disk.percentage, settings.homeHighLoadThreshold, 95)
 
-  const loadRatio = server.load.one !== null && server.cpuCores !== null && server.cpuCores > 0
-    ? server.load.one / server.cpuCores
-    : null
-  evaluatedSignals += addThresholdIssue(issues, 'Load/Core', loadRatio, 1, 2, '×')
+    const loadRatio = server.load.one !== null && server.cpuCores !== null && server.cpuCores > 0
+      ? server.load.one / server.cpuCores
+      : null
+    evaluatedSignals += addThresholdIssue(issues, 'Load/Core', loadRatio, 1, 2, '×')
 
-  const gpuValues = server.gpus.flatMap((gpu) => gpu.utilization === null ? [] : [gpu.utilization])
-  evaluatedSignals += addThresholdIssue(issues, 'GPU', gpuValues.length ? Math.max(...gpuValues) : null, settings.homeHighLoadThreshold, 95)
+    const gpuValues = server.gpus.flatMap((gpu) => gpu.utilization === null ? [] : [gpu.utilization])
+    evaluatedSignals += addThresholdIssue(issues, 'GPU', gpuValues.length ? Math.max(...gpuValues) : null, settings.homeHighLoadThreshold, 95)
+  }
 
   const usage = trafficUsage(server)
   evaluatedSignals += addThresholdIssue(issues, '流量配额', usage?.percent ?? null, settings.homeTrafficWarningThreshold, 100)
@@ -149,7 +157,7 @@ export function evaluateServerHealth(server: GlassServer, settings: Pick<ThemeSe
 
   const probeLatency = server.latency.flatMap((probe) => typeof probe.latency === 'number' ? [probe.latency] : [])
   const timedOut = server.latency.filter((probe) => probe.latency === null || probe.packetLoss === null).length
-  if (server.latency.length > 0) {
+  if (server.online && server.latency.length > 0) {
     evaluatedSignals += 1
     if (timedOut > 0) issues.push({ metric: '探测', message: `${timedOut} 个 Ping/Loss 目标超时`, tone: 'critical' })
     const peakLatency = probeLatency.length ? Math.max(...probeLatency) : null
@@ -173,13 +181,16 @@ export function evaluateServerHealth(server: GlassServer, settings: Pick<ThemeSe
   const criticalCount = issues.filter((issue) => issue.tone === 'critical').length
   const warningCount = issues.length - criticalCount
   const score = Math.max(0, 100 - criticalCount * 25 - warningCount * 10)
-  const tone: HealthTone = evaluatedSignals < 2
-    ? 'unknown'
-    : criticalCount > 0 || score < 50
-      ? 'critical'
-      : warningCount > 0 || score < 80
-        ? 'warning'
-        : 'healthy'
+  // 有严重问题（例如离线）就是明确结论，不因其余信号不足而判为「数据不足」。
+  const tone: HealthTone = criticalCount > 0
+    ? 'critical'
+    : evaluatedSignals < 2
+      ? 'unknown'
+      : score < 50
+        ? 'critical'
+        : warningCount > 0 || score < 80
+          ? 'warning'
+          : 'healthy'
   return { server, tone, score: tone === 'unknown' ? null : score, evaluatedSignals, historySamples, issues }
 }
 
@@ -188,12 +199,6 @@ export function buildHealthSummary(servers: readonly GlassServer[], settings: Pi
     const rank: Record<HealthTone, number> = { critical: 0, warning: 1, unknown: 2, healthy: 3 }
     return rank[left.tone] - rank[right.tone] || (left.score ?? -1) - (right.score ?? -1) || left.server.name.localeCompare(right.server.name)
   })
-}
-
-const BILLING_MONTHS: Readonly<Record<string, number>> = {
-  month: 1, monthly: 1, quarter: 3, quarterly: 3, half_year: 6, halfyear: 6,
-  year: 12, yearly: 12, annual: 12, two_years: 24, three_years: 36,
-  four_years: 48, five_years: 60,
 }
 
 export interface ValueRow {
@@ -210,11 +215,10 @@ export interface ValueGroup {
   rows: ValueRow[]
 }
 
+/** 与详情页「月均支出」、CFSM 同一口径（价格 ÷ 周期天数 × 30）；免费、未设置价格或未知周期不参与。 */
 export function monthlyPrice(server: GlassServer): number | null {
-  const price = Number(server.price)
-  const months = BILLING_MONTHS[server.billingCycle?.trim().toLowerCase() ?? '']
-  if (!Number.isFinite(price) || price <= 0 || !months) return null
-  return price / months
+  const result = monthlyCost(server)
+  return result.status === 'ok' && result.amount > 0 ? result.amount : null
 }
 
 export function buildValueGroups(servers: readonly GlassServer[]): ValueGroup[] {
@@ -231,7 +235,9 @@ export function buildValueGroups(servers: readonly GlassServer[]): ValueGroup[] 
     const coverage = values.filter((value) => value !== null).length
     if (coverage === 0) continue
     const resourcePoints = (cpuCores ?? 0) * 4 + (memoryGiB ?? 0) * 2 + (diskGiB ?? 0) / 25 + (trafficTiB ?? 0) * 8
-    const currency = server.currency?.trim() || '未标明币种'
+    // 按规范化后的币种分组：`$`、`US$` 与 `USD` 是同一种钱，排在同一张表里比较。
+    const source = resolveSourceCurrency(server.currency)
+    const currency = source.status === 'known' ? source.code : server.currency?.trim() || '未标明币种'
     const row: ValueRow = { server, currency, monthlyCost: cost, score: resourcePoints / cost, coverage, resources: { cpuCores, memoryGiB, diskGiB, trafficTiB } }
     groups.set(currency, [...(groups.get(currency) ?? []), row])
   }

@@ -9,6 +9,7 @@ import {
   buildValueGroups,
   type HealthTone,
 } from '@/domain/advanced-tools'
+import { parseBillingPrice } from '@/domain/finance'
 import type { ThemeSettings } from '@/theme/settings'
 import type { GlassServer } from '@/types/glassmorphism'
 import { MISSING_TEXT } from '@/utils/format'
@@ -36,10 +37,10 @@ const healthCounts = computed(() => health.value.reduce<Record<HealthTone, numbe
   return counts
 }, { healthy: 0, warning: 0, critical: 0, unknown: 0 }))
 const historyNodeCount = computed(() => health.value.filter((item) => item.historySamples > 0).length)
-const freeNodeCount = computed(() => props.servers.filter((server) => {
-  const price = Number(server.price)
-  return price === 0 || price === -1
-}).length)
+// 只有 CFSM 的免费值（0 / -1）才算免费；未填写价格（`Number('')` 也是 0）不算。
+const freeNodeCount = computed(() => props.servers.filter((server) => (
+  parseBillingPrice(server.price).status === 'free'
+)).length)
 
 const tools: ReadonlyArray<{ key: ToolKey, label: string, hint: string }> = [
   { key: 'health', label: '健康摘要', hint: '真实指标规则' },

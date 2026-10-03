@@ -384,3 +384,14 @@ describe('数据语义：不补点、不插值、不写 0', () => {
     expect(html).not.toContain('<img')
   })
 })
+
+describe('图表提示框统一转义系列名', () => {
+  it('GPU 型号里的 HTML 只转义一次', () => {
+    const gpuPoints = points.map((item) => ({ ...item, gpus: [{ id: '0', name: '<b>A100</b>', utilization: 40 }] }))
+    const option = gpuChartOption(context(false, false, gpuPoints))
+    const html = option.tooltip.formatter([{ dataIndex: 0, seriesName: '<b>A100</b>', value: 40, color: '#000000' }])
+    expect(html).toContain('&lt;b&gt;A100&lt;/b&gt;')
+    expect(html).not.toContain('<b>A100')
+    expect(html).not.toContain('&amp;lt;')
+  })
+})

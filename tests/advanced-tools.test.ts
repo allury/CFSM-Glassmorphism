@@ -73,13 +73,26 @@ describe('health summary', () => {
       latency: [], history: { latencySeries: {}, packetLossSeries: {} }, cpuCores: null,
     })
     expect(evaluateServerHealth(sparse, DEFAULT_THEME_SETTINGS).tone).toBe('unknown')
+    // 离线本身就是严重问题，不因其余信号缺失而降为「数据不足」。
+    expect(evaluateServerHealth({ ...sparse, online: false }, DEFAULT_THEME_SETTINGS).tone).toBe('critical')
     expect(buildHealthSummary([server(), sparse], DEFAULT_THEME_SETTINGS)).toHaveLength(2)
+  })
+
+  it('grades an offline node only as offline, not by its last realtime report', () => {
+    const offline = server({
+      online: false, cpu: 97, memory: { used: 9, total: 10, percentage: 90 },
+      latency: [{ target: 'ct', label: '电信', latency: null, packetLoss: null }],
+    })
+    const health = evaluateServerHealth(offline, DEFAULT_THEME_SETTINGS, Date.UTC(2026, 9, 2))
+    expect(health.tone).toBe('critical')
+    expect(health.issues.map((issue) => issue.metric)).toEqual(['在线状态'])
   })
 })
 
 describe('value comparison', () => {
   it('normalizes known billing periods and never combines currencies', () => {
-    expect(monthlyPrice(server())).toBe(10)
+    // 与详情页「月均支出」、CFSM 同一口径：价格 ÷ 周期天数 × 30（年付按 365 天）。
+    expect(monthlyPrice(server())).toBeCloseTo(120 / 365 * 30)
     expect(monthlyPrice(server({ price: '0' }))).toBeNull()
     expect(monthlyPrice(server({ price: '-1' }))).toBeNull()
     expect(monthlyPrice(server({ billingCycle: 'mystery' }))).toBeNull()
@@ -91,6 +104,13 @@ describe('value comparison', () => {
     ])
     expect(groups.map((group) => group.currency)).toEqual(['CNY', 'USD'])
     expect(groups.every((group) => group.rows.length === 1)).toBe(true)
+
+    // `$` 与 `USD` 是同一种币，排在同一张表里比较。
+    const merged = buildValueGroups([
+      server({ key: 'a', id: 'a', currency: '$', price: '10', billingCycle: 'month' }),
+      server({ key: 'b', id: 'b', currency: 'USD', price: '12', billingCycle: 'month' }),
+    ])
+    expect(merged.map((group) => [group.currency, group.rows.length])).toEqual([['USD', 2]])
   })
 })
 

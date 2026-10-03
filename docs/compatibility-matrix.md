@@ -25,7 +25,7 @@
 
 第 8 轮在既有 normalized model 与主题 store 上启用 realistic、cobe、tiled 三种 Earth/Map 视觉。定位只接受可可靠归一化的 `region` 国家/地区代码或名称，并聚合到国家/地区中心；无法定位的节点会明确计数并排除，不用节点名、标签、IP、ASN、城市或外部 Geo 服务猜测位置。
 
-登录态首页高级工具只复用已经加载的真实 CFSM 快照：健康摘要综合在线状态、CPU、RAM、Swap、Disk、Load/Core、GPU、流量配额、到期、当前 Ping/Loss 及 `/api/servers` 真实 Ping/Loss 窗口；性价比按可识别账期折算月价、免费/未知价格不参与排行、币种绝不混算；快照导出保留 probe 的 `unconfigured / timeout / number` 三态；拓扑明确是 region → group → server/tags 的分类视图而非网络链路。Audit Log 因没有公开主题 API 而隐藏。
+登录态首页高级工具只复用已经加载的真实 CFSM 快照：健康摘要综合在线状态、CPU、RAM、Swap、Disk、Load/Core、GPU、流量配额、到期、当前 Ping/Loss 及 `/api/servers` 真实 Ping/Loss 窗口，离线节点只报离线，不拿最后一次上报的实时指标与探测评级；性价比按可识别账期折算月价（与详情页月均支出同口径：价格 ÷ 周期天数 × 30）、免费/未知价格不参与排行、币种绝不混算（`$` 与 `USD` 这类同一币种的写法归为一组）；快照导出保留 probe 的 `unconfigured / timeout / number` 三态；拓扑明确是 region → group → server/tags 的分类视图而非网络链路。Audit Log 因没有公开主题 API 而隐藏。
 
 ## 第 9 轮实现进度
 
