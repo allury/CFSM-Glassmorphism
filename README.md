@@ -112,6 +112,7 @@ ASN 可写成 `AS3258`、`asn AS3258` 或 `asn-3258`；组织名前缀与名称�
 ## 兼容性
 
 - 已在 CF-Server-Monitor Worker `2.8.5 Stable` 与 `2.8.5 Beta5` 上实测；更早版本未验证。
+- 浏览器需要 Chrome / Edge 111、Safari 16.2、Firefox 121 或更新版本（主题使用 `oklch()`、`color-mix()` 与 `:has()` 等 CSS 特性），更早的浏览器可能出现配色或排版异常。
 - 仅使用 CFSM 公开的第三方主题接口：`/api/config`、`/api/servers`、`/api/server`、`/api/history/all`、`/api/ws`，以及保存主题配置的 `POST /api/theme_options`。
 - 管理入口链接到 CFSM 自带的 `/admin#admin`，主题本身不实现管理后台。
 - 国旗与操作系统图标取自 CFSM 默认皮肤（`/flags/`、`/os-icons/`），不打包进主题。
