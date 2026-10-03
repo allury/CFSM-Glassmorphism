@@ -14,7 +14,7 @@
 
 <img src="docs/screenshots/home-dark.webp" alt="首页 · 深色" width="100%">
 
-**节点详情 · 信息卡与历史图表**
+**节点详情 · 概览、信息卡与历史图表**
 
 <img src="docs/screenshots/detail.webp" alt="节点详情" width="100%">
 
@@ -75,18 +75,6 @@ https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.17
 也可以从 [Releases](https://github.com/allury/CFSM-Glassmorphism/releases/latest) 下载 `CFSM-Glassmorphism-v1.1.17.zip` 手动安装：压缩包根目录只有 `index.html` 与 `assets/`，解压后按 CFSM 的主题安装流程放置即可。
 
 如需回退到上一个版本，把自定义主题 URL 换成 `https://github.com/allury/CFSM-Glassmorphism/tree/theme-v1.1.14` 再应用；切换到不同的标签地址会使用不同的缓存键。
-
-### main 临时预览（非稳定版）
-
-希望提前体验已通过完整质量门的 `main` 最新源码，请使用**本次预览交付的完整 40 位提交 SHA** 作为主题地址中的引用：
-
-```text
-https://github.com/allury/CFSM-Glassmorphism/tree/<本次 preview-main 的完整 40 位提交 SHA>
-```
-
-可用 `git ls-remote https://github.com/allury/CFSM-Glassmorphism.git refs/heads/preview-main` 查询最新完整 SHA；交付记录也会直接给出可安装地址。`main` 保留源码，不能作为主题安装地址；`preview-main` 仅包含已通过 Actions 质量门的 `index.html` 与 `assets/`，提交说明标注来源源码 SHA。此分支每次以一个新的无父提交替换，只保留最新一次预览；它不创建版本标签或 Release，也不推进稳定版 `theme-dist`。
-
-**不要用 `preview-main` 分支名安装**：分支前移后，CFSM 对页面和资源的约 1 小时缓存可能产生新旧文件混用与空白；重新应用不会清缓存。固定完整 SHA 可避免分支前移导致的混用，但该地址本身约缓存 1 天。新预览发布后，旧 SHA 不再属于任何分支，GitHub 不保证它能继续访问；预览仅适合临时验证，请及时换成新 SHA 地址或上方的稳定版标签地址。
 
 ### 二、调整主题设置
 
